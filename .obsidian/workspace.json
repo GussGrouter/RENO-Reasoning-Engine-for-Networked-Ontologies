@@ -1,0 +1,230 @@
+{
+  "main": {
+    "id": "4920ad46129fe251",
+    "type": "split",
+    "children": [
+      {
+        "id": "930a56796e5d04a8",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "c9992b578a372238",
+            "type": "leaf",
+            "state": {
+              "type": "pdf",
+              "state": {
+                "file": "raw/code/pdf/a-philosophy-of-software-design.pdf"
+              },
+              "icon": "lucide-file-text",
+              "title": "a-philosophy-of-software-design"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "27931335561cddfe",
+    "type": "split",
+    "children": [
+      {
+        "id": "1428ec5333e1544e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "f222205bac49fceb",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "072a6ee2a2bdae38",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "dfa10a98b8d62227",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "8da75416e5ab1729",
+    "type": "split",
+    "children": [
+      {
+        "id": "649bef4cd6ce2d7e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "ecf5f714082e930d",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": false
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "428a5669bc7b89cc",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "44af9c65e87dfbff",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "17cefe2741b49e5f",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "7e44f9fe3951bc7d",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          },
+          {
+            "id": "6f4b23c1a61af445",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "c9992b578a372238",
+  "lastOpenFiles": [
+    "wiki/code/concept/centralized-monitoring-architecture.md",
+    "processed/code/systems-performance-observability-monitoring-4-2-4.md",
+    "raw/code/pdf/a-philosophy-of-software-design.pdf",
+    "raw/Youtube/5 viable app ideas Nate B Johnsson.md",
+    "processed/code/systems-performance-sar-monitoring-collection-4-4-2.md",
+    "raw/Youtube",
+    "wiki/Untitled",
+    "wiki/code/source/systems-performance-network-ch10-tuning-configuration-jumbo-lacp-firewall-dscp-10-8-3.md",
+    "processed/code/systems-performance-network-ch10-tuning-configuration-jumbo-lacp-firewall-dscp-10-8-3-chunk-000001.md",
+    "processed/code/systems-performance-network-ch10-tuning-configuration-jumbo-lacp-firewall-dscp-10-8-3.md",
+    "wiki/code/source/systems-performance-network-ch10-tuning-msg-zerocopy-send-flag-10-8-2b.md",
+    "processed/code/systems-performance-network-ch10-tuning-msg-zerocopy-send-flag-10-8-2b-chunk-000001.md",
+    "processed/code/systems-performance-network-ch10-tuning-msg-zerocopy-send-flag-10-8-2b.md",
+    "wiki/code/source/systems-performance-network-ch10-tuning-socket-options-table-10-8-10-8-2a.md",
+    "processed/code/systems-performance-network-ch10-tuning-socket-options-table-10-8-10-8-2a-chunk-000001.md",
+    "processed/code/systems-performance-network-ch10-tuning-socket-options-table-10-8-10-8-2a.md",
+    "processed/code/systems-performance-ch10-scout-p520-640.rebuilt.txt",
+    "processed/code/systems-performance-ch10-scout-p520-580.full.txt",
+    "wiki/code/source/systems-performance-network-ch10-tuning-bql-cgroups-qdisc-tuned-10-8-1d.md",
+    "processed/code/systems-performance-network-ch10-tuning-bql-cgroups-qdisc-tuned-10-8-1d-chunk-000001.md",
+    "processed/code/systems-performance-network-ch10-tuning-bql-cgroups-qdisc-tuned-10-8-1d.md",
+    "processed/code/sedfAeBI4",
+    "processed/code/sedweRxSu",
+    "processed/code/sedcQ7ZpQ",
+    "wiki/code/source/systems-performance-network-ch10-tuning-congestion-tcp-options-ecn-10-8-1c.md",
+    "processed/code/systems-performance-network-ch10-tuning-congestion-tcp-options-ecn-10-8-1c-chunk-000001.md",
+    "processed/code/systems-performance-network-ch10-tuning-congestion-tcp-options-ecn-10-8-1c.md",
+    "wiki/code/source/systems-performance-network-ch10-tuning-buffers-backlogs-device-10-8-1b.md",
+    "processed/code/systems-performance-network-ch10-tuning-buffers-backlogs-device-10-8-1b-chunk-000001.md",
+    "processed/code/systems-performance-network-ch10-tuning-buffers-backlogs-device-10-8-1b.md",
+    "wiki/code/source/systems-performance-network-ch10-tuning-sysctl-system-wide-discovery-example-10-8-1a.md",
+    "processed/code/systems-performance-network-ch10-tuning-sysctl-system-wide-discovery-example-10-8-1a-chunk-000001.md",
+    "processed/code/systems-performance-network-ch10-tuning-sysctl-system-wide-discovery-example-10-8-1a.md",
+    "wiki/code/source/systems-performance-network-ch10-tuning-intro-characterize-first-10-8.md",
+    "processed/code/systems-performance-ch8-scout-p398-460.txt",
+    "processed/code/systems-performance-ch8-scout-p478-520.txt"
+  ]
+}

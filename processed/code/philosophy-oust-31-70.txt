@@ -1,0 +1,1312 @@
+    Figure 3.1 raises an important question: where is the crossover point between
+the strategic and tactical curves? In other words, how long does it take before the
+strategic approach has paid for itself? Unfortunately I am not aware of any data
+on this topic, and it would be difficult to perform the kind of controlled
+experiment needed to answer the question in a convincing fashion. My personal
+opinion is that the time to payback is somewhere in the range of 6–18 months.
+This has a lot to do with developers’ memory: by the time a piece of code is a
+few months old, developers have forgotten most of what was in their minds when
+they wrote it, so development will slow down significantly if the code is
+complex. These additional costs quickly compensate for any initial gains from
+strategic programming. Again, this is just my opinion, and I don’t have any data
+to back it up.
+
+
+3.4 Startups and investment
+In some environments there are strong forces working against the strategic
+approach. For example, early-stage startups feel tremendous pressure to get their
+early releases out quickly. In these companies, it might seem that even a 10–20%
+investment isn’t affordable. As a result, many startups take a tactical approach,
+spending little effort on design and even less on cleanup when problems pop up.
+They rationalize this with the thought that, if they are successful, they’ll have
+enough money to hire extra engineers to clean things up.
+    If you are in a company leaning in this direction, you should realize that once
+a code base turns to spaghetti, it is nearly impossible to fix. You will probably
+pay high development costs for the life of the product. Furthermore, the payoff
+for good (or bad) design comes pretty quickly, so there’s a good chance that the
+tactical approach won’t even speed up your first product release.
+    Another thing to consider is that one of the most important factors for
+success of a company is the quality of its engineers. The best way to lower
+development costs is to hire great engineers: they don’t cost much more than
+mediocre engineers but have tremendously higher productivity. However, the best
+engineers care deeply about good design. If your code base is a wreck, word will
+get out, and this will make it harder for you to recruit. As a result, you are likely
+to end up with mediocre engineers. This will increase your future costs and
+probably cause the system structure to degrade even more.
+    Facebook is an example of a startup that encouraged tactical programming.
+For many years the company’s motto was “Move fast and break things.” New
+engineers fresh out of college were encouraged to dive immediately into the
+company’s code base; it was normal for engineers to push commits into
+production in their first week on the job. On the positive side, Facebook
+developed a reputation as a company that empowered its employees. Engineers
+had tremendous latitude, and there were few rules and restrictions to get in their
+way.
+    Facebook has been spectacularly successful as a company, but its code base
+suffered because of the company’s tactical approach; much of the code was
+unstable and hard to understand, with few comments or tests, and painful to work
+with. Over time the company realized that its culture was unsustainable.
+Eventually, Facebook changed its motto to “Move fast with solid infrastructure”
+to encourage its engineers to invest more in good design. It remains to be seen
+whether Facebook can successfully clean up the problems that accumulated over
+years of tactical programming.
+    In fairness to Facebook, I should point out that Facebook’s code probably
+isn’t much worse than average among startups. Tactical programming is
+commonplace among startups; Facebook just happens to be a particularly visible
+example.
+    Fortunately, it is also possible to succeed in Silicon Valley with a strategic
+approach. Google and VMware grew up around the same time as Facebook, but
+both of these companies embraced a more strategic approach. Both companies
+placed a heavy emphasis on high quality code and good design, and both
+companies built sophisticated products that solved complex problems with
+reliable software systems. The companies’ strong technical cultures became well
+known in Silicon Valley. Few other companies could compete with them for
+hiring the top technical talent.
+    These examples show that a company can succeed with either approach.
+However, it’s a lot more fun to work in a company that cares about software
+design and has a clean code base.
+
+
+3.5 Conclusion
+Good design doesn’t come for free. It has to be something you invest in
+continually, so that small problems don’t accumulate into big ones. Fortunately,
+good design eventually pays for itself, and sooner than you might think.
+    It’s crucial to be consistent in applying the strategic approach and to think of
+investment as something to do today, not tomorrow. When you get in a crunch it
+will be tempting to put off cleanups until after the crunch is over. However, this
+is a slippery slope; after the current crunch there will almost certainly be another
+one, and another after that. Once you start delaying design improvements, it’s
+easy for the delays to become permanent and for your culture to slip into the
+tactical approach. The longer you wait to address design problems, the bigger
+they become; the solutions become more intimidating, which makes it easy to
+put them off even more. The most effective approach is one where every
+engineer makes continuous small investments in good design.
+Chapter 4
+Modules Should Be Deep
+
+One of the most important techniques for managing software complexity is to
+design systems so that developers only need to face a small fraction of the overall
+complexity at any given time. This approach is called modular design, and this
+chapter presents its basic principles.
+
+
+4.1 Modular design
+In modular design, a software system is decomposed into a collection of modules
+that are relatively independent. Modules can take many forms, such as classes,
+subsystems, or services. In an ideal world, each module would be completely
+independent of the others: a developer could work in any of the modules without
+knowing anything about any of the other modules. In this world, the complexity
+of a system would be the complexity of its worst module.
+     Unfortunately, this ideal is not achievable. Modules must work together by
+calling each others’s functions or methods. As a result, modules must know
+something about each other. There will be dependencies between the modules: if
+one module changes, other modules may need to change to match. For example,
+the arguments for a method create a dependency between the method and any
+code that invokes the method. If the required arguments change, all invocations
+of the method must be modified to conform to the new signature. Dependencies
+can take many other forms, and they can be quite subtle; as one example, a
+method may not function correctly unless some other method has been invoked
+first. The goal of modular design is to minimize the dependencies between
+modules.
+     In order to identify and manage dependencies, we think of each module in
+two parts: an interface and an implementation. The interface consists of
+everything that a developer working in a different module must know in order to
+use the given module. Typically, the interface describes what the module does
+but not how it does it. The implementation consists of the code that carries out
+the promises made by the interface. A developer working in a particular module
+must understand the interface and implementation of that module, plus the
+interfaces of any other modules invoked by the given module. A developer
+should not need to understand the implementations of modules other than the
+one he or she is working in.
+    Consider a module that implements balanced trees. The module probably
+contains sophisticated code for ensuring that the tree remains balanced. However,
+this complexity is not visible to users of the module. Users see a relatively simple
+interface for invoking operations to insert, remove, and fetch nodes in the tree. To
+invoke an insert operation, the caller need only provide the key and value for the
+new node; the mechanisms for traversing the tree and splitting nodes are not
+visible in the interface.
+    For the purposes of this book, a module is any unit of code that has an
+interface and an implementation. Each class in an object-oriented programming
+language is a module. Methods within a class, or functions in a language that
+isn’t object-oriented, can also be thought of as modules: each of these has an
+interface and an implementation, and modular design techniques can be applied
+to them. Higher-level subsystems and services are also modules; their interfaces
+may take different forms, such as kernel calls or HTTP requests. Much of the
+discussion about modular design in this book focuses on designing classes, but
+the techniques and concepts apply to other kinds of modules as well.
+    The best modules are those whose interfaces are much simpler than their
+implementations. Such modules have two advantages. First, a simple interface
+minimizes the complexity that a module imposes on the rest of the system.
+Second, if a module is modified in a way that does not change its interface, then
+no other module will be affected by the modification. If a module’s interface is
+much simpler than its implementation, there will be many aspects of the module
+that can be changed without affecting other modules.
+
+
+4.2 What’s in an interface?
+The interface to a module contains two kinds of information: formal and
+informal. The formal parts of an interface are specified explicitly in the code, and
+some of these can be checked for correctness by the programming language. For
+example, the formal interface for a method is its signature, which includes the
+names and types of its parameters, the type of its return value, and information
+about exceptions thrown by the method. Most programming languages ensure
+that each invocation of a method provides the right number and types of
+arguments to match its signature. The formal interface for a class consists of the
+signatures for all of its public methods, plus the names and types of any public
+variables.
+    Each interface also includes informal elements. These are not specified in a
+way that can be understood or enforced by the programming language. The
+informal parts of an interface include its high-level behavior, such as the fact that
+a function deletes the file named by one of its arguments. If there are constraints
+on the usage of a class (perhaps one method must be called before another), these
+are also part of the class’s interface. In general, if a developer needs to know a
+particular piece of information in order to use a module, then that information is
+part of the module’s interface. The informal aspects of an interface can only be
+described using comments, and the programming language cannot ensure that
+the description is complete or accurate1. For most interfaces the informal aspects
+are larger and more complex than the formal aspects.
+    One of the benefits of a clearly specified interface is that it indicates exactly
+what developers need to know in order to use the associated module. This helps
+to eliminate the “unknown unknowns” problem described in Section 2.2.
+
+
+4.3 Abstractions
+The term abstraction is closely related to the idea of modular design. An
+abstraction is a simplified view of an entity, which omits unimportant
+details. Abstractions are useful because they make it easier for us to think about
+and manipulate complex things.
+    In modular programming, each module provides an abstraction in the form of
+its interface. The interface presents a simplified view of the module’s
+functionality; the details of the implementation are unimportant from the
+standpoint of the module’s abstraction, so they are omitted from the interface.
+    In the definition of abstraction, the word “unimportant” is crucial. The more
+unimportant details that are omitted from an abstraction, the better. However, a
+detail can only be omitted from an abstraction if it really is unimportant. An
+abstraction can go wrong in two ways. First, it can include details that are not
+really important; when this happens, it makes the abstraction more complicated
+than necessary, which increases the cognitive load on developers using the
+abstraction. The second error is when an abstraction omits details that really are
+important. This results in obscurity: developers looking only at the abstraction
+will not have all the information they need to use the abstraction correctly. An
+abstraction that omits important details is a false abstraction: it might appear
+simple, but in reality it isn’t. The key to designing abstractions is to understand
+what is important, and to look for designs that minimize the amount of
+information that is important.
+    As an example, consider a file system. The abstraction provided by a file
+system omits many details, such as the mechanism for choosing which blocks on
+a storage device to use for the data in a given file. These details are unimportant
+to users of the file system (as long as the system provides adequate performance).
+However, some of the details of a file system’s implementation are important to
+users. Most file systems cache data in main memory, and they may delay writing
+new data to the storage device in order to improve performance. Some
+applications, such as databases, need to know exactly when data is written
+through to storage, so they can ensure that data will be preserved after system
+crashes. Thus, the rules for flushing data to secondary storage must be visible in
+the file system’s interface.
+    We depend on abstractions to manage complexity not just in programming,
+but pervasively in our everyday lives. A microwave oven contains complex
+electronics to convert alternating current into microwave radiation and distribute
+that radiation throughout the cooking cavity. Fortunately, users see a much
+simpler abstraction, consisting of a few buttons to control the timing and
+intensity of the microwaves. Cars provide a simple abstraction that allows us to
+drive them without understanding the mechanisms for electrical motors, battery
+power management, anti-lock brakes, cruise control, and so on.
+Figure 4.1: Deep and shallow modules. The best modules are deep: they allow a lot of functionality to be
+accessed through a simple interface. A shallow module is one with a relatively complex interface, but not
+much functionality: it doesn’t hide much complexity.
+
+
+
+4.4 Deep modules
+The best modules are those that provide powerful functionality yet have simple
+interfaces. I use the term deep to describe such modules. To visualize the notion
+of depth, imagine that each module is represented by a rectangle, as shown in
+Figure 4.1. The area of each rectangle is proportional to the functionality
+implemented by the module. The top edge of a rectangle represents the module’s
+interface; the length of that edge indicates the complexity of the interface. The
+best modules are deep: they have a lot of functionality hidden behind a simple
+interface. A deep module is a good abstraction because only a small fraction of
+its internal complexity is visible to its users.
+     Module depth is a way of thinking about cost versus benefit. The benefit
+provided by a module is its functionality. The cost of a module (in terms of
+system complexity) is its interface. A module’s interface represents the
+complexity that the module imposes on the rest of the system: the smaller and
+simpler the interface, the less complexity that it introduces. The best modules are
+those with the greatest benefit and the least cost. Interfaces are good, but more,
+or larger, interfaces are not necessarily better!
+     The mechanism for file I/O provided by the Unix operating system and its
+descendants, such as Linux, is a beautiful example of a deep interface. There are
+only five basic system calls for I/O, with simple signatures:
+    int open(const char* path, int flags, mode_t permissions);
+    ssize_t read(int fd, void* buffer, size_t count);
+    ssize_t write(int fd, const void* buffer, size_t count);
+   off_t lseek(int fd, off_t offset, int referencePosition);
+   int close(int fd);
+The open system call takes a hierarchical file name such as /a/b/c and returns an
+integer file descriptor, which is used to reference the open file. The other
+arguments for open provide optional information such as whether the file is being
+opened for reading or writing, whether a new file should be created if there is no
+existing file, and access permissions for the file, if a new file is created. The read
+and write system calls transfer information between buffer areas in the
+application’s memory and the file; close ends the access to the file. Most files
+are accessed sequentially, so that is the default; however, random access can be
+achieved by invoking the lseek system call to change the current access position.
+    A modern implementation of the Unix I/O interface requires hundreds of
+thousands of lines of code, which address complex issues such as:
+
+     How are files represented on disk in order to allow efficient access?
+     How are directories stored, and how are hierarchical path names processed
+     to find the files they refer to?
+     How are permissions enforced, so that one user cannot modify or delete
+     another user’s files?
+     How are file accesses implemented? For example, how is functionality
+     divided between interrupt handlers and background code, and how do these
+     two elements communicate safely?
+     What scheduling policies are used when there are concurrent accesses to
+     multiple files?
+     How can recently accessed file data be cached in memory in order to reduce
+     the number of disk accesses?
+     How can a variety of different secondary storage devices, such as disks and
+     flash drives, be incorporated into a single file system?
+
+    All of these issues, and many more, are handled by the Unix file system
+implementation; they are invisible to programmers who invoke the system calls.
+Implementations of the Unix I/O interface have evolved radically over the years,
+but the five basic kernel calls have not changed.
+    Another example of a deep module is the garbage collector in a language
+such as Go or Java. This module has no interface at all; it works invisibly behind
+the scenes to reclaim unused memory. Adding garbage collection to a system
+actually shrinks its overall interface, since it eliminates the interface for freeing
+objects. The implementation of a garbage collector is quite complex, but that
+complexity is hidden from programmers.
+    Deep modules such as Unix I/O and garbage collectors provide powerful
+abstractions because they are easy to use, yet they hide significant
+implementation complexity.
+
+
+4.5 Shallow modules
+On the other hand, a shallow module is one whose interface is relatively complex
+in comparison to the functionality that it provides. For example, a class that
+implements linked lists is shallow. It doesn’t take much code to manipulate a
+linked list (inserting or deleting an element takes only a few lines), so the linked
+list abstraction doesn’t hide very many details. The complexity of a linked list
+interface is nearly as great as the complexity of its implementation. Shallow
+classes like linked lists are sometimes unavoidable and they can still be useful,
+but they don’t provide much leverage against complexity.
+     Here is an extreme example of a shallow method, taken from a project in a
+software design class:
+   private void addNullValueForAttribute(String attribute) {
+         data.put(attribute, null);
+   }
+From the standpoint of managing complexity, this method makes things worse,
+not better. The method offers no abstraction, since all of its functionality is
+visible through its interface. For example, callers probably need to know that the
+attribute will be stored in the data variable. It is no simpler to think about the
+interface than to think about the full implementation. If the method is
+documented properly, the documentation will be longer than the method’s code.
+It even takes more keystrokes to invoke the method than it would take for a caller
+to manipulate the data variable directly. The method adds complexity (in the
+form of a new interface for developers to learn) but provides no compensating
+benefit.
+
+
+                     Red Flag: Shallow Module
+  A shallow module is one whose interface is complicated relative to the
+  functionality it provides. Shallow modules don’t help much in the battle
+  against complexity, because the benefit they provide (not having to learn
+  about how they work internally) is negated by the cost of learning and using
+  their interfaces. Small modules tend to be shallow.
+
+
+
+4.6 Classitis
+Unfortunately, the value of deep classes is not widely appreciated today. The
+conventional wisdom in programming is that classes should be small, not deep.
+Students are often taught that the most important thing in class design is to break
+up larger classes into smaller ones. The same advice is often given about
+methods: “Any method longer than N lines should be divided into multiple
+methods” (N can be as low as 10). This approach results in large numbers of
+shallow classes and methods, which add to overall system complexity.
+    The extreme of the “classes should be small” approach is a syndrome I call
+classitis, which stems from the mistaken view that “classes are good, so more
+classes are better.” In systems suffering from classitis, developers are encouraged
+to minimize the amount of functionality in each new class: if you want more
+functionality, introduce more classes. Classitis may result in classes that are
+individually simple, but it increases the complexity of the overall system. Small
+classes don’t contribute much functionality, so there have to be a lot of them,
+each with its own interface. These interfaces accumulate to create tremendous
+complexity at the system level. Small classes also result in a verbose
+programming style, due to the boilerplate required for each class.
+
+
+4.7 Examples: Java and Unix I/O
+One of the most visible examples of classitis today is the Java class library. The
+Java language doesn’t require lots of small classes, but a culture of classitis
+seems to have taken root in the Java programming community. For example, for
+many years Java developers had to create three different objects in order to open
+a file and read serialized objects from it:
+   FileInputStream fileStream =
+       new FileInputStream(fileName);
+   BufferedInputStream bufferedStream =
+       new BufferedInputStream(fileStream);
+   ObjectInputStream objectStream =
+       new ObjectInputStream(bufferedStream);
+A FileInputStream object provides only rudimentary I/O: it is not capable of
+performing buffered I/O, nor can it read or write serialized objects. The
+BufferedInputStream object adds buffering to a FileInputStream, and the
+ObjectInputStream adds the ability to read and write serialized objects. The first
+two objects in the code above, fileStream and bufferedStream, are never used
+once the file has been opened; all future operations use objectStream.
+     It is particularly annoying (and error-prone) that buffering must be requested
+explicitly by creating a separate BufferedInputStream object; if a developer
+forgets to create this object, there will be no buffering and I/O will be slow.
+Perhaps the Java developers would argue that not everyone wants to use buffering
+for file I/O, so it shouldn’t be built into the base mechanism. They might argue
+that it’s better to keep buffering separate, so people can choose whether or not to
+use it. Providing choice is good, but interfaces should be designed to make the
+common case as simple as possible (see the formula on page 6). Almost every
+user of file I/O will want buffering, so it should be provided by default. For those
+few situations where buffering is not desirable, the library can provide a
+mechanism to disable it. Any mechanism for disabling buffering should be
+cleanly separated in the interface (for example, by providing a different
+constructor for FileInputStream, or through a method that disables or replaces
+the buffering mechanism), so that most developers do not even need to be aware
+of its existence.
+     In contrast, the designers of the Unix system calls made the common case
+simple. For example, they recognized that sequential I/O is most common, so
+they made that the default behavior. Random access is still relatively easy to do,
+using the lseek system call, but a developer doing only sequential access need
+not be aware of that mechanism. If an interface has many features, but most
+developers only need to be aware of a few of them, the effective complexity of
+that interface is just the complexity of the commonly used features.
+
+
+4.8 Conclusion
+By separating the interface of a module from its implementation, we can hide the
+complexity of the implementation from the rest of the system. Users of a module
+need only understand the abstraction provided by its interface. The most
+important issue in designing classes and other modules is to make them deep, so
+that they have simple interfaces for the common use cases, yet still provide
+significant functionality. This maximizes the amount of complexity that is
+concealed.
+
+
+   1There exist languages, mostly in the research community, where the overall behavior of a method or
+
+function can be described formally using a specification language. The specification can be checked
+automatically to ensure that it matches the implementation. An interesting question is whether such a formal
+specification could replace the informal parts of an interface. My current opinion is that an interface
+described in English is likely to be more intuitive and understandable for developers than one written in a
+formal specification language.
+Chapter 5
+Information Hiding (and Leakage)
+
+Chapter 4 argued that modules should be deep. This chapter, and the next few
+that follow, discuss techniques for creating deep modules.
+
+
+5.1 Information hiding
+One of the most important techniques for achieving deep modules is information
+hiding. This technique was first described in a classic paper by David Parnas1.
+The basic idea is that each module should encapsulate a few pieces of
+knowledge, which represent design decisions. The knowledge is embedded in the
+module’s implementation but does not appear in its interface, so it is not visible
+to other modules.
+    The information hidden within a module usually consists of details about
+how to implement some mechanism. Here are some examples of information that
+might be hidden within a module:
+
+     How to store information in a B-tree, and how to access it efficiently.
+     How to identify the physical disk block corresponding to each logical block
+     within a file.
+     How to implement the TCP network protocol.
+     How to schedule threads on a multi-core processor.
+     How to parse JSON documents.
+
+     The hidden information includes data structures and algorithms related to the
+mechanism. It can also include lower-level details such as the size of a page, and
+it can include higher-level concepts that are more abstract, such as an assumption
+that most files are small.
+     Information hiding reduces complexity in two ways. First, it simplifies the
+interface to a module. The interface reflects a simpler, more abstract view of the
+module’s functionality and hides the details; this reduces the cognitive load on
+developers who use the module. For instance, a developer using a B-tree class
+need not worry about the ideal fanout for nodes in the tree or how to keep the
+tree balanced. Second, information hiding makes it easier to evolve the system. If
+a piece of information is hidden, there are no dependencies on that information
+outside the module containing the information, so a design change related to that
+information will affect only the one module. For example, if the TCP protocol
+changes (to introduce a new mechanism for congestion control, for instance), the
+protocol’s implementation will have to be modified, but no changes should be
+needed in higher-level code that uses TCP to send and receive data.
+    When designing a new module, you should think carefully about what
+information can be hidden in that module. If you can hide more information, you
+should also be able to simplify the module’s interface, and this makes the module
+deeper.
+    Note: hiding variables and methods in a class by declaring them private isn’t
+the same thing as information hiding. Private elements can help with information
+hiding, since they make it impossible for the items to be accessed directly from
+outside the class. However, information about the private items can still be
+exposed through public methods such as getter and setter methods. When this
+happens the nature and usage of the variables are just as exposed as if the
+variables were public.
+    The best form of information hiding is when information is totally hidden
+within a module, so that it is irrelevant and invisible to users of the module.
+However, partial information hiding also has value. For example, if a particular
+feature or piece of information is only needed by a few of a class’s users, and it is
+accessed through separate methods so that it isn’t visible in the most common
+use cases, then that information is mostly hidden. Such information will create
+fewer dependencies than information that is visible to every user of the class.
+
+
+5.2 Information leakage
+The opposite of information hiding is information leakage. Information leakage
+occurs when a design decision is reflected in multiple modules. This creates a
+dependency between the modules: any change to that design decision will require
+changes to all of the involved modules. If a piece of information is reflected in
+the interface for a module, then by definition it has been leaked; thus, simpler
+interfaces tend to correlate with better information hiding. However, information
+can be leaked even if it doesn’t appear in a module’s interface. Suppose two
+classes both have knowledge of a particular file format (perhaps one class reads
+files in that format and the other class writes them). Even if neither class exposes
+that information in its interface, they both depend on the file format: if the format
+changes, both classes will need to be modified. Back-door leakage like this is
+more pernicious than leakage through an interface, because it isn’t obvious.
+    Information leakage is one of the most important red flags in software
+design. One of the best skills you can learn as a software designer is a high level
+of sensitivity to information leakage. If you encounter information leakage
+between classes, ask yourself “How can I reorganize these classes so that this
+particular piece of knowledge only affects a single class?” If the affected classes
+are relatively small and closely tied to the leaked information, it may make sense
+to merge them into a single class. Another possible approach is to pull the
+information out of all of the affected classes and create a new class that
+encapsulates just that information. However, this approach will be effective only
+if you can find a simple interface that abstracts away from the details; if the new
+class exposes most of the knowledge through its interface, then it won’t provide
+much value (you’ve simply replaced back-door leakage with leakage through an
+interface).
+
+
+5.3 Temporal decomposition
+One common cause of information leakage is a design style I call temporal
+decomposition. In temporal decomposition, the structure of a system corresponds
+to the time order in which operations will occur. Consider an application that
+reads a file in a particular format, modifies the contents of the file, and then
+writes the file out again. With temporal decomposition, this application might be
+broken into three classes: one to read the file, another to perform the
+modifications, and a third to write out the new version. Both the file reading and
+file writing steps have knowledge about the file format, which results in
+information leakage. The solution is to combine the core mechanisms for reading
+and writing files into a single class. This class will get used during both the
+reading and writing phases of the application. It’s easy to fall into the trap of
+temporal decomposition, because the order in which operations must occur is
+often on your mind when you code. However, most design decisions manifest
+themselves at several different times over the life of the application; as a result,
+temporal decomposition often results in information leakage.
+
+
+                 Red Flag: Information Leakage
+  Information leakage occurs when the same knowledge is used in multiple
+  places, such as two different classes that both understand the format of a
+  particular type of file.
+
+
+    Order usually does matter, so it will be reflected somewhere in the
+application. However, it shouldn’t be reflected in the module structure unless that
+structure is consistent with information hiding (perhaps the different stages use
+totally different information). When designing modules, focus on the
+knowledge that’s needed to perform each task, not the order in which tasks
+occur.
+
+
+5.4 Example: HTTP server
+To illustrate the issues in information hiding, let’s consider the design decisions
+made by students implementing the HTTP protocol in a software design course.
+It’s useful to see both the things they did well and the areas where they had
+problems.
+     HTTP is a mechanism used by Web browsers to communicate with Web
+servers. When a user clicks on a link in a Web browser or submits a form, the
+browser uses HTTP to send a request over the network to a Web server. Once the
+server has processed the request, it sends a response back to the browser; the
+response normally contains a new Web page to display. The HTTP protocol
+specifies the format of requests and responses, both of which are represented
+textually. Figure 5.1 shows a sample HTTP request describing a form submission.
+The students in the course were asked to implement one or more classes to make
+it easy for Web servers to receive incoming HTTP requests and send responses.
+                   Red Flag: Temporal Decomposition
+   In temporal decomposition, execution order is reflected in the code
+   structure: operations that happen at different times are in different methods
+   or classes. If the same knowledge is used at different points in execution, it
+   gets encoded in multiple places, resulting in information leakage.
+
+
+
+
+Figure 5.1: A POST request in the HTTP protocol consists of text sent over a TCP socket. Each request
+contains an initial line, a collection of headers terminated by an empty line, and an optional body. The initial
+line contains the request type (POST is used for submitting form data), a URL indicating an operation
+(/comments/create) and optional parameters (photo_id has the value 246), and the HTTP protocol version
+used by the sender. Each header line consists of a name such as Content-Length followed by its value. For
+this request, the body contains additional parameters (comment and priority).
+
+
+
+5.5 Example: too many classes
+The most common mistake made by students was to divide their code into a large
+number of shallow classes, which led to information leakage between the classes.
+One team used two different classes for receiving HTTP requests; the first class
+read the request from the network connection into a string, and the second class
+parsed the string. This is an example of a temporal decomposition (“first we read
+the request, then we parse it”). Information leakage occurred because an HTTP
+request can’t be read without parsing much of the message; for example, the
+Content-Length header specifies the length of the request body, so the headers
+must be parsed in order to compute the total request length. As a result, both
+classes needed to understand most of the structure of HTTP requests, and parsing
+code was duplicated in both classes. This approach also created extra complexity
+for callers, who had to invoke two methods in different classes, in a particular
+order, to receive a request.
+    Because the classes shared so much information, it would have been better to
+merge them into a single class that handles both request reading and parsing.
+This provides better information hiding, since it isolates all knowledge of the
+request format in one class, and it also provides a simpler interface to callers (just
+one method to invoke).
+    This example illustrates a general theme in software design: information
+hiding can often be improved by making a class slightly larger. One reason
+for doing this is to bring together all of the code related to a particular capability
+(such as parsing an HTTP request), so that the resulting class contains everything
+related to that capability. A second reason for increasing the size of a class is to
+raise the level of the interface; for example, rather than having separate methods
+for each of three steps of a computation, have a single method that performs the
+entire computation. This can result in a simpler interface. Both of these benefits
+apply in the example of the previous paragraph: combining the classes brings
+together all of the code related to parsing an HTTP request, and it replaces two
+externally-visible methods with one. The combined class is deeper than the
+original classes.
+    Of course, it is possible to take the notion of larger classes too far (such as a
+single class for the entire application). Chapter 9 will discuss conditions under
+which it makes sense to separate code into multiple smaller classes.
+
+
+5.6 Example: HTTP parameter handling
+After an HTTP request has been received by a server, the server needs to access
+some of the information from the request. The code that handles the request in
+Figure 5.1 might need to know the value of the photo_id parameter. Parameters
+can be specified in the first line of the request (photo_id in Figure 5.1) or,
+sometimes, in the body (comment and priority in Figure 5.1). Each parameter
+has a name and a value. The values of parameters use a special encoding called
+URL encoding; for example, in the value for comment in Figure 5.1, “+” is used to
+represent a space character, and “%21” is used instead of “!”. In order to process
+a request, the server will need the values for some of the parameters, and it will
+want them in unencoded form.
+    Most of the student projects made two good choices with respect to
+parameter handling. First, they recognized that server applications don’t care
+whether a parameter is specified in the header line or the body of the request, so
+they hid this distinction from callers and merged the parameters from both
+locations together. Second, they hid knowledge of URL encoding: the HTTP
+parser decodes parameter values before returning them to the Web server, so that
+the value of the comment parameter in Figure 5.1 will be returned as “What a cute
+baby!”, not “What+a+cute+baby%21”). In both of these cases, information
+hiding resulted in simpler APIs for the code using the HTTP module.
+    However, most of the students used an interface for returning parameters that
+was too shallow, and this resulted in lost opportunities for information hiding.
+Most projects used an object of type HTTPRequest to hold the parsed HTTP
+request, and the HTTPRequest class had a single method like the following one to
+return parameters:
+   public Map<String, String> getParams() {
+     return this.params;
+   }
+Rather than returning a single parameter, the method returns a reference to the
+Map used internally to store all of the parameters. This method is shallow, and it
+exposes the internal representation used by the HTTPRequest class to store
+parameters. Any change to that representation will result in a change to the
+interface, which will require modifications to all callers. When implementations
+are modified, the changes often involve changes in the representation of key data
+structures (to improve performance, for example). Thus, it’s important to avoid
+exposing internal data structures as much as possible. This approach also makes
+more work for callers: a caller must first invoke getParams, then it must call
+another method to retrieve a specific parameter from the Map. Finally, callers
+must realize that they should not modify the Map returned by getParams, since
+that will affect the internal state of the HTTPRequest.
+    Here is a better interface for retrieving parameter values:
+   public String getParameter(String name) { ... }
+   public int getIntParameter(String name) { ... }
+getParameter returns a parameter value as a string. It provides a slightly deeper
+interface than getParams above; more importantly, it hides the internal
+representation of parameters. getIntParameter converts the value of a parameter
+from its string form in the HTTP request to an integer (e.g., the photo_id
+parameter in Figure 5.1). This saves the caller from having to request string-to-
+integer conversion separately, and hides that mechanism from the caller.
+Additional methods for other data types, such as getDoubleParameter, could be
+defined if needed. (All of these methods will throw exceptions if the desired
+parameter doesn’t exist, or if it can’t be converted to the requested type; the
+exception declarations have been omitted in the code above).
+
+
+5.7 Example: defaults in HTTP responses
+The HTTP projects also had to provide support for generating HTTP responses.
+The most common mistake students made in this area was inadequate defaults.
+Each HTTP response must specify an HTTP protocol version; one team required
+callers to specify this version explicitly when creating a response object.
+However, the response version must correspond to that in the request object, and
+the request must already be passed as an argument when sending the response (it
+indicates where to send the response). Thus, it makes more sense for the HTTP
+classes to provide the response version automatically. The caller is unlikely to
+know what version to specify, and if the caller does specify a value, it probably
+results in information leakage between the HTTP library and the caller. HTTP
+responses also include a Date header specifying the time when the response was
+sent; the HTTP library should provide a sensible default for this as well.
+    Defaults illustrate the principle that interfaces should be designed to make
+the common case as simple as possible. They are also an example of partial
+information hiding: in the normal case, the caller need not be aware of the
+existence of the defaulted item. In the rare cases where a caller needs to override
+a default, it will have to know about the value, and it can invoke a special method
+to modify it.
+    Whenever possible, classes should “do the right thing” without being
+explicitly asked. Defaults are an example of this. The Java I/O example on page
+26 illustrates this point in a negative way. Buffering in file I/O is so universally
+desirable that noone should ever have to ask explicitly for it, or even be aware of
+its existence; the I/O classes should do the right thing and provide it
+automatically. The best features are the ones you get without even knowing they
+exist.
+                       Red Flag: Overexposure
+  If the API for a commonly used feature forces users to learn about other
+  features that are rarely used, this increases the cognitive load on users who
+  don’t need the rarely used features.
+
+
+
+5.8 Information hiding within a class
+The examples in this chapter focused on information hiding as it relates to the
+externally visible APIs for classes, but information hiding can also be applied at
+other levels in the system, such as within a class. Try to design the private
+methods within a class so that each method encapsulates some information or
+capability and hides it from the rest of the class. In addition, try to minimize the
+number of places where each instance variable is used. Some variables may need
+to be accessed widely across the class, but others may be needed in only a few
+places; if you can reduce the number of places where a variable is used, you will
+eliminate dependencies within the class and reduce its complexity.
+
+
+5.9 Taking it too far
+Information hiding only makes sense when the information being hidden is not
+needed outside its module. If the information is needed outside the module, then
+you must not hide it. Suppose that the performance of a module is affected by
+certain configuration parameters, and that different uses of the module will
+require different settings of the parameters. In this case it is important that the
+parameters are exposed in the interface of the module, so that they can be tuned
+appropriately. As a software designer, your goal should be to minimize the
+amount of information needed outside a module; for example, if a module can
+automatically adjust its configuration, that is better than exposing configuration
+parameters. But, it’s important to recognize which information is needed outside
+a module and make sure it is exposed.
+5.10 Conclusion
+Information hiding and deep modules are closely related. If a module hides a lot
+of information, that tends to increase the amount of functionality provided by the
+module while also reducing its interface. This makes the module deeper.
+Conversely, if a module doesn’t hide much information, then either it doesn’t
+have much functionality, or it has a complex interface; either way, the module is
+shallow.
+    When decomposing a system into modules, try not to be influenced by the
+order in which operations will occur at runtime; that will lead you down the path
+of temporal decomposition, which will result in information leakage and shallow
+modules. Instead, think about the different pieces of knowledge that are needed
+to carry out the tasks of your application, and design each module to encapsulate
+one or a few of those pieces of knowledge. This will produce a clean and simple
+design with deep modules.
+
+
+   1David Parnas, “On the Criteria to be Used in Decomposing Systems into Modules,” Communications of
+
+the ACM, December 1972.
+Chapter 6
+General-Purpose Modules are Deeper
+
+The process of teaching my software design course, in which I’m constantly
+trying to identify the causes of complexity in student code, has changed my
+thinking about software design in several ways. The most important of these has
+to do with generality versus specialization. I have found over and over that
+specialization leads to complexity; I now think that over-specialization may be
+the single greatest cause of complexity in software. Conversely, code that is more
+general-purpose is simpler, cleaner, and easier to understand.
+    This principle applies at many different levels in software design. When
+designing modules such as classes or methods, one of the best ways to produce a
+deep API is to make it general-purpose (general-purpose APIs result in more
+information hiding). When writing detailed code, one of the most effective ways
+to simplify the code is by eliminating special cases, so that the common-case
+code handles the edge cases as well. Eliminating special cases can also make
+code more efficient, as we shall see in Chapter 20.
+    This chapter discusses the problems caused by specialization and the benefits
+of generality. Specialization cannot be completely eliminated, so the chapter also
+offers guidelines on how to separate special-purpose code from general-purpose
+code.
+
+
+6.1 Make classes somewhat general-purpose
+One of the most common decisions that you will face when designing a new
+class is whether to implement it in a general-purpose or special-purpose fashion.
+Some might argue that you should take a general-purpose approach, in which
+you implement a mechanism that can be used to address a broad range of
+problems, not just the ones that are important today. In this case, the new
+mechanism may find unanticipated uses in the future, thereby saving time. The
+general-purpose approach seems consistent with the investment mindset
+discussed in Chapter 3, where you spend a bit more time up front to save time
+later on.
+     On the other hand, we know that it’s hard to predict the future needs of a
+software system, so a general-purpose solution might include facilities that are
+never actually needed. Furthermore, if you implement something that is too
+general-purpose, it might not do a good job of solving the particular problem you
+have today. As a result, some might argue that it’s better to focus on today’s
+needs, building just what you know you need, and specializing it for the way you
+plan to use it today. If you take the special-purpose approach and discover
+additional uses later, you can always refactor it to make it general-purpose. The
+special-purpose approach seems consistent with an incremental approach to
+software development.
+     When I first started teaching my software design course I leaned towards the
+second approach (make it special-purpose to begin with), but after teaching the
+course a few times I changed my mind. In reviewing student projects I noticed
+that general-purpose classes were almost always better than special-purpose
+alternatives. What particularly surprised me is that general-purpose interfaces are
+simpler and deeper than special-purpose ones, and they result in less code in the
+implementation. It turns out that even if you use a class in a special-purpose way,
+it’s less work to build it in a general-purpose way. And, the general-purpose
+approach can save you even more time in the future, if you reuse the class for
+other purposes. But general-purpose is still better even if you don’t reuse the
+class.
+     In my experience, the sweet spot is to implement new modules in a somewhat
+general-purpose fashion. The phrase “somewhat general-purpose” means that
+the module’s functionality should reflect your current needs, but its interface
+should not. Instead, the interface should be general enough to support multiple
+uses. The interface should be easy to use for today’s needs without being tied
+specifically to them. The word “somewhat” is important: don’t get carried away
+and build something so general-purpose that it is difficult to use for your current
+needs.
+
+
+6.2 Example: storing text for an editor
+Let’s consider an example from a software design class in which students were
+asked to build simple a GUI text editor. The editor had to display a file and allow
+users to point, click, and type to edit the file. It also had to support multiple
+simultaneous views of the same file in different windows, and it had to support
+multi-level undo and redo for modifications to the file.
+    Each of the student projects included a class that managed the underlying text
+of the file. The text classes typically provided methods for loading a file into
+memory, reading and modifying the text of the file, and writing the modified text
+back to a file. Many of the student teams implemented special-purpose APIs for
+the text class.
+    They knew that the class was going to be used in an interactive editor, so they
+thought about the features that the editor had to provide and tailored the API of
+the text class to those specific features. For example, if a user of the editor typed
+the backspace key, the editor deleted the character immediately to the left of the
+cursor; if the user typed the delete key, the editor deleted the character
+immediately to the right of the cursor. Knowing this, some of the teams created
+one method in the text class to support each of these specific features:
+   void backspace(Cursor cursor);
+   void delete(Cursor cursor);
+Each of these methods takes the cursor position as its argument; a special type
+Cursor represents this position. The editor also had to support a selection that
+could be copied or deleted. The students handled this by defining a Selection
+class and passing an object of this class to the text class during deletions:
+   void deleteSelection(Selection selection);
+The students probably thought that it would be easier to implement the user
+interface if the methods of the text class corresponded to the features visible to
+users. In reality, however, this specialization provided little benefit for the user
+interface code, and it created a high cognitive load for developers working on
+either the user interface or the text class. The text class ended up with a large
+number of shallow methods, each of which was only suitable for one user
+interface operation. Many of the methods, such as delete, were only invoked in a
+single place. As a result, a developer working on the user interface had to learn
+about a large number of methods for the text class.
+    This approach created information leakage between the user interface and the
+text class. Abstractions related to the user interface, such as the selection or the
+backspace key, were reflected in the text class; this increased the cognitive load
+for developers working on the text class. Each new user interface operation
+required a new method to be defined in the text class, so a developer working on
+the user interface was likely to end up working on the text class as well. One of
+the goals in class design is to allow each class to be developed independently, but
+the specialized approach tied the user interface and text classes together.
+
+
+6.3 A more general-purpose API
+A better approach is to make the text class more generic. Its API should be
+defined only in terms of basic text features, without reflecting the higher-level
+operations that will be implemented with it. For example, only two methods are
+needed for modifying text:
+   void insert(Position position, String newText);
+   void delete(Position start, Position end);
+The first method inserts an arbitrary string at an arbitrary position within the
+text, and the second method deletes all of the characters at positions greater than
+or equal to start but less than end. This API also uses a more generic type
+Position instead of Cursor, which reflects a specific user interface. The text
+class should also provide general-purpose facilities for manipulating positions
+within the text, such as the following:
+   Position changePosition(Position position, int numChars);
+This method returns a new position that is a given number of characters away
+from a given position. If the numChars argument is positive, the new position is
+later in the file than position; if numChars is negative, the new position is before
+position. The method automatically skips to the next or previous line when
+necessary. With these methods, the delete key can be implemented with the
+following code (assuming the cursor variable holds the current cursor position):
+   text.delete(cursor, text.changePosition(cursor, 1));
+Similarly, the backspace key can be implemented as follows:
+   text.delete(text.changePosition(cursor, -1), cursor);
+With the general-purpose text API, the code to implement user interface
+functions such as delete and backspace is a bit longer than with the original
+approach using a specialized text API. However, the new code is more obvious
+than the old code. A developer working in the user interface module probably
+cares about which characters are deleted by the backspace key. With the new
+code, this is obvious. With the old code, the developer had to go to the text class
+and read the documentation and/or code of the backspace method to verify the
+behavior. Furthermore, the general-purpose approach has less code overall than
+the specialized approach, since it replaces a large number of special-purpose
+methods in the text class with a smaller number of general-purpose ones.
+    A text class implemented with the general-purpose interface could potentially
+be used for other purposes besides an interactive editor. As one example, suppose
+you were building an application that modified a specified file by replacing all
+occurrences of a particular string with another string. Methods from the
+specialized text class, such as backspace and delete, would have little value for
+this application. However, the general-purpose text class would already have
+most of the functionality needed for the new application. All that is missing is a
+method to search for the next occurrence of a given string, such as this:
+   Position findNext(Position start, String string);
+Of course, an interactive text editor is likely to have a mechanism for searching
+and replacing, in which case the text class would already include this method.
+
+
+6.4 Generality leads to better information hiding
+The general-purpose approach provides a cleaner separation between the text and
+user interface classes, which results in better information hiding. The text class
+need not be aware of specifics of the user interface, such as how the backspace
+key is handled; these details are now encapsulated in the user interface class.
+New user interface features can be added without creating new supporting
+functions in the text class. The general-purpose interface also reduces cognitive
+load: a developer working on the user interface only needs to learn a few simple
+methods, which can be reused for a variety of purposes.
+    The backspace method in the original version of the text class was a false
+abstraction. It purported to hide information about which characters are deleted,
+but the user interface module really needs to know this; user interface developers
+are likely to read the code of the backspace method in order to confirm its
+precise behavior. Putting the method in the text class just makes it harder for user
+interface developers to get the information they need. One of the most important
+elements of software design is determining who needs to know what, and when.
+When the details are important, it is better to make them explicit and as obvious
+as possible, such as the revised implementation of the backspace operation.
+Hiding this information behind an interface just creates obscurity.
+6.5 Questions to ask yourself
+It is easier to recognize a clean general-purpose class design than it is to create
+one. Here are some questions you can ask yourself, which will help you to find
+the right balance between general-purpose and special-purpose for an interface.
+
+What is the simplest interface that will cover all my current needs? If you
+reduce the number of methods in an API without reducing its overall capabilities,
+then you are probably creating more general-purpose methods. The special-
+purpose text API had at least three methods for deleting text: backspace, delete,
+and deleteSelection. The more general-purpose API had only one method for
+deleting text, which served all three purposes. Reducing the number of methods
+makes sense only as long as the API for each individual method stays simple; if
+you have to introduce lots of additional arguments in order to reduce the number
+of methods, then you may not really be simplifying things.
+
+In how many situations will this method be used? If a method is designed for
+one particular use, such as the backspace method, that is a red flag that it may be
+too special-purpose. See if you can replace several special-purpose methods with
+a single general-purpose method.
+
+Is this API easy to use for my current needs? This question can help you to
+determine when you have gone too far in making an API simple and general-
+purpose. If you have to write a lot of additional code to use a class for your
+current purpose, that’s a red flag that the interface doesn’t provide the right
+functionality. For example, one approach for the text class would be to design it
+around single-character operations: insert inserts a single character and delete
+deletes a single character. This API is both simple and general-purpose.
+However, it would not be particularly easy to use for a text editor: higher-level
+code would contain lots of loops to insert or delete ranges of characters. The
+single-character approach would also be inefficient for large operations. Thus it’s
+better for the text class to have built-in support for operations on ranges of
+characters.
+
+
+6.6 Push specialization upwards (and
+       downwards!)
+Most software systems must inevitably have some code that is specialized. For
+example, applications provide specific features for their users; these are often
+highly specialized. Thus it isn’t usually possible to eliminate specialization
+altogether. However, specialized code should be cleanly separated from general-
+purpose code. This can be done by pushing the specialized code either up or
+down in the software stack.
+    One way to separate specialized code is to push it upwards. The top-level
+classes of an application, which provide specific features, will necessarily be
+specialized for those features. But this specialization need not percolate down
+into the lower-level classes that are used to implement the features. We saw this
+in the editor example earlier in this chapter. The original student implementation
+leaked specialized user-interface details such as the behavior of the backspace
+key down into the implementation of the text class. The improved text API
+pushed all of the specialization upwards into the user interface code, leaving only
+general-purpose code in the text class.
+    Sometimes the best approach is to push specialization downwards. One
+example of this is device drivers. An operating system typically must support
+hundreds or thousands of different device types of devices, such as different
+kinds of secondary storage devices. Each of these device types has its own
+specialized command set. In order to prevent specialized device characteristics
+from leaking into the main operating system code, operating systems define an
+interface with general-purpose operations that any secondary storage device must
+implement, such as “read a block” and “write a block”. For each different device,
+a device driver module implements the general-purpose interface using the
+specialized features of that particular device. This approach pushes specialization
+down into the device drivers, so that the core of the operating system can be
+written without any knowledge of specific device characteristics. This approach
+also makes it easy to add new devices: if a device has enough features to
+implement the device driver interface, it can be added to the system with no
+changes to the main operating system.
+
+
+6.7 Example: editor undo mechanism
+In the GUI editor project, one of the requirements was to support multi-level
+undo/redo, not just for changes to the text itself, but also for changes in the
+selection, insertion cursor, and view. For example, if a user selects some text,
+deletes it, scrolls to a different place in the file, and then invokes undo, the editor
+must restore its state to what it was just before the deletion. This includes
+restoring the deleted text, selecting it again, and also making the selected text
+visible in the window.
+    Some of the student projects implemented the entire undo mechanism as part
+of the text class. The text class maintained a list of all the undoable changes. It
+automatically added entries to this list whenever the text was changed. For
+changes to the selection, insertion cursor, and view, the user interface code
+invoked additional methods in the text class, which then added entries for those
+changes to the undo list. When undo or redo was requested by the user, the user
+interface code invoked a method in the text class, which then processed the
+entries in the undo list. For entries related to text, it updated the internals of the
+text class; for entries related to other things, such as the selection, the text class
+called back to the user interface code to carry out the undo or redo.
+    This approach resulted in an awkward set of features in the text class. The
+core of undo/redo consists of a general-purpose mechanism for managing a list
+of actions that have been executed and stepping through them during undo and
+redo operations. The core was located in the text class along with special-
+purpose handlers that implemented undo and redo for specific things such as text
+and the selection. The special-purpose undo handlers for the selection and the
+cursor had nothing to do with anything else in the text class; they resulted in
+information leakage between the text class and the user interface, as well as extra
+methods in each module to pass undo information back and forth. If a new sort
+of undoable entity were added to the system in the future, it would require
+changes to the text class, including new methods specific to that entity. In
+addition, the general-purpose undo core had little to do with the general-purpose
+text facilities in the class.
+    These problems can be solved by extracting the general-purpose core of the
+undo/redo mechanism and placing it in a separate class:
+    public class History {
+       public interface Action {
+          public void redo();
+          public void undo();
+       }
+       History() {...}
+
+
+       void addAction(Action action) {...}
+       void addFence() {...}
+
+       void undo() {...}
+          void redo() {...}
+       }
+In this design, the History class manages a collection of objects that implement
+the interface History.Action. Each History.Action describes a single operation,
+such as a text insertion or a change in the cursor location, and it provides
+methods that can undo or redo the operation. The History class knows nothing
+about the information stored in the actions or how they implement their undo and
+redo methods. History maintains a history list describing all of the actions
+executed over the lifetime of an application, and it provides undo and redo
+methods that walk backwards and forwards through the list in response to user-
+requested undos and redos, calling undo and redo methods in the
+History.Actions.
+    History.Actions are special-purpose objects: each one understands a
+particular kind of undoable operation. They are implemented outside the History
+class, in modules that understand particular kinds of undoable actions. The text
+class might implement UndoableInsert and UndoableDelete objects to describe
+text insertions and deletions. Whenever it inserts text, the text class creates a new
+UndoableInsert object describing the insertion and invokes History.addAction
+to add it to the history list. The editor’s user interface code might create
+UndoableSelection and UndoableCursor objects that describe changes to the
+selection and insertion cursor.
+    The History class also allows actions to be grouped so that, for example, a
+single undo request from the user can restore deleted text, reselect the deleted
+text, and reposition the insertion cursor. To implement grouping the History
+class uses fences, which are markers placed in the history list to separate groups
+of related actions. Each call to History.redo walks backwards through the
+history list, undoing actions until it reaches the next fence. The placement of
+fences is determined by higher-level code by invoking History.addFence.
+    This approach divides the functionality of undo into three categories, each of
+which is implemented in a different place:
+     A general-purpose mechanism for managing and grouping actions and
+     invoking undo/redo operations (implemented by the History class).
+     The specifics of particular actions (implemented by a variety of classes,
+     each of which understands a small number of action types).
+     The policy for grouping actions (implemented by high-level user interface
+     code to provide the right overall application behavior).
+
+    Each of these categories can be implemented without any understanding of
+the other categories. The History class does not know what kind of actions are
+being undone; it could be used in a variety of applications. Each action class
+understands only a single kind of action, and neither the History class nor the
+action classes needs to be aware of the policy for grouping actions.
+    The key design decision was the one that separated the general-purpose part
+of the undo mechanism from the special-purpose parts, creating a separate class
+for the general-purpose part and pushing the special-purpose parts down into
+subclasses of History.Action. Once that was done, the rest of the design fell out
+naturally.
+    Note: the suggestion to separate general-purpose code from special-purpose
+code refers to code related to a particular mechanism. For example, special-
+purpose undo code (such as code to undo a text insertion) should be separated
+from general-purpose undo code (such as code to manage the history list).
+However, it may make sense to combine special-purpose code for one
+mechanism with general-purpose code for another. The text class is an example
+of this: it implements a general-purpose mechanism for managing text, but it
+includes special-purpose code related to undoing. The undo code is special-
+purpose because it only handles undo operations for text modifications. It doesn’t
+make sense to combine this code with the general-purpose undo infrastructure in
+the History class, but it does make sense to put it in the text class, since it is
+closely related to other text functions.
+
+
+6.8 Eliminate special cases in code
+Up until this point I have been discussing specialization in the context of class
+and method design. Another form of specialization occurs in the code for method
+bodies, in the form of special cases. Special cases can result in code that is
+riddled with if statements, which make the code hard to understand and are
+prone to bugs. Thus, special cases should be eliminated wherever possible. The
+best way to do this is by designing the normal case in a way that automatically
+handles the edge conditions without any extra code.
+    In the text editor project, students had to implement a mechanism for
+selecting text and copying or deleting the selection. Most students introduced a
+state variable in their selection implementation to indicate whether or not the
+selection exists. They probably chose this approach because there are times when
+no selection is visible on the screen, so it seemed natural to represent this notion
+in the implementation. However, this approach resulted in numerous checks to
+detect the “no selection” condition and handle it specially.
+    The selection handling code can be simplified by eliminating the “no
+selection” special case, so that the selection always exists. When there is no
+selection visible on the screen, it can be represented internally with an empty
+selection, whose starting and ending positions are the same. With this approach,
+the selection management code can be written without any checks for “no
+selection”. When copying the selection, if the selection is empty then 0 bytes will
+be inserted at the new location; if implemented correctly, there will be no need to
+check for 0 bytes as a special case. Similarly, it should be possible to design the
+code for deleting the selection so that the empty case is handled without any
+special-case checks. Consider a selection all on a single line. To delete the
+selection, extract the portion of the line preceding the selection and concatenate
+it with the portion of the line following the selection to form the new line. If the
+selection is empty, this approach will regenerate the original line.
+    Chapter 10 will discuss exceptions, which create many more special cases,
+and how to reduce the number of places where they must be handled.
+
+
+6.9 Conclusion
+Unnecessary specialization, whether in the form of special-purpose classes and
+methods or special cases in code, is a significant contributor to software
+complexity. Specialization can’t be eliminated completely, but with good design
+you should be able to reduce it significantly and separate specialized code from
+general-purpose code. This will result in deeper classes, better information
+hiding, and simpler and more obvious code.
+Chapter 7
+Different Layer, Different Abstraction
+
+Software systems are composed in layers, where higher layers use the facilities
+provided by lower layers. In a well-designed system, each layer provides a
+different abstraction from the layers above and below it; if you follow a single
+operation as it moves up and down through layers by invoking methods, the
+abstractions change with each method call. For example:
+
+    In a file system, the uppermost layer implements a file abstraction. A file
+    consists of a variable-length array of bytes, which can be updated by
+    reading and writing variable-length byte ranges. The next lower layer in the
+    file system implements a cache in memory of fixed-size disk blocks; callers
+    can assume that frequently used blocks will stay in memory where they can
+    be accessed quickly. The lowest layer consists of device drivers, which move
+    blocks between secondary storage devices and memory.
+    In a network transport protocol such as TCP, the abstraction provided by the
+    topmost layer is a stream of bytes delivered reliably from one machine to
+    another. This level is built on a lower level that transmits packets of bounded
+    size between machines on a best-effort basis: most packets will be delivered
+    successfully, but some packets may be lost or delivered out of order.
+
+    If a system contains adjacent layers with similar abstractions, this is a red
+flag that suggests a problem with the class decomposition. This chapter discusses
+situations where this happens, the problems that result, and how to refactor to
+eliminate the problems.
+
+
+7.1 Pass-through methods
+When adjacent layers have similar abstractions, the problem often manifests
+itself in the form of pass-through methods. A pass-through method is one that
+does little except invoke another method, whose signature is similar or identical
+to that of the calling method. For example, a student project implementing a GUI
+text editor contained a class consisting almost entirely of pass-through methods.
+Here is an extract from that class:
+   public class TextDocument ... {
+      private TextArea textArea;
+      private TextDocumentListener listener;
+      ...
+      public Character getLastTypedCharacter() {
+          return textArea.getLastTypedCharacter();
+      }
+      public int getCursorOffset() {
+          return textArea.getCursorOffset();
+      }
+      public void insertString(String textToInsert,
+             int offset) {
+          textArea.insertString(textToInsert, offset);
+      }
+      public void willInsertString(String stringToInsert,
+             int offset) {
+          if (listener != null) {
+             listener.willInsertString(this, stringToInsert, offset);
+          }
+      }
+      ...
+   }
+
+
+
+
+                Red Flag: Pass-Through Method
+  A pass-through method is one that does nothing except pass its arguments
+  to another method, usually with the same API as the pass-through method.
+  This typically indicates that there is not a clean division of responsibility
+  between the classes.
+
+
+13 of the 15 public methods in that class were pass-through methods.
+    Pass-through methods make classes shallower: they increase the interface
+complexity of the class, which adds complexity, but they don’t increase the total
+functionality of the system. Of the four methods above, only the last one has any
+functionality, and even there it is trivial: the method checks the validity of one
+variable. Pass-through methods also create dependencies between classes: if the
+signature changes for the insertString method in TextArea, then the
+insertString method in TextDocument will have to change to match.
+    Pass-through methods indicate that there is confusion over the division of
+responsibility between classes. In the example above, the TextDocument class
+offers an insertString method, but the functionality for inserting text is
+implemented entirely in TextArea. This is usually a bad idea: the interface to a
+piece of functionality should be in the same class that implements the
+functionality. When you see pass-through methods from one class to another,
+consider the two classes and ask yourself “Exactly which features and
+abstractions is each of these classes responsible for?” You will probably notice
+that there is an overlap in responsibility between the classes.
+    The solution is to refactor the classes so that each class has a distinct and
+coherent set of responsibilities. Figure 7.1 illustrates several ways to do this. One
+approach, shown in Figure 7.1(b), is to expose the lower level class directly to the
+callers of the higher level class, removing all responsibility for the feature from
+the higher level class. Another approach is to redistribute the functionality
+between the classes, as in Figure 7.1(c). Finally, if the classes can’t be
+disentangled, the best solution may be to merge them as in Figure 7.1(d).
+    In the example above, there were three classes with intertwined
+responsibilities: TextDocument, TextArea, and TextDocumentListener. The
+student eliminated the pass-through methods by moving methods between
+classes and collapsing the three classes into just two, whose responsibilities were
+more clearly differentiated.
+
+
+7.2 When is interface duplication OK?
+Having methods with the same signature is not always bad. The important thing
+is that each new method should contribute significant functionality. Pass-through
+methods are bad because they contribute no new functionality.
+     One example where it’s useful for a method to call another method with the
+same signature is a dispatcher. A dispatcher is a method that uses its arguments
+to select one of several other methods to invoke; then it passes most or all of its
+arguments to the chosen method. The signature for the dispatcher is often the
+same as the signature for the methods that it calls. Even so, the dispatcher
+provides useful functionality: it chooses which of several other methods should
+carry out each task.
+
+
+
+
+Figure 7.1: Pass-through methods. In (a), class C1 contains three pass-through methods, which do nothing
+but invoke methods with the same signature in C2 (each symbol represents a particular method signature).
+The pass-through methods can be eliminated by having C1’s callers invoke C2 directly as in (b), by
+redistributing functionality between C1 and C2 to avoid calls between the classes as in (c), or by combining
+the classes as in (d).
+
+     For example, when a Web server receives an incoming HTTP request from a
+Web browser, it invokes a dispatcher that examines the URL in the incoming
+request and selects a specific method to handle the request. Some URLs might be
+handled by returning the contents of a file on disk; others might be handled by
+invoking a procedure in a language such as PHP or JavaScript. The dispatch
+process can be quite intricate, and is usually driven by a set of rules that are
+matched against the incoming URL.
+     It is fine for several methods to have the same signature as long as each of
+them provides useful and distinct functionality. The methods invoked by a
+dispatcher have this property. Another example is interfaces with multiple
+implementations, such as disk drivers in an operating system. Each driver
+provides support for a different kind of disk, but they all have the same interface.
+When several methods provide different implementations of the same interface,
+it reduces cognitive load. Once you have worked with one of these methods, it’s
+easier to work with the others, since you don’t need to learn a new interface.
+Methods like this are usually in the same layer and they don’t invoke each other.
+
+
+7.3 Decorators
+The decorator design pattern (also known as a “wrapper”) is one that encourages
+API duplication across layers. A decorator object takes an existing object and
+extends its functionality; it provides an API similar or identical to the underlying
+object, and its methods invoke the methods of the underlying object. In the Java
+I/O example from Chapter 4, the BufferedInputStream class is a decorator: given
+an InputStream object, it provides the same API but introduces buffering. For
+example, when its read method is invoked to read a single character, it invokes
+read on the underlying InputStream to read a much larger block, and saves the
+extra characters to satisfy future read calls. Another example occurs in
+windowing systems: a Window class implements a simple form of window that is
+not scrollable, and a ScrollableWindow class decorates the Window class by
+adding horizontal and vertical scrollbars.
+    The motivation for decorators is to separate special-purpose extensions of a
+class from a more generic core. However, decorator classes tend to be shallow:
+they introduce a large amount of boilerplate for a small amount of new
+functionality. Decorator classes often contain many pass-through methods. It’s
+easy to overuse the decorator pattern, creating a new class for every small new
+feature. This results in an explosion of shallow classes, such as the Java I/O
+example.
+    Before creating a decorator class, consider alternatives such as the following:
+
+     Could you add the new functionality directly to the underlying class, rather
+     than creating a decorator class? This makes sense if the new functionality is
+     relatively general-purpose, or if it is logically related to the underlying class,
+     or if most uses of the underlying class will also use the new functionality.
+     For example, virtually everyone who creates a Java InputStream will also
+     create a BufferedInputStream, and buffering is a natural part of I/O, so
+     these classes should have been combined.
+     If the new functionality is specialized for a particular use case, would it
+     make sense to merge it with the use case, rather than creating a separate
+     class?
+     Could you merge the new functionality with an existing decorator, rather
+     than creating a new decorator? This would result in a single deeper
+     decorator class rather than multiple shallow ones.
+     Finally, ask yourself whether the new functionality really needs to wrap the
+     existing functionality: could you implement it as a stand-alone class that is
+     independent of the base class? In the windowing example, the scrollbars
+     could probably be implemented separately from the main window, without
+     wrapping all of its existing functionality.
+
+    There are occasionally situations where wrappers make sense. One example
+is when a system uses an external class whose interface cannot be modified, but
+the class must conform to a different interface in the application where it is being
+used. In this case, a wrapper class can be used to translate between the interfaces.
+However, situations like this are rare; there is usually a better alternative than
+using a wrapper class.
+
+
+7.4 Interface versus implementation
+Another application of the “different layer, different abstraction” rule is that the
+interface of a class should normally be different from its implementation: the
+representations used internally should be different from the abstractions that
+appear in the interface. If the two have similar abstractions, then the class
+probably isn’t very deep. For example, in the text editor project discussed in
+Chapter 6, most of the teams implemented the text module in terms of lines of
+text, with each line stored separately. Some of the teams also designed the APIs
+for the text class around lines, with methods such as getLine and putLine.
+However, this made the text class shallow and awkward to use. In the higher-level
+user interface code, it’s common to insert text in the middle of a line (e.g., when
+the user is typing) or to delete a range of text that spans lines. With a line-
+oriented API for the text class, callers were forced to split and join lines to
+implement the user-interface operations. This code was nontrivial and it was
+duplicated and scattered across the implementation of the user interface.
+    The text classes were much easier to use when they provided a character-
+oriented interface, such as an insert method that inserts an arbitrary string of
+text (which may include newlines) at an arbitrary position in the text and a
+delete method that deletes the text between two arbitrary positions in the text.
+

@@ -1,0 +1,817 @@
+A Philosophy of Software Design
+
+         John Ousterhout
+        Stanford University
+A Philosophy of Software Design
+by John Ousterhout
+
+Copyright © 2018-2021 John K. Ousterhout
+All rights reserved. No part of this book may be reproduced, in any form or by any means, without
+permission in writing from the author.
+Published by Yaknyam Press, Palo Alto, CA.
+
+Cover design by Pete Nguyen and Shirin Oreizy (www.hellonextstep.com).
+
+Printing History:
+ April 2018:         First Edition (v1.0)
+ November 2018:      First Edition (v1.01)
+ July 2021:          Second Edition (v2.0)
+
+ISBN 978-1-7321022-1-7
+
+Digital book(s) (epub and mobi) produced by Booknook.biz.
+Contents
+
+Preface
+
+1 Introduction
+    1.1 How to use this book
+
+2 The Nature of Complexity
+    2.1 Complexity defined
+    2.2 Symptoms of complexity
+    2.3 Causes of complexity
+    2.4 Complexity is incremental
+    2.5 Conclusion
+
+3 Working Code Isn’t Enough
+   3.1 Tactical programming
+   3.2 Strategic programming
+   3.3 How much to invest?
+   3.4 Startups and investment
+   3.5 Conclusion
+
+4 Modules Should Be Deep
+   4.1 Modular design
+   4.2 What’s in an interface?
+   4.3 Abstractions
+   4.4 Deep modules
+   4.5 Shallow modules
+   4.6 Classitis
+   4.7 Examples: Java and Unix I/O
+      4.8   Conclusion
+
+5   Information Hiding (and Leakage)
+      5.1 Information hiding
+      5.2 Information leakage
+      5.3 Temporal decomposition
+      5.4 Example: HTTP server
+      5.5 Example: too many classes
+      5.6 Example: HTTP parameter handling
+      5.7 Example: defaults in HTTP responses
+      5.8 Information hiding within a class
+      5.9 Taking it too far
+      5.10 Conclusion
+
+6   General-Purpose Modules are Deeper
+     6.1 Make classes somewhat general-purpose
+     6.2 Example: storing text for an editor
+     6.3 A more general-purpose API
+     6.4 Generality leads to better information hiding
+     6.5 Questions to ask yourself
+     6.6 Push specialization upwards (and downwards!)
+     6.7 Example: editor undo mechanism
+     6.8 Eliminate special cases in code
+     6.9 Conclusion
+
+7   Different Layer, Different Abstraction
+      7.1 Pass-through methods
+      7.2 When is interface duplication OK?
+      7.3 Decorators
+      7.4 Interface versus implementation
+      7.5 Pass-through variables
+      7.6 Conclusion
+8   Pull Complexity Downwards
+      8.1 Example: editor text class
+      8.2 Example: configuration parameters
+      8.3 Taking it too far
+      8.4 Conclusion
+
+9   Better Together Or Better Apart?
+      9.1 Bring together if information is shared
+      9.2 Bring together if it will simplify the interface
+      9.3 Bring together to eliminate duplication
+      9.4 Separate general-purpose and special-purpose code
+      9.5 Example: insertion cursor and selection
+      9.6 Example: separate class for logging
+      9.7 Splitting and joining methods
+      9.8 A different opinion: Clean Code
+      9.9 Conclusion
+
+10 Define Errors Out Of Existence
+     10.1 Why exceptions add complexity
+     10.2 Too many exceptions
+     10.3 Define errors out of existence
+     10.4 Example: file deletion in Windows
+     10.5 Example: Java substring method
+     10.6 Mask exceptions
+     10.7 Exception aggregation
+     10.8 Just crash?
+     10.9 Taking it too far
+     10.10 Conclusion
+
+11 Design it Twice
+
+12 Why Write Comments? The Four Excuses
+     12.1 Good code is self-documenting
+     12.2 I don’t have time to write comments
+     12.3 Comments get out of date and become misleading
+     12.4 All the comments I have seen are worthless
+     12.5 Benefits of well-written comments
+     12.6 A different opinion: comments are failures
+
+13 Comments Should Describe Things that Aren’t Obvious from the Code
+    13.1 Pick conventions
+    13.2 Don’t repeat the code
+    13.3 Lower-level comments add precision
+    13.4 Higher-level comments enhance intuition
+    13.5 Interface documentation
+    13.6 Implementation comments: what and why, not how
+    13.7 Cross-module design decisions
+    13.8 Conclusion
+    13.9 Answers to questions from Section 13.5
+
+14 Choosing Names
+     14.1 Example: bad names cause bugs
+     14.2 Create an image
+     14.3 Names should be precise
+     14.4 Use names consistently
+     14.5 Avoid extra words
+     14.6 A different opinion: Go style guide
+     14.7 Conclusion
+
+15 Write The Comments First
+    15.1 Delayed comments are bad comments
+    15.2 Write the comments first
+    15.3 Comments are a design tool
+    15.4 Early comments are fun comments
+     15.5 Are early comments expensive?
+     15.6 Conclusion
+
+16 Modifying Existing Code
+    16.1 Stay strategic
+    16.2 Maintaining comments: keep the comments near the code
+    16.3 Comments belong in the code, not the commit log
+    16.4 Maintaining comments: avoid duplication
+    16.5 Maintaining comments: check the diffs
+    16.6 Higher-level comments are easier to maintain
+
+17 Consistency
+     17.1 Examples of consistency
+     17.2 Ensuring consistency
+     17.3 Taking it too far
+     17.4 Conclusion
+
+18 Code Should be Obvious
+     18.1 Things that make code more obvious
+     18.2 Things that make code less obvious
+     18.3 Conclusion
+
+19 Software Trends
+     19.1 Object-oriented programming and inheritance
+     19.2 Agile development
+     19.3 Unit tests
+     19.4 Test-driven development
+     19.5 Design patterns
+     19.6 Getters and setters
+     19.7 Conclusion
+
+20 Designing for Performance
+        20.1 How to think about performance
+        20.2 Measure before (and after) modifying
+        20.3 Design around the critical path
+        20.4 An example: RAMCloud Buffers
+        20.5 Conclusion
+
+21 Decide What Matters
+     21.1 How to decide what matters?
+     21.2 Minimize what matters
+     21.3 How to emphasize things that matter
+     21.4 Mistakes
+     21.5 Thinking more broadly
+
+22 Conclusion
+
+Index
+
+Summary of Design Principles
+
+Summary of Red Flags
+Preface
+
+People have been writing programs for electronic computers for more than 80
+years, but there has been surprisingly little conversation about how to design
+those programs or what good programs should look like. There has been
+considerable discussion about software development processes such as agile
+development and about development tools such as debuggers, version control
+systems, and test coverage tools. There has also been extensive analysis of
+programming techniques such as object-oriented programming and functional
+programming, and of design patterns and algorithms. All of these discussions
+have been valuable, but the core problem of software design is still largely
+untouched. David Parnas’ classic paper “On the Criteria to be used in
+Decomposing Systems into Modules” appeared in 1971, but the state of the art in
+software design has not progressed much beyond that paper in the ensuing 45
+years.
+    The most fundamental problem in computer science is problem
+decomposition: how to take a complex problem and divide it up into pieces that
+can be solved independently. Problem decomposition is the central design task
+that programmers face every day, and yet, other than the work described here, I
+have not been able to identify a single class in any university where problem
+decomposition is a central topic. We teach for loops and object-oriented
+programming, but not software design.
+    In addition, there is a huge variation in quality and productivity among
+programmers, but we have made little attempt to understand what makes the best
+programmers so much better or to teach those skills in our classes. I have talked
+with several people I consider to be great programmers, but most of them had
+difficulty articulating specific techniques that give them their advantage. Many
+people assume that software design skill is an innate talent that cannot be taught.
+However, there is quite a bit of scientific evidence that outstanding performance
+in many fields is related more to high-quality practice than innate ability (see, for
+example, Talent is Overrated by Geoff Colvin).
+     For many years these issues have perplexed and frustrated me. I have
+wondered whether software design can be taught, and I have hypothesized that
+design skill is what separates great programmers from average ones. I finally
+decided that the only way to answer these questions was to attempt to teach a
+course on software design. The result is CS 190 at Stanford University. In this
+class I put forth a set of principles of software design. Students then work
+through a series of projects to assimilate and practice the principles. The class is
+taught in a fashion similar to a traditional English writing class. In an English
+class, students use an iterative process where they write a draft, get feedback, and
+then rewrite to make improvements. In CS 190, students develop a substantial
+piece of software from scratch. We then go through extensive code reviews to
+identify design problems, and students revise their projects to fix the problems.
+This allows students to see how their code can be improved by applying design
+principles.
+     I have now taught the software design class several times, and this book is
+based on the design principles that emerged from the class. The principles are
+fairly high level and border on the philosophical (“Define errors out of
+existence”), so it is hard for students to understand the ideas in the abstract.
+Students learn best by writing code, making mistakes, and then seeing how their
+mistakes and the subsequent fixes relate to the principles.
+     At this point you may well be wondering: what makes me think I know all
+the answers about software design? To be honest, I don’t. There were no classes
+on software design when I learned to program, and I never had a mentor to teach
+me design principles. At the time I learned to program, code reviews were
+virtually nonexistent. My ideas about software design come from personal
+experience writing and reading code. Over my career I have written about
+250,000 lines of code in a variety of languages. I’ve worked on teams that
+created three operating systems from scratch, multiple file and storage systems,
+infrastructure tools such as debuggers, build systems, and GUI toolkits, a
+scripting language, and interactive editors for text, drawings, presentations, and
+integrated circuits. Along the way I’ve experienced firsthand the problems of
+large systems and experimented with various design techniques. In addition, I’ve
+read a considerable amount of code written by other people, which has exposed
+me to a variety of approaches, both good and bad.
+     Out of all of this experience, I’ve tried to extract common threads, both about
+mistakes to avoid and techniques to use. This book is a reflection of my
+experiences: every problem described here is one that I have experienced
+personally, and every suggested technique is one that I have used successfully in
+my own coding.
+    I don’t expect this book to be the final word on software design; I’m sure
+there are valuable techniques that I’ve missed, and some of my suggestions may
+turn out to be bad ideas in the long run. However, I hope that the book will start a
+conversation about software design. Compare the ideas in this book with your
+own experiences and decide for yourself whether the approaches described here
+really do reduce software complexity. This book is an opinion piece, so some
+readers will disagree with some of my suggestions. If you do disagree, try to
+understand why. I’m interested in hearing about things that work for you, things
+that don’t work, and any other ideas you may have about software design. I hope
+that the ensuing conversations will improve our collective understanding of
+software design. I will incorporate what I learn in future editions of this book.
+    The best way to communicate with me about the book is to send email to the
+following address:
+
+                    software-design-book@googlegroups.com
+
+    I’m interested in hearing specific feedback about the book, such as bugs or
+suggestions for improvement, as well as general thoughts and experiences related
+to software design. I’m particularly interested in compelling examples that I can
+use in future editions of the book. The best examples illustrate an important
+design principle and are simple enough to explain in a paragraph or two. If you
+would like to see what other people are saying on the email address and
+participate in discussions, you can join the Google Group software-design-book.
+    If for some reason the software-design-book Google Group should disappear
+in the future, search on the Web for my home page; it will contain updated
+instructions for how to communicate about the book. Please don’t send book-
+related email to my personal email address.
+    I recommend that you take the suggestions in this book with a grain of salt.
+The overall goal is to reduce complexity; this is more important than any
+particular principle or idea you read here. If you try an idea from this book and
+find that it doesn’t actually reduce complexity, then don’t feel obligated to keep
+using it (but, do let me know about your experience; I’d like to get feedback on
+what works and what doesn’t).
+    Many people have offered criticisms or made suggestions that improved the
+quality of the book. The following people offered helpful comments on various
+drafts of the book: Abutalib Aghayev, Jeff Dean, Will Duquette, Sanjay
+Ghemawat, John Hartman, Brian Kernighan, James Koppel, Amy Ousterhout,
+Kay Ousterhout, Rob Pike, Partha Ranganathan, Daniel Rey, Keith Schwartz, and
+Alex Snaps. Christos Kozyrakis suggested the terms “deep” and “shallow” for
+classes and interfaces, replacing previous terms “thick” and “thin”, which were
+somewhat ambiguous. I am indebted to the students in CS 190; the process of
+reading their code and discussing it with them has helped to crystallize my
+thoughts about design.
+Chapter 1
+Introduction
+(It’s All About Complexity)
+
+Writing computer software is one of the purest creative activities in the history of
+the human race. Programmers aren’t bound by practical limitations such as the
+laws of physics; we can create exciting virtual worlds with behaviors that could
+never exist in the real world. Programming doesn’t require great physical skill or
+coordination, like ballet or basketball. All programming requires is a creative
+mind and the ability to organize your thoughts. If you can visualize a system, you
+can probably implement it in a computer program.
+    This means that the greatest limitation in writing software is our ability to
+understand the systems we are creating. As a program evolves and acquires more
+features, it becomes complicated, with subtle dependencies between its
+components. Over time, complexity accumulates, and it becomes harder and
+harder for programmers to keep all of the relevant factors in their minds as they
+modify the system. This slows down development and leads to bugs, which slow
+development even more and add to its cost. Complexity increases inevitably over
+the life of any program. The larger the program, and the more people that work
+on it, the more difficult it is to manage complexity.
+    Good development tools can help us deal with complexity, and many great
+tools have been created over the last several decades. But there is a limit to what
+we can do with tools alone. If we want to make it easier to write software, so that
+we can build more powerful systems more cheaply, we must find ways to make
+software simpler. Complexity will still increase over time, in spite of our best
+efforts, but simpler designs allow us to build larger and more powerful systems
+before complexity becomes overwhelming.
+    There are two general approaches to fighting complexity, both of which will
+be discussed in this book. The first approach is to eliminate complexity by
+making code simpler and more obvious. For example, complexity can be reduced
+by eliminating special cases or using identifiers in a consistent fashion.
+     The second approach to complexity is to encapsulate it, so that programmers
+can work on a system without being exposed to all of its complexity at once. This
+approach is called modular design. In modular design, a software system is
+divided up into modules, such as classes in an object-oriented language. The
+modules are designed to be relatively independent of each other, so that a
+programmer can work on one module without having to understand the details of
+other modules.
+     Because software is so malleable, software design is a continuous process
+that spans the entire lifecycle of a software system; this makes software design
+different from the design of physical systems such as buildings, ships, or bridges.
+However, software design has not always been viewed this way. In the early days
+of programming, design was often concentrated at the beginning of a project, as
+it is in other engineering disciplines. The extreme of this approach is called the
+waterfall model, in which a project is divided into discrete phases such as
+requirements definition, design, coding, testing, and maintenance. In the
+waterfall model, each phase completes before the next phase starts; in many
+cases different people are responsible for each phase. The entire system is
+designed at once, during the design phase. The design is frozen at the end of this
+phase, and the role of the subsequent phases is to flesh out and implement that
+design.
+     Unfortunately, the waterfall model rarely works well for software. Software
+systems are intrinsically more complex than physical systems; it isn’t possible to
+visualize the design for a large software system well enough to understand all of
+its implications before building anything. As a result, the initial design will have
+many problems. The problems do not become apparent until implementation is
+well underway. However, the waterfall model is not structured to accommodate
+major design changes at this point (for example, the designers may have moved
+on to other projects). Thus, developers try to patch around the problems without
+changing the overall design. This results in an explosion of complexity.
+     Because of these issues, most software development projects today use an
+incremental approach such as agile development, in which the initial design
+focuses on a small subset of the overall functionality. This subset is designed,
+implemented, and then evaluated. Problems with the original design are
+discovered and corrected, then a few more features are designed, implemented
+and evaluated. Each iteration exposes problems with the existing design, which
+are fixed before the next set of features is designed. By spreading out the design
+in this way, problems with the initial design can be fixed while the system is still
+small; later features benefit from experience gained during the implementation of
+earlier features, so they have fewer problems.
+     The incremental approach works for software because software is malleable
+enough to allow significant design changes partway through implementation. In
+contrast, major design changes are much more challenging for physical systems:
+for example, it would not be practical to change the number of towers supporting
+a bridge in the middle of construction.
+     Incremental development means that software design is never done. Design
+happens continuously over the life of a system: developers should always be
+thinking about design issues. Incremental development also means continuous
+redesign. The initial design for a system or component is almost never the best
+one; experience inevitably shows better ways to do things. As a software
+developer, you should always be on the lookout for opportunities to improve the
+design of the system you are working on, and you should plan on spending some
+fraction of your time on design improvements.
+     If software developers should always be thinking about design issues, and
+reducing complexity is the most important element of software design, then
+software developers should always be thinking about complexity. This book is
+about how to use complexity to guide the design of software throughout its
+lifetime.
+     This book has two overall goals. The first is to describe the nature of
+software complexity: what does “complexity” mean, why does it matter, and how
+can you recognize when a program has unnecessary complexity? The book’s
+second, and more challenging, goal is to present techniques you can use during
+the software development process to minimize complexity. Unfortunately, there
+isn’t a simple recipe that will guarantee great software designs. Instead, I will
+present a collection of higher-level concepts that border on the philosophical,
+such as “classes should be deep” or “define errors out of existence.” These
+concepts may not immediately identify the best design, but you can use them to
+compare design alternatives and guide your exploration of the design space.
+
+
+1.1 How to use this book
+Many of the design principles described here are somewhat abstract, so they may
+be hard to appreciate without looking at actual code. It has been a challenge to
+find examples that are small enough to include in the book, yet large enough to
+illustrate problems with real systems (if you encounter good examples, please
+send them to me). Thus, this book may not be sufficient by itself for you to learn
+how to apply the principles.
+    The best way to use this book is in conjunction with code reviews. When you
+read other people’s code, think about whether it conforms to the concepts
+discussed here and how that relates to the complexity of the code. It’s easier to
+see design problems in someone else’s code than your own. You can use the red
+flags described here to identify problems and suggest improvements. Reviewing
+code will also expose you to new design approaches and programming
+techniques.
+    One of the best ways to improve your design skills is to learn to recognize red
+flags: signs that a piece of code is probably more complicated than it needs to be.
+Over the course of this book I will point out red flags that suggest problems
+related to each major design issue; the most important ones are summarized at
+the back of the book. You can then use these when you are coding: when you see
+a red flag, stop and look for an alternate design that eliminates the problem.
+When you first try this approach, you may have to try several design alternatives
+before you find one that eliminates the red flag. Don’t give up easily: the more
+alternatives you try before fixing the problem, the more you will learn. Over
+time, you will find that your code has fewer and fewer red flags, and your designs
+are cleaner and cleaner. Your experience will also show you other red flags that
+you can use to identify design problems (I’d be happy to hear about these).
+    When applying the ideas from this book, it’s important to use moderation and
+discretion. Every rule has its exceptions, and every principle has its limits. If you
+take any design idea to its extreme, you will probably end up in a bad place.
+Beautiful designs reflect a balance between competing ideas and approaches.
+Several chapters have sections titled “Taking it too far,” which describe how to
+recognize when you are overdoing a good thing.
+    Almost all of the examples in this book are in Java or C++, and much of the
+discussion is in terms of designing classes in an object-oriented language.
+However, the ideas apply in other domains as well. Almost all of the ideas related
+to methods can also be applied to functions in a language without object-oriented
+features, such as C. The design ideas also apply to modules other than classes,
+such as subsystems or network services.
+   With this background, let’s discuss in more detail what causes complexity,
+and how to make software systems simpler.
+Chapter 2
+The Nature of Complexity
+
+This book is about how to design software systems to minimize their complexity.
+The first step is to understand the enemy. Exactly what is “complexity”? How
+can you tell if a system is unnecessarily complex? What causes systems to
+become complex? This chapter will address those questions at a high level;
+subsequent chapters will show you how to recognize complexity at a lower level,
+in terms of specific structural features.
+    The ability to recognize complexity is a crucial design skill. It allows you to
+identify problems before you invest a lot of effort in them, and it allows you to
+make good choices among alternatives. It is easier to tell whether a design is
+simple than it is to create a simple design, but once you can recognize that a
+system is too complicated, you can use that ability to guide your design
+philosophy towards simplicity. If a design appears complicated, try a different
+approach and see if that is simpler. Over time, you will notice that certain
+techniques tend to result in simpler designs, while others correlate with
+complexity. This will allow you to produce simpler designs more quickly.
+    This chapter also lays out some basic assumptions that provide a foundation
+for the rest of the book. Later chapters take the material of this chapter as given
+and use it to justify a variety of refinements and conclusions.
+
+
+2.1 Complexity defined
+For the purposes of this book, I define “complexity” in a practical way.
+Complexity is anything related to the structure of a software system that
+makes it hard to understand and modify the system. Complexity can take
+many forms. For example, it might be hard to understand how a piece of code
+works; it might take a lot of effort to implement a small improvement, or it might
+not be clear which parts of the system must be modified to make the
+improvement; it might be difficult to fix one bug without introducing another. If
+a software system is hard to understand and modify, then it is complicated; if it is
+easy to understand and modify, then it is simple.
+    You can also think of complexity in terms of cost and benefit. In a complex
+system, it takes a lot of work to implement even small improvements. In a simple
+system, larger improvements can be implemented with less effort.
+    Complexity is what a developer experiences at a particular point in time
+when trying to achieve a particular goal. It doesn’t necessarily relate to the
+overall size or functionality of the system. People often use the word “complex”
+to describe large systems with sophisticated features, but if such a system is easy
+to work on, then, for the purposes of this book, it is not complex. Of course,
+almost all large and sophisticated software systems are in fact hard to work on, so
+they also meet my definition of complexity, but this need not necessarily be the
+case. It is also possible for a small and unsophisticated system to be quite
+complex.
+    Complexity is determined by the activities that are most common. If a system
+has a few parts that are very complicated, but those parts almost never need to be
+touched, then they don’t have much impact on the overall complexity of the
+system. To characterize this in a crude mathematical way:
+
+
+
+
+The overall complexity of a system (C) is determined by the complexity of each
+part p (cp) weighted by the fraction of time developers spend working on that
+part (tp). Isolating complexity in a place where it will never be seen is almost as
+good as eliminating the complexity entirely.
+    Complexity is more apparent to readers than writers. If you write a piece of
+code and it seems simple to you, but other people think it is complex, then it is
+complex. When you find yourself in situations like this, it’s worth probing the
+other developers to find out why the code seems complex to them; there are
+probably some interesting lessons to learn from the disconnect between your
+opinion and theirs. Your job as a developer is not just to create code that you can
+work with easily, but to create code that others can also work with easily.
+2.2 Symptoms of complexity
+Complexity manifests itself in three general ways, which are described in the
+paragraphs below. Each of these manifestations makes it harder to carry out
+development tasks.
+    Change amplification: The first symptom of complexity is that a seemingly
+simple change requires code modifications in many different places. For
+example, consider a Web site containing several pages, each of which displays a
+banner with a background color. In many early Web sites, the color was specified
+explicitly on each page, as shown in Figure 2.1(a). In order to change the
+background for such a Web site, a developer might have to modify every existing
+page by hand; this would be nearly impossible for a large site with thousands of
+pages. Fortunately, modern Web sites use an approach like that in Figure 2.1(b),
+where the banner color is specified once in a central place, and all of the
+individual pages reference that shared value. With this approach, the banner
+color of the entire Web site can be changed with a single modification. One of
+the goals of good design is to reduce the amount of code that is affected by each
+design decision, so design changes don’t require very many code modifications.
+    Cognitive load: The second symptom of complexity is cognitive load, which
+refers to how much a developer needs to know in order to complete a task. A
+higher cognitive load means that developers have to spend more time learning
+the required information, and there is a greater risk of bugs because they have
+missed something important. For example, suppose a function in C allocates
+memory, returns a pointer to that memory, and assumes that the caller will free
+the memory. This adds to the cognitive load of developers using the function; if a
+developer fails to free the memory, there will be a memory leak. If the system
+can be restructured so that the caller doesn’t need to worry about freeing the
+memory (the same module that allocates the memory also takes responsibility for
+freeing it), it will reduce the cognitive load. Cognitive load arises in many ways,
+such as APIs with many methods, global variables, inconsistencies, and
+dependencies between modules.
+    System designers sometimes assume that complexity can be measured by
+lines of code. They assume that if one implementation is shorter than another,
+then it must be simpler; if it only takes a few lines of code to make a change, then
+the change must be easy. However, this view ignores the costs associated with
+cognitive load. I have seen frameworks that allowed applications to be written
+with only a few lines of code, but it was extremely difficult to figure out what
+those lines were. Sometimes an approach that requires more lines of code is
+actually simpler, because it reduces cognitive load.
+
+
+
+
+Figure 2.1: Each page in a Web site displays a colored banner. In (a) the background color for the banner is
+specified explicitly in each page. In (b) a shared variable holds the background color and each page
+references that variable. In (c) some pages display an additional color for emphasis, which is a darker shade
+of the banner background color; if the background color changes, the emphasis color must also change.
+
+    Unknown unknowns: The third symptom of complexity is that it is not
+obvious which pieces of code must be modified to complete a task, or what
+information a developer must have to carry out the task successfully. Figure
+2.1(c) illustrates this problem. The Web site uses a central variable to determine
+the banner background color, so it appears to be easy to change. However, a few
+Web pages use a darker shade of the background color for emphasis, and that
+darker color is specified explicitly in the individual pages. If the background
+color changes, then the the emphasis color must change to match. Unfortunately,
+developers are unlikely to realize this, so they may change the central bannerBg
+variable without updating the emphasis color. Even if a developer is aware of the
+problem, it won’t be obvious which pages use the emphasis color, so the
+developer may have to search every page in the Web site.
+    Of the three manifestations of complexity, unknown unknowns are the worst.
+An unknown unknown means that there is something you need to know, but there
+is no way for you to find out what it is, or even whether there is an issue. You
+won’t find out about it until bugs appear after you make a change. Change
+amplification is annoying, but as long as it is clear which code needs to be
+modified, the system will work once the change has been completed. Similarly, a
+high cognitive load will increase the cost of a change, but if it is clear which
+information to read, the change is still likely to be correct. With unknown
+unknowns, it is unclear what to do or whether a proposed solution will even
+work. The only way to be certain is to read every line of code in the system,
+which is impossible for systems of any size. Even this may not be sufficient,
+because a change may depend on a subtle design decision that was never
+documented.
+    One of the most important goals of good design is for a system to be obvious.
+This is the opposite of high cognitive load and unknown unknowns. In an
+obvious system, a developer can quickly understand how the existing code works
+and what is required to make a change. An obvious system is one where a
+developer can make a quick guess about what to do, without thinking very hard,
+and yet be confident that the guess is correct. Chapter 18 discusses techniques for
+making code more obvious.
+
+
+2.3 Causes of complexity
+Now that you know the high-level symptoms of complexity and why complexity
+makes software development difficult, the next step is to understand what causes
+complexity, so that we can design systems to avoid the problems. Complexity is
+caused by two things: dependencies and obscurity. This section discusses these
+factors at a high level; subsequent chapters will discuss how they relate to lower-
+level design decisions.
+    For the purposes of this book, a dependency exists when a given piece of
+code cannot be understood and modified in isolation; the code relates in some
+way to other code, and the other code must be considered and/or modified if the
+given code is changed. In the Web site example of Figure 2.1(a), the background
+color creates dependencies between all of the pages. All of the pages need to
+have the same background, so if the background is changed for one page, then it
+must be changed for all of them. Another example of dependencies occurs in
+network protocols. Typically there is separate code for the sender and receiver for
+the protocol, but they must each conform to the protocol; changing the code for
+the sender almost always requires corresponding changes at the receiver, and vice
+versa. The signature of a method creates a dependency between the
+implementation of that method and the code that invokes it: if a new parameter is
+added to a method, all of the invocations of that method must be modified to
+specify that parameter.
+    Dependencies are a fundamental part of software and can’t be completely
+eliminated. In fact, we intentionally introduce dependencies as part of the
+software design process. Every time you write a new class you create
+dependencies around the API for that class. However, one of the goals of
+software design is to reduce the number of dependencies and to make the
+dependencies that remain as simple and obvious as possible.
+    Consider the Web site example. In the old Web site with the background
+specified separately on each page, all of the Web pages were dependent on each
+other. The new Web site fixed this problem by specifying the background color
+in a central place and providing an API that individual pages use to retrieve that
+color when they are rendered. The new Web site eliminated the dependency
+between the pages, but it created a new dependency around the API for retrieving
+the background color. Fortunately, the new dependency is more obvious: it is
+clear that each individual Web page depends on the bannerBg color, and a
+developer can easily find all the places where the variable is used by searching
+for its name. Furthermore, compilers help to manage API dependencies: if the
+name of the shared variable changes, compilation errors will occur in any code
+that still uses the old name. The new Web site replaced a nonobvious and
+difficult-to-manage dependency with a simpler and more obvious one.
+    The second cause of complexity is obscurity. Obscurity occurs when
+important information is not obvious. A simple example is a variable name that
+is so generic that it doesn’t carry much useful information (e.g., time). Or, the
+documentation for a variable might not specify its units, so the only way to find
+out is to scan code for places where the variable is used. Obscurity is often
+associated with dependencies, where it is not obvious that a dependency exists.
+For example, if a new error status is added to a system, it may be necessary to
+add an entry to a table holding string messages for each status, but the existence
+of the message table might not be obvious to a programmer looking at the status
+declaration. Inconsistency is also a major contributor to obscurity: if the same
+variable name is used for two different purposes, it won’t be obvious to
+developers which of these purposes a particular variable serves.
+    In many cases, obscurity comes about because of inadequate documentation;
+Chapter 13 deals with this topic. However, obscurity is also a design issue. If a
+system has a clean and obvious design, then it will need less documentation. The
+need for extensive documentation is often a red flag that the design isn’t quite
+right. The best way to reduce obscurity is by simplifying the system design.
+    Together, dependencies and obscurity account for the three manifestations of
+complexity described in Section 2.2. Dependencies lead to change amplification
+and a high cognitive load. Obscurity creates unknown unknowns, and also
+contributes to cognitive load. If we can find design techniques that minimize
+dependencies and obscurity, then we can reduce the complexity of software.
+
+
+2.4 Complexity is incremental
+Complexity isn’t caused by a single catastrophic error; it accumulates in lots of
+small chunks. A single dependency or obscurity, by itself, is unlikely to affect
+significantly the maintainability of a software system. Complexity comes about
+because hundreds or thousands of small dependencies and obscurities build up
+over time. Eventually, there are so many of these small issues that every possible
+change to the system is affected by several of them.
+    The incremental nature of complexity makes it hard to control. It’s easy to
+convince yourself that a little bit of complexity introduced by your current
+change is no big deal. However, if every developer takes this approach for every
+change, complexity accumulates rapidly. Once complexity has accumulated, it is
+hard to eliminate, since fixing a single dependency or obscurity will not, by
+itself, make a big difference. In order to slow the growth of complexity, you must
+adopt a “zero tolerance” philosophy, as discussed in Chapter 3.
+
+
+2.5 Conclusion
+Complexity comes from an accumulation of dependencies and obscurities. As
+complexity increases, it leads to change amplification, a high cognitive load, and
+unknown unknowns. As a result, it takes more code modifications to implement
+each new feature. In addition, developers spend more time acquiring enough
+information to make the change safely and, in the worst case, they can’t even find
+all the information they need. The bottom line is that complexity makes it
+difficult and risky to modify an existing code base.
+Chapter 3
+Working Code Isn’t Enough
+(Strategic vs. Tactical Programming)
+
+One of the most important elements of good software design is the mindset you
+adopt when you approach a programming task. Many organizations encourage a
+tactical mindset, focused on getting features working as quickly as possible.
+However, if you want a good design, you must take a more strategic approach
+where you invest time to produce clean designs and fix problems. This chapter
+discusses why the strategic approach produces better designs and is actually
+cheaper than the tactical approach over the long run.
+
+
+3.1 Tactical programming
+Most programmers approach software development with a mindset I call tactical
+programming. In the tactical approach, your main focus is to get something
+working, such as a new feature or a bug fix. At first glance this seems totally
+reasonable: what could be more important than writing code that works?
+However, tactical programming makes it nearly impossible to produce a good
+system design.
+    The problem with tactical programming is that it is short-sighted. If you’re
+programming tactically, you’re trying to finish a task as quickly as possible.
+Perhaps you have a hard deadline. As a result, planning for the future isn’t a
+priority. You don’t spend much time looking for the best design; you just want to
+get something working soon. You tell yourself that it’s OK to add a bit of
+complexity or introduce a small kludge or two, if that allows the current task to
+be completed more quickly.
+    This is how systems become complicated. As discussed in the previous
+chapter, complexity is incremental. It’s not one particular thing that makes a
+system complicated, but the accumulation of dozens or hundreds of small things.
+If you program tactically, each programming task will contribute a few of these
+complexities. Each of them probably seems like a reasonable compromise in
+order to finish the current task quickly. However, the complexities accumulate
+rapidly, especially if everyone is programming tactically.
+    Before long, some of the complexities will start causing problems, and you
+will begin to wish you hadn’t taken those early shortcuts. But, you will tell
+yourself that it’s more important to get the next feature working than to go back
+and refactor existing code. Refactoring may help out in the long run, but it will
+definitely slow down the current task. So, you look for quick patches to work
+around any problems you encounter. This just creates more complexity, which
+then requires more patches. Pretty soon the code is a mess, but by this point
+things are so bad that it would take months of work to clean it up. There’s no way
+your schedule can tolerate that kind of delay, and fixing one or two of the
+problems doesn’t seem like it will make much difference, so you just keep
+programming tactically.
+    If you have worked on a large software project for very long, I suspect you
+have seen tactical programming at work and have experienced the problems that
+result. Once you start down the tactical path, it’s difficult to change.
+    Almost every software development organization has at least one developer
+who takes tactical programming to the extreme: a tactical tornado. The tactical
+tornado is a prolific programmer who pumps out code far faster than others but
+works in a totally tactical fashion. When it comes to implementing a quick
+feature, nobody gets it done faster than the tactical tornado. In some
+organizations, management treats tactical tornadoes as heroes. However, tactical
+tornadoes leave behind a wake of destruction. They are rarely considered heroes
+by the engineers who must work with their code in the future. Typically, other
+engineers must clean up the messes left behind by the tactical tornado, which
+makes it appear that those engineers (who are the real heroes) are making slower
+progress than the tactical tornado.
+
+
+3.2 Strategic programming
+The first step towards becoming a good software designer is to realize that
+working code isn’t enough. It’s not acceptable to introduce unnecessary
+complexities in order to finish your current task faster. The most important thing
+is the long-term structure of the system. Most of the code in any system is
+written by extending the existing code base, so your most important job as a
+developer is to facilitate those future extensions. Thus, you should not think of
+“working code” as your primary goal, though of course your code must work.
+Your primary goal must be to produce a great design, which also happens to
+work. This is strategic programming.
+     Strategic programming requires an investment mindset. Rather than taking
+the fastest path to finish your current project, you must invest time to improve the
+design of the system. These investments will slow you down a bit in the short
+term, but they will speed you up in the long term, as illustrated in Figure 3.1.
+     Some of the investments will be proactive. For example, it’s worth taking a
+little extra time to find a simple design for each new class; rather than
+implementing the first idea that comes to mind, try a couple of alternative
+designs and pick the cleanest one. Try to imagine a few ways in which the system
+might need to be changed in the future and make sure that will be easy with your
+design. Writing good documentation is another example of a proactive
+investment.
+     Other investments will be reactive. No matter how much you invest up front,
+there will inevitably be mistakes in your design decisions. Over time, these
+mistakes will become obvious. When you discover a design problem, don’t just
+ignore it or patch around it; take a little extra time to fix it. If you program
+strategically, you will continually make small improvements to the system
+design. This is the opposite of tactical programming, where you are continually
+adding small bits of complexity that cause problems in the future.
+
+
+3.3 How much to invest?
+So, what is the right amount of investment? A huge up-front investment, such as
+trying to design the entire system, won’t be effective. This is the waterfall
+method, and we know it doesn’t work. The ideal design tends to emerge in bits
+and pieces, as you get experience with the system. Thus, the best approach is to
+make lots of small investments on a continual basis. I suggest spending about 10–
+20% of your total development time on investments. This amount is small
+enough that it won’t impact your schedules significantly, but large enough to
+produce significant benefits over time. Your initial projects will thus take 10–
+20% longer than they would in a purely tactical approach. That extra time will
+result in a better software design, and you will start experiencing the benefits
+within a few months. It won’t be long before you’re developing at least 10–20%
+faster than you would if you had programmed tactically. At this point your
+investments become free: the benefits from your past investments will save
+enough time to cover the cost of future investments. You will quickly recover the
+cost of the initial investment. Figure 3.1 illustrates this phenomenon.
+
+
+
+
+Figure 3.1: At the beginning, a tactical approach to programming will make progress more quickly than a
+strategic approach. However, complexity accumulates more rapidly under the tactical approach, which
+reduces productivity. Over time, the strategic approach results in greater progress. Note: this figure is
+intended only as a qualitative illustration; I am not aware of any empirical measurements of the precise
+shapes of the curves.
+
+    Conversely, if you program tactically, you will finish your first projects 10–
+20% faster, but over time your development speed will slow as complexity
+accumulates. It won’t be long before you’re programming at least 10–20%
+slower. You will quickly give back all of the time you saved at the beginning, and
+for the rest of system’s lifetime you will be developing more slowly than if you
+had taken the strategic approach. If you haven’t ever worked in a badly degraded
+code base, talk to someone who has; they will tell you that poor code quality
+slows development by at least 20%.
+    The term technical debt is often used to describe the problems caused by
+tactical programming. By programming tactically you are borrowing time from
+the future: development will go more quickly now, but more slowly later on. As
+with financial debt, the amount you pay back will exceed the amount you
+borrowed. Unlike financial debt, most technical debt is never fully repaid: you’ll
+keep paying and paying forever.
+

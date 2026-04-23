@@ -1,0 +1,716 @@
+                                        4.3 Route computation using Dijkstra’s algorithm               81
+
+
+
+
+FIGURE 4.6
+Using a priority queue based on bucket sorting to speed up Dijkstra’s algorithm.
+
+
+cost of a node X is c, then node X can be placed in a list pointed to by element c of the array (Fig. 4.6).
+This leads to the following algorithm.
+    Whenever a node X changes its cost from c to c , node X is removed from the list for c and added to
+the list for c . But how is the minimum element to be found? This can be done by initializing a pointer
+called CurrentMin to 0 (which corresponds to the cost of S). Each time the algorithm wishes to find the
+minimum-cost node not in the tree, CurrentMin is incremented by 1 until an array location is reached
+that contains a nonempty list. Any node in this list can then be added to the tree. The algorithm costs
+O(N + Diam ∗ MaxLinkCost) because the work done in advancing CurrentMin can at most be the size
+of the array. This can be significantly better than N log N for large N and small values of Diam and
+MaxLinkCost.
+    A crucial factor in being able to efficiently use a bucket sort priority queue of the kind described
+earlier is that the node costs are always ahead of the value of CurrentMin. This is a monotonicity
+condition. If it were not true, the algorithm would start checking for the minimum from 1 at each
+iteration, instead of starting from the last value of CurrentMin and never backing up. The monotonicity
+condition is fairly obvious for Dijktra’s algorithm because the costs of nodes not already in the tree
+have to be larger than the costs of nodes that are already in the tree.
+    Fig. 4.6 shows the state of the bucket sort priority queue after A has been added to the tree. This
+corresponds to the right frame of Fig. 4.5. At this stage, CurrentMin = 2, which is the cost of A. At the
+next iteration, CurrentMin will advance to 3, and D will be added to the tree. This will result in the C’s
+cost being reduced to 4. We thus remove C from the list in position 5 and add it to the empty list in
+position 4. CurrentMin is then advanced to 4, and C is added to the tree.
+
+Exercises
+
+• The algorithm requires a node to be removed from a list and added to another, earlier list. How can
+  this be done efficiently?
+• In Fig. 4.6 how can the algorithm know that it can terminate after adding C to the tree instead of
+  advancing to the end of the long array?
+• In networks that have failures, the concept of diameter is a highly suspect one because the diameter
+  could change considerably after a failure. Consider a wheel topology where all N nodes have diam-
+82       Chapter 4 Principles in action
+
+
+
+  eter 2 through a central spoke node; if the central spoke node fails, the diameter goes up to N/2. In
+  actual practice the diameter is often small. Can this cause problems in sizing the array?
+• Can you circumvent the problem of the diameter completely by replacing the linear array of Fig. 4.6
+  with a circular array of size MaxLinkCost? Explain. The resulting solution is known as Dial’s
+  algorithm (Ahuja et al., 1993).
+
+
+
+4.4 Ethernet monitor using bridge hardware
+Alyssa P. Hacker is working for Acme Networks and knows of the Ethernet bridge invented at Acme.
+A bridge (see Chapter 10) is a device that can connect Ethernets together. To forward packets from one
+Ethernet to another, the bridge must look up the 48-bit destination address in an Ethernet packet at high
+speeds.
+    Alyssa decides to convert the bridge into an Ethernet traffic monitor that will passively listen to
+an Ethernet and produce statistics about traffic patterns. The marketing person tells her that she needs
+to monitor traffic between arbitrary source–destination pairs. Thus for every active source–destination
+pair, such as A, B, Alyssa must keep a variable PA,B that measures the number of packets sent from A
+to B since the monitor was started. When a packet is sent from A to B, the monitor (which is listening
+to all packets sent on the cable) will pick up a copy of the packet. If the source is A and the destination is
+B, the monitor should increment PA,B . The problem is to do this in 64 µsec, the minimum interpacket
+time on the Ethernet. The bottleneck is the lookup of the state PA,B associated with a pair of 48-bit
+addresses A, B.
+    Fortunately, the bridge hardware has a spiffy lookup hardware engine that can look up the state
+associated with a single 48-bit address in 1.4 µsec. A call to the hardware can be expressed as Lookup(X,
+D), where X is the 48-bit key and D is the database to be searched. The call returns the state associated
+with X in 1.4 µsec for databases of less than 64,000 keys. What Alyssa must solve is the following
+problem.
+
+Problem
+The monitor needs to update state for AB when a packet from A to B arrives. The monitor has a lookup
+engine that can look up only single addresses and not address pairs. How can Alyssa use the existing
+engine to look up address pairs? The problem is illustrated in Fig. 4.7.
+
+Hint: The problem requires using P4c to exploit the existing bridge hardware. Since 1.4 µsec is
+much smaller than 64 µsec, the design can afford to use more than one hardware lookup. How can
+a 96-bit lookup be reduced to a 48-bit lookup using three lookups?
+    A naive solution is to use two lookups to convert source A and destination B into smaller
+(<24-bit) indices IA and IB . The indices IA and IB can then be used to look up a two-dimensional
+array that stores the state for AB. This requires only two hardware lookups plus one more mem-
+ory access, but it can require large amounts of memory. If there are 1000 possible sources and
+1000 possible destinations, the array must contain a million entries. In practice, there may be
+only 20,000 active source–destination pairs. How could you make the required amount of memory
+proportional to the number of actual source–destination pairs?
+                                                4.4 Ethernet monitor using bridge hardware                        83
+
+
+
+
+FIGURE 4.7
+Adapting an engine that does destination lookups to doing source-destination lookups.
+
+
+
+
+FIGURE 4.8
+Converting a 96-bit lookup into a 48-bit lookup by first converting each 48-bit address into a 24-bit index and
+concatenating the indices.
+
+
+
+
+Solution
+As before, first use one lookup each to convert source A and destination B into smaller (<24-bit)
+indices IA and IB . Then use a third lookup to map from IA IB to AB state. The solution is illustrated in
+Fig. 4.8. The third lookup effectively compresses the two-dimensional array of the naive solution. This
+solution is due to Mark Kempf and Mike Soha.
+
+Exercises
+
+• Can this problem be solved using only two bridge hardware lookups without requiring extra mem-
+  ory?
+• The set of active source–destination pairs may change with time because some pairs of addresses
+  stop communicating for long periods. How can this be handled without keeping the state for every
+  possible address pair that has communicated since the monitor was powered on?
+84        Chapter 4 Principles in action
+
+
+
+
+FIGURE 4.9
+Demultiplexing in the x-kernel is done by hashing the protocol identifier K and (potentially) using a byte-by-byte
+comparison with the key L stored at the hash table entry.
+
+
+
+4.5 Demultiplexing in the x-kernel
+The x-kernel (Hutchinson and Peterson, 1991) provides a software infrastructure for protocol imple-
+mentation in hosts. The x-kernel system provides support for a number of required protocol functions.
+One commonly required function is protocol demultiplexing. For example, when the Internet routing
+layer IP receives a packet, it must use the protocol field to determine whether the packet should be
+subsequently sent to TCP (transmission control protocol) or UDP (user datagram protocol).
+    Most protocols do demultiplexing based on some identifier in the protocol header. These identifiers
+can vary in length in different protocols. For example, Ethernet-type fields can be 5 bytes while TCP
+port numbers are 2 bytes long. Thus the x-kernel allows demultiplexing based on variable-length pro-
+tocol identifiers. When the system is initialized, the protocol routine can register the mapping between
+the identifier and the destination protocol with the x-kernel. At run time, when a packet arrives the pro-
+tocol routine can extract the protocol identifier from the packet and query the x-kernel demultiplexing
+routine for the destination protocol. Since packets can arrive at high speeds, the demultiplexing routine
+should be fast. This leads to the following problem.
+
+Problem
+On average, the fastest way to do a lookup is to use a hash table. As shown in Fig. 4.9, this requires
+computing some hash function on the identifier K to generate a hash index, using this index to access
+the hash table, and comparing the key L stored in the hash table entry with K. If there is a match, the
+demultiplexing routine can retrieve the destination protocol associated with key L. Assume that the
+hash function has been chosen to make collisions infrequent.
+    However, since the identifier length is an arbitrary number of bytes, the comparison routine that
+compares the two keys must, in general, do byte-by-byte comparisons. However, suppose the most
+common case is 4-byte identifiers, which is the machine word size. In this case, it is much more efficient
+to do a word comparison. Thus the goal is to exploit efficient word comparisons (P4c) to optimize the
+expected case (P11). How can this be done while still handling arbitrary protocols?
+
+Hint: Notice that if the x-kernel has to demultiplex a 3-byte identifier, it has to use a byte-by-
+byte comparison routine; if the x-kernel has to demultiplex a 4-byte identifier and 4 bytes are the
+machine word size, it can use a word compare. The first degree of freedom that can be exploited is
+to have different comparison routines for the most common cases (e.g., word compares, long-word
+compares) and a default comparison routine that uses byte comparisons. Doing so trades some extra
+                                                                4.6 Tries with node compression            85
+
+
+
+space for time (P4b). For correctness, however, it is important to know which comparison routine
+to use for each protocol. Consider invoking principles P9 to pass hints in interfaces and P2a to do
+some precomputation.
+
+Solution
+Each protocol has to declare its identifier and destination protocol to the x-kernel when the system
+initializes. When this happens, each protocol can predeclare its identifier length, so the x-kernel can use
+a specialized comparison routine for each protocol. Effectively, information is being passed between the
+client protocol and the x-kernel (P9) at an earlier time (P2a). Assume that the x-kernel has a separate
+hash table for each client protocol and that the x-kernel knows the context for each client in order to
+use code specialized for thatclient.
+
+Exercises
+
+• Code up byte-by-byte and word comparisons on your machine and do a large number of both types
+  of comparisons and compare the overall time taken for each.
+• In the earlier ADC solution, the hash table lookup was finessed by passing an index (instead of the
+  identifier length as earlier). Why might that solution be difficult in this case?
+
+
+
+4.6 Tries with node compression
+A trie is a data structure that is a tree of nodes, where each node is an array of M elements. Fig. 4.10
+shows a simple example with M = 8. Each array can hold either a key (e.g., KEY 1, KEY 2, or KEY 3
+in Fig. 4.10) or a pointer to another trie node (e.g., the first element in the topmost trie node of Fig. 4.10,
+which is the root). The trie is used to search for exact matches (and longest-prefix matches) with an
+input string. Tries are useful in networking for such varied tasks as IP address lookups (Chapter 11),
+bridge lookups (Chapter 10), and demultiplexing filters (Chapter 8).
+
+
+
+
+FIGURE 4.10
+Trie storing three keys. Notice the wasted space in the trie nodes.
+86       Chapter 4 Principles in action
+
+
+
+    The exact trie algorithms do not concern us here. All one needs to know is how a trie is searched.
+Let c = log2 M be the chunk size of a trie. To search the trie, search first breaks the input string into
+chunks of size c. Search uses successive chunks, starting from the most significant, to index into nodes
+of the trie, starting with the root node. When search uses chunk j to index into position i of the current
+trie node, position i could contain either a pointer or a key. If position i contains a nonnull pointer to
+node N , the search continues at node N with chunk j + 1; otherwise, the search terminates.
+    To summarize, each node is an array of pointers or keys, and the search process needs to index
+into these arrays. However, if many trie nodes are sparse, there is considerable wasted space (P1). For
+example, in Fig. 4.10, only 4 out of 16 locations contain useful information. In the worst case, each
+trie node could contain 1 pointer or key and there could be a factor of M in wasted memory. Assume
+M ≤ 32 in what follows. Even if M is this small, a 32-fold increase in memory can greatly increase the
+cost of the design.
+    An obvious approach is to replace each trie node by a linear list of pairs of the form (i, val), where
+val is the nonempty value (either pointer or key) in position i of the node. For example, the root trie
+node in Fig. 4.10 could be replaced by the list (1, ptr1); (7, KEY 1), where ptr1 is the pointer to the
+bottom trie node. Unfortunately, this can slow down trie search by a factor of M, because the search
+of each trie node may now have to search through a list of M locations, instead of a single indexing
+operation. This leads to the following problem.
+
+Problem
+How can trie nodes be compressed to remove null pointers without slowing down search by more than
+a small factor?
+Hint: Despite compressing the nodes, array indexing needs to be efficient. If the nodes are com-
+pressed, how might information about which array elements are removed be represented? Consider
+leveraging off the fact that M is small by following P14 (exploit the small integer size) and P4a
+(exploit locality).
+
+Solution
+Since M < 32, a bitmap of size 32 can easily fit into a computer word (P14 and P4a). Thus null pointers
+are removed after adding a bitmap with zero bits indicating the original positions of null pointers. This
+is shown in Fig. 4.11. The trie node can now be replaced with a bitmap and a compressed trie node.
+A compressed trie node is an array that consists only of the nonnull values in the original node. Thus in
+Fig. 4.11, the original root trie node (on the top) has been replaced with the compressed trie node (on
+the bottom). The bitmap contains a 1 in the first and seventh positions, where the root node contains
+nonnull values. The compressed array now contains only two elements, the first pointer and KEY 3.
+This still begs the question: How should a trie node be searched?
+    Since both uncompressed and compressed nodes are arrays and the search process starts with an
+index I into the uncompressed node, the search process must consult the bitmap to convert the uncom-
+pressed index I into a compressed index C into the compressed node. For example, if I is 1 in Fig. 4.11,
+C should be 1; if I is 7, C should be 2. If I is any other value, C should be 0, indicating that there is
+only a null pointer.
+    Fortunately, the conversion from I to C can be accomplished easily by noting the following. If
+position I in the bitmap contains a 0, then C = 0. Otherwise, C is the number of 1’s in the first I bits of
+the bitmap. Thus if I = 7, then C = 2, since there are two bits set in the first seven bits of the bitmap.
+                                                                  4.7 Packet filtering in routers                  87
+
+
+
+
+FIGURE 4.11
+Compressing a trie node using a bitmap and bit counting to efficiently translate from an uncompressed index to a
+compressed index.
+
+
+    This computation requires at most two memory references: one to access the bitmap (because the
+bitmap is small [P4a]) and one to access the compressed array. The calculation of the number of bits
+set in a bitmap can be done using internal registers (in software) or combinatorial logic (in hardware).
+Thus the effective slowdown is slightly more than a factor of 2 in software and exactly 2 in hardware.
+
+Exercises
+
+• How could you use table lookup (P14, P2a) to speed up counting the number of bits set in software?
+  Would this necessarily require a third memory reference?
+• Suppose the bitmap is large (say, M = 64 K). It would appear that counting the number of bits set
+  in such a large bitmap is impossibly slow in hardware or software. Can you find a way to speed up
+  counting bits in a large bitmap (principles P12 and P2a) using only one extra memory access? This
+  will be extremely useful in Chapter 11.
+
+
+
+4.7 Packet filtering in routers
+Chapter 12 describes protocols that set up resources at routers for traffic, such as video, that needs
+performance guarantees. Such protocols use the concept of packet filters, sometimes called classifiers.
+Thus, in Fig. 4.12 each receiver attached to a router may specify a packet filter describing the packets
+it wishes to receive. For example, in Fig. 4.12 Receiver 1 may be interested in receiving NBC, which is
+specified by Filter 4. Each filter is some specification of the fields that describe the video packets that
+NBC sends. For example, NBC may be specified by packets that use the source address of the NBC
+transmitter in Germany and use a specified TCP destination and source port number.
+    Similarly, in Fig. 4.12 Receiver m may be interested in receiving ABC Sports and CNN, which are
+described by Filters 1 and 7, respectively. Packets arrive at the router at high speeds and must be sent
+88        Chapter 4 Principles in action
+
+
+
+
+FIGURE 4.12
+Packet filtering in a router may require a slow linear scan of all filters followed by making a copy of the packet for
+all filters that match.
+
+
+to all receivers that request the packet. For example, Receivers 1 and 2 may both wish to receive NBC.
+This leads to the following problem.
+Problem
+Each receiving packet must be matched against all filters and sent to all receivers that match. A simple
+linear scan of all filters is expensive if the number of filters is large. Assume the number of filters is
+over a thousand. How can this expensive process be sped up?
+Hint: One might think of optimizing the expected case by caching (P11a). However, why is caching
+difficult in this case? Consider adding a field (P10) to the packet header to make caching easier.
+Ideally, which protocol layer should this be added to? Adding a fixed well-known field for each
+possible video type is not a panacea because it requires global standardization, and filters can be
+based on other fields, such as the source address. Assume the field you add does not require globally
+standardized identifiers. What properties of this field must the source ensure?
+
+Solution
+Caching (P11a), the old workhorse of system designers, is not very straightforward in this problem. In
+general, a cache stores a mapping between an input a and some output f (a). The cache then consists
+of a set of pairs of the form (a, f (a)). This set of pairs is stored as a database keyed by values of
+a. The database can be implemented as a hash table (in software) or a content-addressable memory
+(in hardware). Given input a and the need to calculate f (a), the database is first checked to see if
+a is already in the database. If so, the fast path exits with the existing value of f (a). If not, f (a) is
+computed using some other (possibly expensive) computation and the pair (a, f (a)) is then inserted
+into the cache database. Subsequent inputs with value a can then be calculated very fast.
+    In the packet filtering problem, the goal is to calculate the set of receivers associated with a packet
+P . The problem is that the output is a function of a (potentially) large number of packet header fields
+of P . Thus to use caching, one has to store a large portion of the headers of P associated with the set of
+receivers for P . Storing a mapping between 64 bytes of packet header and an output set of receivers is
+an expensive proposition. It is expensive in time, since searching the cache can take longer because the
+                                                                    4.7 Packet filtering in routers       89
+
+
+
+
+FIGURE 4.13
+Adding a flow identifier (which is unique only with respect to a source) can speed up packet filtering.
+
+
+
+keys are wide. It is also clearly expensive in storage. The larger storage needs in turn imply that fewer
+mappings can be cached for a given cache size, which leads to a poorer cache hit rate.
+    The ideal is to cache a mapping between one or two packet fields and the output receiver set. This
+would speed up cache search time and improve the cache hit rate. These fields should also preferably
+be in the routing header, which routers examine anyway. The problem is that there may be no such field
+that uniquely fingerprints packet P .
+    However, suppose we are system designers designing the routing protocol. We can add a field to
+the routing header. The problem might seem trivial if we could assign each possible stream of packets
+a unique global identifier. For example, if we could assign NBC identifier 1, ABC identifier 2, and
+CNN identifier 3, then we could cache using the identifier as the key. Such a solution would require
+some form of global standards committee responsible for naming every application stream. Even if that
+could be done, the receiver filter might ask for all NBC packets from a given source, and the filter could
+depend on other packet fields. This leads to the following final idea.
+    Change the routing header to add a flow identifier F (Fig. 4.13), whose meaning depends on the
+source. In other words, different sources can use the same flow identifier because it is the combination
+of the source and the flow identifier that is unique. Thus there is no need for global standardization (or
+other global coordination) of flow identifiers. A flow identifier is only a local counter maintained by the
+source. The idea is that a sending application at the sender can ask the routing layer for a flow identifier.
+This identifier is added to the routing header of all the packets for this application.
+    As usual, when the application packet first arrives, the router does a (slow) linear search to deter-
+mine the set of receivers associated with the packet header. Because identifiers are not unique across
+sources, the router caches the mapping using the concatenation of the packet source address and the
+flow identifier as the key. Clearly, correctness depends on the sender application’s not changing fields
+that could affect a filter without also changing the flow identifier in the packet.
+90        Chapter 4 Principles in action
+
+
+
+
+FIGURE 4.14
+The LSP of router R1 (with even 500 endnode neighbors) may be too large to fit into a data link frame. Without a
+clever idea, this would require inefficient fragmentation and reassembly of the LSP at every hop.
+
+
+
+Exercises
+
+• What can go wrong if the source crashes and comes up again without remembering which identifiers
+  it has assigned to different applications? What can go wrong when a receiver adds a new filter? How
+  can these problems be solved?
+• In the current solution, the flow identifier is used as a tip (Chapter 3) and not as a hint. What addi-
+  tional costs would be incurred if the flow identifier-source address pair is treated as a hint and not as
+  a tip?
+
+
+
+4.8 Avoiding fragmentation of LSPs
+The following problem actually arose during the design of the OSI and OSPF (Perlman, 1992) link
+state routing protocols. This problem is about protocol design, as opposed to protocol implementation
+once the design is fixed. Despite this, it illustrates how design choices can greatly affect implementation
+performance.
+    Chapter 2 and Section 4.3 described link state routing. Recall that in link state routing, a router must
+send an LSP listing all its neighbors. The link state protocol consists of two separate processes. The
+first is the update process that sends LSPs reliably from router to router using a flooding protocol that
+relies on a unique sequence number per LSP. The sequence number is used to reject duplicate copies
+of an LSP. Whenever a router receives a new LSP numbered x from source S, the router will remember
+number x and will reject any subsequent LSPs received from S with sequence number x. After the
+update process does its work, the decision process at every router applies Dijkstra’s algorithm to the
+network map formed by the LSPs.
+    While a router may have a small number of router neighbors, a router may have a large number of
+host computers (endnodes) that are connected directly to the router on the same LAN. For example,
+in Fig. 4.14 router R1 has 500 endnode neighbors E1 . . . E500. Large LANs may even have a larger
+number of endnodes. This leads to the following problem.
+                                                      4.8 Avoiding fragmentation of LSPs               91
+
+
+
+Problem
+At 8 bytes per endnode (6 bytes to identify the endnode and 2 bytes of cost information), the LSP
+can be very large (40,000 bytes for 5000 endnodes). This is much too huge for the LSP to fit into a
+maximum-size frame on many commonly used data links. For example, Ethernet has a maximum size
+of 1500 bytes and FDDI specifies a maximum of 4500 bytes. This implies that the large LSP must be
+fragmented into many data link frames on each hop and reassembled at each router before it can be sent
+onward. This requires an expensive reassembly process at each hop to determine whether all the pieces
+of a LSP have been received.
+    It also increases the latency of link state propagation. Suppose that each LSP can fit in M data link
+frames, that the diameter of the network is D, and that the time to send a data link frame over a link is 1
+time unit. Then with hop-by-hop reassembly, the propagation time of an LSP can be D · M. If a router
+did not have to wait to reassemble each LSP at each hop, the propagation delay would be only M + D.
+When the link state protocol was being designed, these problems were discovered by implementors
+reviewing the initial specification.
+    On the other hand, it seems impossible to propagate the fragments independently because the LSP
+carries a single sequence number that is crucial to the update process. Simply copying the sequence
+number into each fragment will not help because that will cause the later fragments to be rejected,
+since they have the same sequence number as the first fragment. The problem is to make the impossible
+possible by shifting computation around in space to avoid the need for hop-by-hop fragmentation.
+Changes to the LSP routing protocol are allowed.
+Hint: Does the information about all 5000 endnodes have to be in the same LSP? Consider invoking
+P3c to shift computation in space.
+
+Solution
+If the individual fragments of the original LSP of R1 are to be propagated independently without hop-
+by-hop reassembly, then each fragment must be a separate LSP by itself, with a separate sequence
+number. This crucial observation leads to the following elegant idea.
+    Modify the link state routing protocol to allow any router R1 to be multiple pseudorouters R1a ,
+R1b , R1c (see Fig. 4.15). The original set of endnodes are divided among these pseudorouters, so the
+LSP of each pseudorouter can fit into most data link frames without the need for fragmentation. For
+example, if most data link sizes are at least 576 bytes, roughly 72 endnodes can fit within a data link
+frame.
+    How is this concept of a pseudorouter actually realized? In the original LSP propagation, each
+router had a 6-byte ID that is placed in all LSPs sent by the router. To allow for pseudorouters, we
+change the protocol to have LSPs carry a 7-byte ID (6-byte router ID + 1-byte pseudorouter ID). The
+pseudorouter ID can be assigned by the actual router that houses all the pseudorouters. By allowing 256
+pseudorouters per router, roughly 18,000 endnodes can be supported per router.
+    While the LSP propagation treats pseudorouters separately, it is crucial that route computation treat
+the separate pseudorouters as one router. After all, the endnodes are all directly connected to R1 in our
+example. But this is easily done because all the LSPs with the same first 6 bytes can be recognized as
+being from the same router.
+    In summary, the main idea is to shift computation in space (P3c) by having the source fragment the
+original LSP into independent LSPs instead of having each data link do the fragmentation. This is a
+92        Chapter 4 Principles in action
+
+
+
+
+FIGURE 4.15
+Avoiding hop-by-hop fragmentation by dividing a large router into pseudorouters.
+
+
+
+good example of systems thinking. Needless to say, the implementors liked this solution (invented by
+Radia Perlman) much better than the original approach.
+
+Exercises
+
+• How can a router assign endnodes to pseudorouters? What happens if a router initially has a lot of
+  endnodes (and hence a lot of pseudorouters) and then most of the endnodes die? This can leave a lot
+  of pseudorouters, each of which has only a few endnodes. Why is this bad, and how can it be fixed?
+• As in the relaxed-consistency examples described in Chapter 3, this solution can lead to some un-
+  expected (but not very serious) temporary inconsistencies. Assuming a solution to the previous
+  exercise, describe a scenario in which a given router, say, R2, can find (at some instant) that its
+  LSP database shows the same endnode (say, E1) belonging to two pseudorouters, R1a and R1c .
+  Why is this no worse than ordinary LSP routing?
+
+
+
+4.9 Policing traffic patterns
+Some network protocols require that sources never send data faster than a certain rate. Instead of merely
+specifying the average rate over long periods of time, the protocol may also specify the maximum
+amount of traffic, B, in bits a source can send in any period of T seconds. This does limit the source to
+an average rate of B/T bits per second. However, it also limits the “burstiness” of the users’ traffic to
+at most one burst of size B every T units of time. For example, choosing a small value of the parameter
+T limits the traffic burstiness considerably. Burstiness causes problems for networks because periods
+of high traffic and packet loss are followed by idle periods.
+    If every source meets its contract (i.e., sends no more than the specified amount in the specified
+period), the network can often guarantee performance and ensure that no traffic is dropped and that all
+traffic is delivered in timely fashion. Unfortunately, this is like saying that if everyone follows the rules
+of the road, traffic will flow smoothly. Most people do follow the rules: some because they feel it is the
+right thing to do, and many because they are aware of penalties that they have to pay when caught by
+traffic police. Thus policing is an important part of an ordered society.
+                                                                    4.9 Policing traffic patterns             93
+
+
+
+
+FIGURE 4.16
+The naive use of a single or multiple timers (to check whether a flow sends no more than B every T seconds) does
+not catch all violations.
+
+
+     For the same reason, many designers advocate that the network should periodically police traffic to
+look for offenders that do not meet their contracts. Without policing, the offenders can get an unfair
+share of network bandwidth.
+     Assume that a traffic flow is identified by the source and destination addresses and the traffic type.
+Thus each router needs to ensure that a particular traffic flow sends no more than B bits in any period
+of T seconds. The simplest solution is for the router to use a single timer that ticks every T seconds
+and to count the number of bits sent in each period using a counter per flow. At the end of each period,
+if the counter exceeds B, the router has detected a violation.
+     Unfortunately, the single timer can police only some periods. For example, assume without
+loss of generality that the timer starts at time 0. Then the only periods checked are the periods
+[0, T ], [T , 2T ], [2T , 3T ], . . .. This does not ensure that the source flow does not violate its contract
+in a period like [T /2, 3T /2], which overlaps the periods that are policed. For example, on the left side
+of Fig. 4.16, the flow sends a burst of size B just before the timer ticks at time T and sends a second
+burst of size B just after the timer ticks at time T .
+     One attempt to fix this problem is for the router to use multiple timers and counters. For example,
+as shown on the right of Fig. 4.16, the router could use one timer that starts at 0 and a second timer that
+starts at time T /2. Unfortunately, the flow can still violate its contract by sending no more than B in
+each policed period but sending more than B in some overlapping period.
+     For instance, in the right frame of Fig. 4.16 an offending flow sends a first burst of B at the end
+of the first period and a second burst of B at the start of the third period, sending 2B within a period
+slightly greater than T /2. Unfortunately, neither of the timers will detect the flow as being a violator.
+This leads to the following problem.
+
+Problem
+Multiple timers are expensive and do not guarantee that the flow will not violate its traffic contract. It is
+easy to see that with even a single timer, the flow can send no more than 2B in any period of T seconds.
+One approach is simply to assume that a factor-of-2 violation is not worth the effort to police. However,
+suppose that bandwidth is precious on a transcontinental link and that a factor-of-2 violation is serious.
+How could a violating flow still be caught using only a single timer?
+94        Chapter 4 Principles in action
+
+
+
+
+FIGURE 4.17
+Picking a random gap of T seconds between policing intervals allows the router to catch a violating flow with high
+probability.
+
+
+
+Hint: Consider exploiting a degree of freedom (P13) that has been assumed to be fixed in the naive
+solution. Do the policing intervals have to start at fixed intervals? Also consider using P3a.
+
+Solution
+As suggested in the hints, the policing intervals need not be fixed. Thus there can be an arbitrary gap
+between policing intervals. How should the gap be picked? Since a violating flow can pick its violating
+period of T to start at any instant, a simple idea is to invoke P3a to yield the following idea (Fig. 4.17).
+    The router uses a single timer of T units and a single counter, as before. A policing interval ends
+with a timer tick; if the counter is greater than B, a violation is detected. Then a flag is set indicating
+that the timer is now used only for inserting a random gap. Then the timer is restarted for a random
+time interval between 0 and T . When the timer ticks, the flag is cleared and the counter is initialized,
+and the timer is reset for a period of T to start policing again.
+
+Exercises
+
+• Suppose the counter is initialized and maintained during the gap period as well as during policing
+  periods. Can the router make any valid inference during such a period, even if the gap period is less
+  than T units?
+• (Open Problem): Suppose the flow is adversarial. What is a good strategy for the flow to consistently
+  violate the contract by as high a margin as possible and still elude the randomized detector described
+  earlier? The flow strategy can be randomized as well. A good answer should be supported by a
+  probabilistic analysis.
+
+
+
+4.10 Identifying a resource hog
+Suppose a device wishes to keep track of resources, like the packet memory allocated to various sources
+in a router. The device wants a cheap way to find the source consuming the most memory so that the
+device can grab memory back from such a resource hog. Fig. 4.18 shows five sources with their present
+resource consumption of 1, 9, 30, 24, and 7 units, respectively. The resource hog is S3.
+                                                           4.10 Identifying a resource hog              95
+
+
+
+
+FIGURE 4.18
+Finding the source that is a resource hog.
+
+
+    A simple solution to identify the resource hog is to use a heap. However, if the number of sources is
+a thousand or more, this may be too expensive at high speeds. Assume that the numbers that describe
+resource usage are integers in the range from 1 to 8000. Thus bucket sort techniques won’t work well
+because we may have to search 8000 entries to find the resource hog.
+    Suppose, instead, that the device does not care about the exact maximum as long as the result comes
+within a factor of 2 (perfect fairness is unimportant as in P3b). For example, in the figure, assume it is
+fine to get an answer of 24 instead of 30. This leads to the following problem.
+
+Problem
+A software or hardware module needs to keep track of resources required by various users. The module
+needs a cheap way to find the user consuming the most resources. Since ordinary heaps are too slow,
+the device designers are willing to relax the system requirements (P3b) to be off by a factor of 2. Can
+this relaxation in accuracy requirements be translated into a more efficient algorithm?
+Hint: Consider using three principles: trading accuracy for computation (P3b), using bucket sorting
+(P14), and using table lookups (P4b, P2a).
+
+Solution
+Since the answer can be off by a factor of 2, it makes sense to aggregate users whose resources are
+within a factor of 2 into the same “resource usage group.” This can be a win if the resulting number of
+groups is much smaller than the original number of users; finding the largest group then will be faster
+than finding the largest user. This is roughly the same idea behind aggregation in hierarchical routing,
+where a number of destinations are aggregated behind a common prefix; this can make routing less
+accurate but reduces the number of routing entries. This leads to the following idea (try to work out the
+details before you read further).
+   Binomial bucketing can be used, as shown in Fig. 4.19, where all users are grouped into buckets
+according to resource consumption, where bucket i contains all users whose resource consumption lies
+between 2i and 2i+1 − 1. In Fig. 4.19, for instance, users S3 and S4 are both in the range [16, 31] and
+hence are in the same bucket.
+   Each bucket contains an unsorted list of the resource records of all the users that fall within that
+bucket range. Thus in Fig. 4.19, S3 and S4 are in the same list. The data structure also contains a
+bitmap, with one bit for every bucket, that is set if the corresponding bucket list is nonempty (Fig. 4.19).
+Thus in Fig. 4.19 the bits corresponding to buckets [1,1], [4,7], [8,15], and [16,31] are set, while the bit
+corresponding to [2,3] is clear.
+96        Chapter 4 Principles in action
+
+
+
+
+FIGURE 4.19
+Aggregating users with resource consumption within a factor of 2 leads to a small number of aggregates whose
+membership can be represented using a bitmap.
+
+
+    Thus to find the resource hog, the algorithm simply looks for the bit position i corresponding to the
+rightmost bit set in the bitmap. The algorithm then returns the user at the head of the bucket list cor-
+responding to position i. Thus in Fig. 4.19 the algorithm would return S4 instead of the more accurate
+S3.
+
+Exercises
+
+• How is this data structure maintained? What happens if the resources in a user (e.g., S3) are reduced
+  from 30 to 16? What kind of lists is needed for efficient maintenance?
+• How large is each bitmap? How can finding the rightmost bit set be done efficiently?
+
+
+
+4.11 Getting rid of the TCP open connection list
+A transport protocol such as TCP (Stevens, 1994) in computer X keeps state for every concurrent
+conversation that X has with other computers. Recall from Chapter 2 that the technical name for the
+shared state between the two endpoints of a conversation is a connection. Thus if a user wishes to
+send mail from X to another workstation, Y , the mail program in X must first establish a connection
+(shared state) to the mail program in Y . A busy server like a Web server may have lots of concurrent
+connections.
+    The state in a connection consists of things like the numbers of packets sent by X that have not been
+acknowledged by Y . Any packets that have not been acknowledged for a long time must be retrans-
+mitted by X. To do retransmission, transport protocols typically have a periodic timer that triggers the
+retransmission of any packets whose acknowledgments have been outstanding for a while.
+    The freely available BSD TCP code (Stevens, 1994) keeps a list of open connections (Fig. 4.20) to
+examine on timer ticks in order to perform any needed retransmissions. However, when a packet arrives
+at X, TCP at X must also quickly determine which connection the packet belongs to in order to update
+the state for the connection. Each connection is identified by a connection identifier that is carried in
+every packet.
+    Relying on the list to determine the connection for a packet would require searching the entire list,
+in the worst case; this could be slow for servers with large numbers of connections. Thus the x-kernel
+                                         4.11 Getting rid of the TCP open connection list                          97
+
+
+
+
+FIGURE 4.20
+The x-kernel implementation uses a hash table mapping connections to state (for packet dispatching) as well as a
+linked list of connections (for timer processing). The redundant state causes dilution of the data cache.
+
+
+implementation (Hutchinson and Peterson, 1991) added a hash table to the BSD implementation (P15)
+to efficiently map from connection identifiers in packets to the corresponding state for the connection.
+The hash table is an array of pointers indexed by hash value that points to lists of connections that hash
+to the same value. In addition, the original linked list of connections was retained for timer processing,
+while the hash table was supposed to speed up packet processing.
+    Oddly enough, measurements of the new implementation actually showed a slowdown! Careful
+measurements traced the problem to the fact that information about connections was stored redun-
+dantly, and this reduced the efficiency of the data cache when implemented on modern processors (see
+Chapter 2 for a model of a modern processor). This illustrates question Q3 in Chapter 3, where an ob-
+vious improvement to one part of the system can affect other parts of the system. Note that while main
+memory may be cheap, fast memory such as the data cache is often limited. Commonly used structures
+such as the connection list should float into the data cache as long as they are small enough to fit.
+    The obvious solution is to avoid redundancy. The hash table is needed for fast lookups. The timer
+routine must also periodically and efficiently scan through all connections. This leads to the following
+problem.
+
+Problem
+Can you get rid of the waste caused by the explicit connection list while retaining the hash table? It is
+reasonable to add a small amount of extra information to the hash table. When doing so, observe that
+the original connection list was made doubly linked to allow easy deletion when connections terminate.
+But this adds storage and dilutes the data cache. How can a singly linked list be used without slowing
+down deletion?
+Hint: The first part is easy to fix by linking the valid hash table entries in a list. The second part
+(avoiding the doubly linked list, which would require two pointers per hash table entry) is a bit
+harder.
+   A connection list consists of nodes, each of which contains a connection ID (96 bits for IP)
+plus two pointers (say, 32 bits each) for easy deletion. Since the hash table is needed for fast
+demultiplexing, the connection list can be removed if the valid hash table entries are linked together
+as shown in Fig. 4.21 and a pointer is kept to the head of the list. On a timer tick, the retransmit
+routine will periodically scan this list. Scanning the complete hash table is less efficient because
+the hash table may have many empty locations.
+98        Chapter 4 Principles in action
+
+
+
+
+FIGURE 4.21
+Linking the valid hash table entries using forward pointers and lazy deletion. The dashed lines imply connection
+records that have been marked as deleted but that will be processed only in the next iteration.
+
+
+    The naive solution would add two pointers to each valid hash table entry to implement a doubly
+linked list. Since these pointers can be hash table indexes instead of arbitrary pointers to memory,
+the indexes need not be larger than the size of the hash table: Even the largest hash table storing
+connections should require no more than 16 bits, often much less. The naive solution does well,
+adding at most 32 bits per entry instead of 160 bits per entry, savings of 128 bits. However, it is
+possible to do better and to add only 16 bits per entry. Consider using lazy evaluation (P2b) and
+relaxing the specification (P3).
+
+Solution
+A doubly linked list is useful only for efficient deletions. When a connection (say, Connection C3 in
+Fig. 4.21) is terminated, the delete routine would ideally like to find the previous valid entry (i.e., the
+list containing Connection C1 in Fig. 4.21) in order to link the previous list to the next list (i.e., the list
+containing C2). This would require each hash table entry to store a pointer to the previous valid entry
+in the list.
+     Instead, consider principle P3, which asks whether the system requirements can be relaxed. Nor-
+mally, one assumes that when a connection terminates, its storage must be reclaimed immediately. To
+reclaim storage, the hash table entry should be placed in a free list, where it can be used by another
+connection. However, if the hash table is a little larger than strictly necessary, it is not essential that the
+storage used by a terminated connection be reused immediately.
+     Given this relaxation of requirements, the implementation can lazily delete the connection state.
+When a connection is terminated, the entry must be marked as unused. This requires an extra bit of
+state, as in P12, but is cheap. The actual deletion of unused hash table entry E involves linking the
+

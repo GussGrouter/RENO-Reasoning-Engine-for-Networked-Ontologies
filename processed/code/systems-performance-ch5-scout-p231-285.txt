@@ -1,0 +1,3788 @@
+192
+
+Chapter 5 Applications
+
+There are a couple of techniques for finding the off-CPU time that matters:
+■
+
+■
+
+Zoom into (or filter by) the application request handling function(s), since we care most
+about off-CPU time during the handling of an application request. For MySQL server this
+is the do_command() function. A search for do_command() and then zooming in produces
+a similar flame graph to Figure 5.4. While this approach is effective, you will need to know
+what function to search for in your specific application.
+Use a kernel filter during collection to exclude uninteresting thread states. The effectiveness is dependent on the kernel; on Linux, matching on TASK_UNINTERRUPTIBLE
+focuses on many interesting off-CPU events, but does exclude some as well.
+
+You will sometimes find application-blocking code paths that are waiting on something else,
+such as a lock. To drill down further, you need to know why the holder of the lock took so long
+to release it. Apart from lock analysis, described in Section 5.4.7, Static Performance Tuning, a
+generic technique is to instrument the waker event. This is an advanced activity: see Chapter 14
+of BPF Performance Tools [Gregg 19], and the tools wakeuptime(8) and offwaketime(8) from BCC.
+Section 5.5.3, offcputime, shows instructions for generating off-CPU flame graphs using
+offcputime(8) from BCC. Apart from scheduler events, syscall events are another useful target
+for studying applications.
+
+5.4.3 Syscall Analysis
+System calls (syscalls) can be instrumented for the study of resource-based performance issues.
+The intent is to find out where syscall time is spent, including the type of syscall and the reason
+it is called.
+Targets for syscall analysis include:
+■
+
+■
+
+■
+
+New process tracing: By tracing the execve(2) syscall you can log new process execution,
+and analyze issues of short-lived processes. See the execsnoop(8) tool in Section 5.5.5,
+execsnoop.
+I/O profiling: Tracing read(2)/write(2)/send(2)/recv(2) and their variants, and studying
+their I/O sizes, flags, and code paths, will help you identify issues of suboptimal I/O, such
+as a large number of small I/O. See the bpftrace tool in Section 5.5.7, bpftrace.
+Kernel time analysis: When systems show a high amount of kernel CPU time, often
+reported as “%sys,” instrumenting syscalls can locate the cause. See the syscount(8) tool in
+Section 5.5.6, syscount. Syscalls explain most but not all of kernel CPU time; exceptions
+include page faults, asynchronous kernel threads, and interrupts.
+
+Syscalls are a well-documented API (man pages), making them an easy event source to study.
+They are also called synchronously with the application, which means that collecting stack
+traces from syscalls will show the application code path responsible. Such stack traces can be
+visualized as a flame graph.
+
+5.4 Methodology
+
+5.4.4
+
+USE Method
+
+As introduced in Chapter 2, Methodologies, and applied in later chapters, the USE method
+checks the utilization, saturation, and errors of all hardware resources. Many application performance issues may be solved this way, by showing that a resource has become a bottleneck.
+The USE method can also be applied to software resources. If you can find a functional diagram
+showing the internal components of an application, consider the utilization, saturation, and
+error metrics for each software resource and see what makes sense.
+For example, the application may use a pool of worker threads to process requests, with a
+queue for requests waiting their turn. Treating this as a resource, the three metrics could then
+be defined in this way:
+■
+
+■
+
+■
+
+Utilization: Average number of threads busy processing requests during an interval, as a
+percentage of the total threads. For example, 50% would mean that, on average, half the
+threads were busy working on requests.
+Saturation: Average length of the request queue during an interval. This shows how many
+requests have backed up waiting for a worker thread.
+Errors: Requests denied or failed for any reason.
+
+Your task is then to find how these metrics can be measured. They may already be provided by
+the application somewhere, or they may need to be added or measured using another tool, such
+as dynamic tracing.
+Queueing systems, like this example, can also be studied using queueing theory (see Chapter 2,
+Methodologies).
+For a different example, consider file descriptors. The system may impose a limit, such that these
+are a finite resource. The three metrics could be as follows:
+■
+
+■
+
+■
+
+Utilization: Number of in-use file descriptors, as a percentage of the limit
+Saturation: Depends on the OS behavior: if threads block waiting for file descriptors, this
+can be the number of blocked threads waiting for this resource
+Errors: Allocation error, such as EFILE, “Too many open files”
+
+Repeat this exercise for the components of your application, and skip any metrics that don’t
+make sense. This process may help you develop a short checklist for checking application health
+before moving on to other methodologies.
+
+5.4.5 Thread State Analysis
+This is the first methodology I use for every performance issue, but it is also an advanced activity
+on Linux. The goal is to identify at a high level where application threads are spending their
+time, which solves some issues immediately, and directs the investigation of others. You can do
+this by dividing each application’s thread time into a number of meaningful states.
+
+193
+
+194
+
+Chapter 5 Applications
+
+At a minimum, there are two thread states: on-CPU and off-CPU. You can identify if threads are
+in the on-CPU state using standard metrics and tools (e.g., top(1)), and follow with CPU profiling or off-CPU analysis as appropriate (see Sections 5.4.1, CPU Profiling, and 5.4.2, Off-CPU
+Analysis). This methodology is more effective with more states.
+
+Nine States
+This is a list of nine thread states I’ve chosen to give better starting points for analysis than the
+two earlier states (on-CPU and off-CPU):
+■
+
+User: On-CPU in user mode
+
+■
+
+Kernel: On-CPU in kernel mode
+
+■
+
+Runnable: And off-CPU waiting for a turn on-CPU
+
+■
+
+Swapping (anonymous paging): Runnable, but blocked for anonymous page-ins
+
+■
+
+Disk I/O: Waiting for block device I/O: reads/writes, data/text page-ins
+
+■
+
+Net I/O: Waiting for network device I/O: socket reads/writes
+
+■
+
+Sleeping: A voluntary sleep
+
+■
+
+Lock: Waiting to acquire a synchronization lock (waiting on someone else)
+
+■
+
+Idle: Waiting for work
+
+This nine-state model is pictured in Figure 5.6.
+
+Figure 5.6 Nine-state thread model
+Performance for an application request is improved by reducing the time in every state except
+idle. Other things being equal, this would mean that application requests have lower latency,
+and the application can handle more load.
+
+5.4 Methodology
+
+Once you’ve established in which states the threads are spending their time, you can investigate
+them further:
+■
+
+■
+
+■
+
+■
+
+■
+
+■
+
+■
+
+User or Kernel: Profiling can determine which code paths are consuming CPU, including
+time spent spinning on locks. See Section 5.4.1, CPU Profiling.
+Runnable: Time in this state means the application wants more CPU resources. Examine
+CPU load for the entire system, and any CPU limits present for the application (e.g.,
+resource controls).
+Swapping (anonymous paging): A lack of available main memory for the application can
+cause swapping delays. Examine memory usage for the entire system and any memory
+limits present. See Chapter 7, Memory, for details.
+Disk: This state includes direct disk I/O and page faults. To analyze, see Section 5.4.3,
+Syscall Analysis, Chapter 8, File Systems, and Chapter 9, Disks. Workload characterization
+can help solve many disk I/O problems; examine file names, I/O sizes, and I/O types.
+Network: This state is for time blocked during network I/O (send/receive), but not listening for new connections (that’s idle time). To analyze, see Section 5.4.3, Syscall Analysis;
+Section 5.5.7, bpftrace and the I/O Profiling heading; and Chapter 10, Network. Workload
+characterization can also be useful for network I/O problems; examine hostnames, protocols, and throughput.
+Sleeping: Analyze the reason (code path) and duration of the sleeps.
+Lock: Identify the lock, the thread holding it, and the reason why the holder held it for
+so long. The reason may be that the holder was blocked on another lock, which requires
+further unwinding. This is an advanced activity, usually performed by the software
+developer who has intimate knowledge of the application and its locking hierarchy. I
+have developed a BCC tool to aid this type of analysis: offwaketime(8) (included in BCC),
+which shows the blocking stack trace along with the waker.
+
+Because of how applications typically wait for work, you will often find that time in the network
+I/O and lock states is actually idle time. An application worker thread may implement idle by
+waiting on network I/O for the next request (e.g., HTTP keep-alive) or by waiting on a conditional variable (lock state) to be woken up to process work.
+The following summarizes how these thread states may be measured on Linux.
+
+Linux
+Figure 5.7 shows a Linux thread state model based on kernel thread state.
+The kernel thread state is based on the kernel task_struct state member: Runnable is TASK_
+RUNNING, Disk is TASK_UNINTERRUPTIBLE, and Sleep is TASK_INTERRUPTIBLE. These states
+are shown by tools including ps(1) and top(1) using single-letter codes: R, D, and S, respectively.
+(There are more states, such as stopped by a debugger, that I did not include here.)
+While this provides some clues for further analysis, it is far from dividing time into the nine
+states described earlier. More information is required: for example, Runnable can be split into
+user and kernel time using /proc or getrusage(2) statistics.
+
+195
+
+196
+
+Chapter 5 Applications
+
+Figure 5.7 Linux thread states
+Other kernels typically provide more states, making this methodology easier to apply. I originally developed and used this methodology on the Solaris kernel, inspired by its microstate
+accounting feature, which recorded thread time in eight different states: user, system, trap, text
+fault, data fault, lock, sleep, and run queue (scheduler latency). These don’t match my ideal
+states, but are a better starting point.
+I’ll discuss three approaches that I use on Linux: clue-based, off-CPU analysis, and direct
+measurement.
+
+Clue-Based
+You can start by using common OS tools, such as pidstat(1) and vmstat(8), to suggest where
+thread state time may be spent. The tools and column of interest are:
+■
+
+User: pidstat(1) “%usr” (this state is measured directly)
+
+■
+
+Kernel: pidstat(1) “%system” (this state is measured directly)
+
+■
+
+Runnable: vmstat(8) “r” (system-wide)
+
+■
+
+Swapping: vmstat(8) “si” and “so” (system-wide)
+
+■
+
+Disk I/O: pidstat(1) -d “iodelay” (includes the swapping state)
+
+■
+
+Network I/O: sar(1) -n DEV “rxkB/s” and “txkB/s” (system-wide)
+
+■
+
+Sleeping: Not easily available
+
+■
+
+Lock: perf(1) top (may identify spin lock time directly)
+
+■
+
+Idle: Not easily available
+
+Some of these statistics are system-wide. If you find via vmstat(8) that there is a system-wide rate
+of swapping, you could investigate that state using deeper tools to confirm that the application
+is affected. These tools are covered in the following sections and chapters.
+
+5.4 Methodology
+
+Off-CPU Analysis
+As many of the states are off-CPU (everything except User and Kernel), you can apply off-CPU
+analysis to determine the thread state. See Section 5.4.2, Off-CPU Analysis.
+
+Direct Measurement
+Measure thread time accurately by thread state as follows:
+User: User-mode CPU is available from a number of tools and in /proc/PID/stat and getrusage(2).
+pidstat(1) reports this as %usr.
+Kernel: Kernel-mode CPU is also in /proc/PID/stat and getrusage(2). pidstat(1) reports this as
+%system.
+Runnable: This is tracked by the kernel schedstats feature in nanoseconds and is exposed via
+/proc/PID/schedstat. It can also be measured, at the cost of some overhead, using tracing tools
+including the perf(1) sched subcommand and BCC runqlat(8), both covered in Chapter 6, CPUs.
+Swapping: Time swapping (anonymous paging) in nanoseconds can be measured by delay
+accounting, introduced in Chapter 4, Observability Tools, Section 4.3.3, Delay Accounting,
+which included an example tool: getdelays.c. Tracing tools can also be used to instrument swapping latency.
+Disk: pidstat(1) -d shows “iodelay” as the number of clock ticks during which a process was
+delayed by block I/O and swapping; if there was no system-wide swapping (as reported by
+vmstat(8)), you could conclude that any iodelay was the I/O state. Delay accounting and other
+accounting features, if enabled, also provide block I/O time, as used by iotop(8). You can also use
+tracing tools such as biotop(8) from BCC.
+Network: Network I/O can be investigated using tracing tools such as BCC and bpftrace, including the tcptop(8) tool for TCP network I/O. The application may also have instrumentation to
+track time in I/O (network and disk).
+Sleeping: Time entering voluntary sleep can be examined using tracers and events including the
+syscalls:sys_enter_nanosleep tracepoint. My naptime.bt tool traces these sleeps and prints the
+PID and duration [Gregg 19][Gregg 20b].
+Lock: Lock time can be investigated using tracing tools, including klockstat(8) from BCC and,
+from the bpf-perf-tools-book repository, pmlock.bt and pmheld.bt for pthread mutex locks, and
+mlock.bt and mheld.bt for kernel mutexes.
+Idle: Tracing tools can be used to instrument the application code paths that handle waiting for
+work.
+Sometimes applications can appear to be completely asleep: they remain blocked off-CPU without a rate of I/O or other events. To determine what state the application threads are in, it may be
+necessary to use a debugger such as pstack(1) or gdb(1) to inspect thread stack traces, or to read
+them from the /proc/PID/stack files. Note that debuggers like these can pause the target application and cause performance problems of their own: understand how to use them and their risks
+before trying them in production.
+
+197
+
+198
+
+Chapter 5 Applications
+
+5.4.6 Lock Analysis
+For multithreaded applications, locks can become a bottleneck, inhibiting parallelism and
+scalability. Single-threaded applications can be inhibited by kernel locks (e.g., file system locks).
+Locks can be analyzed by:
+■
+
+Checking for contention
+
+■
+
+Checking for excessive hold times
+
+The first identifies whether there is a problem now. Excessive hold times are not necessarily an
+immediate problem, but they may become so in the future with more parallel load. For each, try
+to identify the name of the lock (if it exists) and the code path that led to using it.
+While there are special-purpose tools for lock analysis, you can sometimes solve issues from CPU
+profiling alone. For spin locks, contention shows up as CPU usage and can easily be identified
+using CPU profiling of stack traces. For adaptive mutex locks, contention often involves some
+spinning, which can also be identified by CPU profiling of stack traces. In that case, be aware
+that the CPU profile gives only a part of the story, as threads may have blocked and slept while
+waiting for the locks. See Section 5.4.1, CPU Profiling.
+For specific lock analysis tools on Linux, see Section 5.5.7, bpftrace.
+
+5.4.7 Static Performance Tuning
+Static performance tuning focuses on issues of the configured environment. For application
+performance, examine the following aspects of the static configuration:
+■
+
+What version of the application is running, and what are its dependencies? Are there
+newer versions? Do their release notes mention performance improvements?
+
+■
+
+Are there known performance issues? Is there a bug database that lists them?
+
+■
+
+How is the application configured?
+
+■
+
+If it was configured or tuned differently from the defaults, what was the reason? (Was it
+based on measurements and analysis, or guesswork?)
+
+■
+
+Does the application employ a cache of objects? How is it sized?
+
+■
+
+Does the application run concurrently? How is that configured (e.g., thread pool sizing)?
+
+■
+
+Is the application running in a special mode? (For example, debug mode may have been
+enabled and be reducing performance, or the application may be a debug build instead of
+a release build.)
+
+■
+
+What system libraries does the application use? What versions are they?
+
+■
+
+What memory allocator does the application use?
+
+■
+
+Is the application configured to use large pages for its heap?
+
+■
+
+Is the application compiled? What version of the compiler? What compiler options and
+optimizations? 64-bit?
+
+5.5 Observability Tools
+
+■
+
+■
+
+■
+
+Does the native code include advanced instructions? (Should it?) (For example,
+SIMD/vector instructions including Intel SSE.)
+Has the application encountered an error, and is it now in a degraded mode? Or is it
+misconfigured and always running in a degraded mode?
+Are there system-imposed limits or resource controls for CPU, memory, file system, disk,
+or network usage? (These are common with cloud computing.)
+
+Answering these questions may reveal configuration choices that have been overlooked.
+
+5.4.8 Distributed Tracing
+In a distributed environment, an application may be composed of services that run on separate
+systems. While each service can be studied as though it is its own mini-application, it is also
+necessary to study the distributed application as a whole. This requires new methodologies and
+tools, and is commonly performed using distributed tracing.
+Distributed tracing involves logging information on each service request and then later combining this information for study. Each application request that spans multiple services can then
+be broken down into its dependency requests, and the service responsible for high application
+latency or errors can be identified.
+Collected information can include:
+■
+
+A unique identifier for the application request (external request ID)
+
+■
+
+Information about its location in the dependency hierarchy
+
+■
+
+Start and end times
+
+■
+
+Error status
+
+A challenge with distributed tracing is the amount of log data generated: multiple entries for
+every application request. One solution is to perform head-based sampling where at the start
+(“head”) of the request, a decision is made whether to sample (“trace”) it: for example, to trace
+one in every ten thousands requests. This is sufficient to analyze the performance of the bulk
+of the requests, but it may make the analysis of intermittent errors or outliers difficult due to
+limited data. Some distributed tracers are tail-based, where all events are first captured and then
+a decision is made as to what to keep, perhaps based on latency and errors.
+Once a problematic service has been identified, it can be analyzed in more detail using other
+methodologies and tools.
+
+5.5
+
+Observability Tools
+
+This section introduces application performance observability tools for Linux-based operating
+systems. See the previous section for strategies to follow when using them.
+The tools in this section are listed in Table 5.3 along with a description of how these tools are
+used in this chapter.
+
+199
+
+200
+
+Chapter 5 Applications
+
+Table 5.3
+
+Linux application observability tools
+
+Section
+
+Tool
+
+Description
+
+5.5.1
+
+perf
+
+CPU profiling, CPU flame graphs, syscall tracing
+
+5.5.2
+
+profile
+
+CPU profiling using timed sampling
+
+5.5.3
+
+offcputime
+
+Off-CPU profiling using scheduler tracing
+
+5.5.4
+
+strace
+
+Syscall tracing
+
+5.5.5
+
+execsnoop
+
+New process tracing
+
+5.5.6
+
+syscount
+
+Syscall counting
+
+5.5.7
+
+bpftrace
+
+Signal tracing, I/O profiling, lock analysis
+
+These begin with CPU profiling tools then tracing tools. Many of the tracing tools are BPFbased, and use the BCC and bpftrace frontends (Chapter 15); they are: profile(8), offcputime(8),
+execsnoop(8), and syscount(8). See the documentation for each tool, including its man pages, for
+full references of its features.
+Also look for application-specific performance tools not listed in this table. Later chapters cover
+resource-oriented tools: CPUs, memory, disks, etc., which are also useful for application analysis.
+Many of the following tools collect application stack traces. If you find your stack trace contains
+“[unknown]” frames or appears impossibly short, see Section 5.6, Gotchas, which describes common problems and summarizes methods to fix them.
+
+5.5.1 perf
+perf(1) is the standard Linux profiler, a multi-tool with many uses. It is explained in Chapter
+13, perf. As CPU profiling is critical for application analysis, a summary of CPU profiling using
+perf(1) is included here. Chapter 6, CPUs, covers CPU profiling and flame graphs in more detail.
+
+CPU Profiling
+The following uses perf(1) to sample stack traces (-g) across all CPUs (-a) at 49 Hertz (-F 49: samples per second) for 30 seconds, and then to list the samples:
+# perf record -F 49 -a -g -- sleep 30
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.560 MB perf.data (2940 samples) ]
+# perf script
+mysqld 10441 [000] 64918.205722:
+
+10101010 cpu-clock:pppH:
+
+5587b59bf2f0 row_mysql_store_col_in_innobase_format+0x270 (/usr/sbin/mysqld)
+5587b59c3951 [unknown] (/usr/sbin/mysqld)
+5587b58803b3 ha_innobase::write_row+0x1d3 (/usr/sbin/mysqld)
+5587b47e10c8 handler::ha_write_row+0x1a8 (/usr/sbin/mysqld)
+5587b49ec13d write_record+0x64d (/usr/sbin/mysqld)
+
+5.5 Observability Tools
+
+5587b49ed219 Sql_cmd_insert_values::execute_inner+0x7f9 (/usr/sbin/mysqld)
+5587b45dfd06 Sql_cmd_dml::execute+0x426 (/usr/sbin/mysqld)
+5587b458c3ed mysql_execute_command+0xb0d (/usr/sbin/mysqld)
+5587b4591067 mysql_parse+0x377 (/usr/sbin/mysqld)
+5587b459388d dispatch_command+0x22cd (/usr/sbin/mysqld)
+5587b45943b4 do_command+0x1a4 (/usr/sbin/mysqld)
+5587b46b22c0 [unknown] (/usr/sbin/mysqld)
+5587b5cfff0a [unknown] (/usr/sbin/mysqld)
+7fbdf66a9669 start_thread+0xd9 (/usr/lib/x86_64-linux-gnu/libpthread-2.30.so)
+[...]
+
+There are 2,940 stack samples in this profile; only one stack has been included here. The perf(1)
+script subcommand prints each stack sample in a previously recorded profile (the perf.data file).
+perf(1) also has a report subcommand for summarizing the profile as a code-path hierarchy. The
+profile can also be visualized as a CPU flame graph.
+
+CPU Flame Graphs
+CPU flame graphs have been automated at Netflix so that operators and developers can request
+them from a browser-based UI. They can be built entirely using open-source software, including
+from the GitHub repository in the following commands. For the Figure 5.3 CPU flame graph
+shown earlier, the commands were:
+# perf record -F 49 -a -g -- sleep 10; perf script --header > out.stacks
+# git clone https://github.com/brendangregg/FlameGraph; cd FlameGraph
+# ./stackcollapse-perf.pl < ../out.stacks | ./flamegraph.pl --hash > out.svg
+
+The out.svg file can then be loaded in a web browser.
+flamegraph.pl provides custom color palettes for different languages: for example, for Java applications, try --color=java. Run flamegraph.pl -h for all options.
+
+Syscall Tracing
+The perf(1) trace subcommand traces system calls by default, and is perf(1)’s version of strace(1)
+(Section 5.5.4, strace). For example, tracing a MySQL server process:
+# perf trace -p $(pgrep mysqld)
+? (
+): mysqld/10120 ... [continued]: futex())
+= -1 ETIMEDOUT (Connection timed out)
+0.014 ( 0.002 ms): mysqld/10120 futex(uaddr: 0x7fbddc37ed48, op: WAKE|
+PRIVATE_FLAG, val: 1)
+= 0
+0.023 (10.103 ms): mysqld/10120 futex(uaddr: 0x7fbddc37ed98, op: WAIT_BITSET|
+PRIVATE_FLAG, utime: 0x7fbdc9cfcbc0, val3: MATCH_ANY) = -1 ETIMEDOUT (Connection
+timed out)
+[...]
+
+201
+
+202
+
+Chapter 5 Applications
+
+Only a few output lines are included, showing futex(2) calls as various MySQL threads wait for
+work (these dominated the off-CPU time flame graph in Figure 5.5).
+The advantage of perf(1) is that it uses per-CPU buffers to reduce the overhead, making it much
+safer to use than the current implementation of strace(1). It can also trace system-wide, whereas
+strace(1) is limited to a set of processes (typically a single process), and it can trace events other
+than syscalls. perf(1), however, does not have as many syscall argument translations as strace(1);
+here is a single line from strace(1) for comparison:
+[pid 10120] futex(0x7fbddc37ed98, FUTEX_WAIT_BITSET_PRIVATE, 0, {tv_sec=445110,
+tv_nsec=427289364}, FUTEX_BITSET_MATCH_ANY) = -1 ETIMEDOUT (Connection timed out)
+
+The strace(1) version has expanded the utime struct. There is work underway for perf(1) trace to
+use BPF for improved argument “beautification.” As an end goal, perf(1) trace could ultimately
+be a swap-in replacement for strace(1). (For more on strace(1), see Section 5.5.4, strace.)
+
+Kernel Time Analysis
+As perf(1) trace shows time in syscalls, it helps explain the system CPU time commonly shown
+by monitoring tools, although it is easier to start with a summary than the event-by-event output. perf(1) trace summarizes syscalls with -s:
+# perf trace -s -p $(pgrep mysqld)
+mysqld (14169), 225186 events, 99.1%
+syscall
+
+calls
+
+total
+
+min
+
+avg
+
+max
+
+(msec)
+
+(msec)
+
+(msec)
+
+stddev
+
+(msec)
+
+(%)
+
+--------------- -------- --------- --------- --------- ---------
+
+------
+
+sendto
+
+27239
+
+267.904
+
+0.002
+
+0.010
+
+0.109
+
+0.28%
+
+recvfrom
+
+69861
+
+212.213
+
+0.001
+
+0.003
+
+0.069
+
+0.23%
+
+ppoll
+
+15478
+
+201.183
+
+0.002
+
+0.013
+
+0.412
+
+0.75%
+
+[...]
+
+The output shows syscall counts and timing for each thread.
+The earlier output showing futex(2) calls is not very interesting in isolation, and running perf(1)
+trace on any busy application will produce an avalanche of output. It helps to start with this
+summary first, and then to use perf(1) trace with a filter to inspect only the syscall types of
+interest.
+
+I/O Profiling
+I/O syscalls are particularly interesting, and some were seen in the previous output. Tracing the
+sendto(2) calls using a filter (-e):
+
+5.5 Observability Tools
+
+# perf trace -e sendto -p $(pgrep mysqld)
+0.000 ( 0.015 ms): mysqld/14097 sendto(fd: 37<socket:[833323]>, buff:
+0x7fbdac072040, len: 12664, flags: DONTWAIT) = 12664
+0.451 ( 0.019 ms): mysqld/14097 sendto(fd: 37<socket:[833323]>, buff:
+0x7fbdac072040, len: 12664, flags: DONTWAIT) = 12664
+0.624 ( 0.011 ms): mysqld/14097 sendto(fd: 37<socket:[833323]>, buff:
+0x7fbdac072040, len: 11, flags: DONTWAIT) = 11
+0.788 ( 0.010 ms): mysqld/14097 sendto(fd: 37<socket:[833323]>, buff:
+0x7fbdac072040, len: 11, flags: DONTWAIT) = 11
+[...]
+
+The output shows two 12664-byte sends followed by two 11-byte sends, all with the DONTWAIT
+flag. If I saw a flood of small sends, I might wonder if performance could be improved by coalescing them, or avoiding the DONTWAIT flag.
+While perf(1) trace can be used for some I/O profiling, I often wish to dig further into the arguments and summarize them in custom ways. For example, this sendto(2) trace shows the file
+descriptor (37) and socket number (833323), but I’d rather see the socket type, IP addresses, and
+ports. For such custom tracing, you can switch to bpftrace in Section 5.5.7, bpftrace.
+
+5.5.2 profile
+profile(8)11 is timer-based CPU profiler from BCC (Chapter 15). It uses BPF to reduce overhead by
+aggregating stack traces in kernel context, and only passes unique stacks and their counts to user
+space.
+The following profile(8) example samples at 49 Hertz across all CPUs, for 10 seconds:
+# profile -F 49 10
+Sampling at 49 Hertz of all threads by user + kernel stack for 10 secs.
+[...]
+SELECT_LEX::prepare(THD*)
+Sql_cmd_select::prepare_inner(THD*)
+Sql_cmd_dml::prepare(THD*)
+Sql_cmd_dml::execute(THD*)
+mysql_execute_command(THD*, bool)
+Prepared_statement::execute(String*, bool)
+Prepared_statement::execute_loop(String*, bool)
+mysqld_stmt_execute(THD*, Prepared_statement*, bool, unsigned long, PS_PARAM*)
+dispatch_command(THD*, COM_DATA const*, enum_server_command)
+do_command(THD*)
+[unknown]
+
+11
+Origin: I developed profile(8) for BCC on 15-Jul-2016, based on code from Sasha Goldshtein, Andrew Birchall,
+Evgeny Vereshchagin, and Teng Qin.
+
+203
+
+204
+
+Chapter 5 Applications
+
+[unknown]
+start_thread
+-
+
+mysqld (10106)
+13
+
+[...]
+
+Only one stack trace is included in this output, showing that SELECT_LEX::prepare() was sampled on-CPU with that ancestry 13 times.
+profile(8) is further discussed in Chapter 6, CPUs, Section 6.6.14, profile, which lists its various
+options and includes instructions for generating CPU flame graphs from its output.
+
+5.5.3 offcputime
+offcputime(8)12 is a BCC and bpftrace tool (Chapter 15) to summarize time spent by threads
+blocked and off-CPU, showing stack traces to explain why. It supports Off-CPU analysis
+(Section 5.4.2, Off-CPU Analysis). offcputime(8) is the counterpart to profile(8): between them,
+they show the entire time spent by threads on the system.
+The following shows offcputime(8) from BCC, tracing for 5 seconds:
+# offcputime 5
+Tracing off-CPU time (us) of all threads by user + kernel stack for 5 secs.
+[...]
+finish_task_switch
+schedule
+jbd2_log_wait_commit
+jbd2_complete_transaction
+ext4_sync_file
+vfs_fsync_range
+do_fsync
+__x64_sys_fdatasync
+do_syscall_64
+entry_SYSCALL_64_after_hwframe
+fdatasync
+IO_CACHE_ostream::sync()
+MYSQL_BIN_LOG::sync_binlog_file(bool)
+MYSQL_BIN_LOG::ordered_commit(THD*, bool, bool)
+MYSQL_BIN_LOG::commit(THD*, bool)
+ha_commit_trans(THD*, bool, bool)
+trans_commit(THD*, bool)
+12
+Origin: I created off-CPU analysis as a methodology, along with tools for performing it, in 2005; I developed this
+offcputime(8) BCC tool on 13-Jan-2016.
+
+5.5 Observability Tools
+
+mysql_execute_command(THD*, bool)
+Prepared_statement::execute(String*, bool)
+Prepared_statement::execute_loop(String*, bool)
+mysqld_stmt_execute(THD*, Prepared_statement*, bool, unsigned long, PS_PARAM*)
+dispatch_command(THD*, COM_DATA const*, enum_server_command)
+do_command(THD*)
+[unknown]
+[unknown]
+start_thread
+-
+
+mysqld (10441)
+352107
+
+[...]
+
+The output shows unique stack traces and their time spent off-CPU in microseconds. This
+particular stack shows ext4 file system sync operations via a code path through MYSQL_BIN_
+LOG::sync_binlog_file(), totaling 352 milliseconds during this trace.
+For efficiency, offcputime(8) aggregates these stacks in kernel context, and emits only unique
+stacks to user space. It also only records stack traces for off-CPU durations that exceed a threshold, one microsecond by default, which can be tuned using the -m option.
+There is also a -M option to set the maximum time for recording stacks. Why would we want
+to exclude long-duration stacks? This can be an effective way to filter out uninteresting stacks:
+threads waiting for work and blocking for one or more seconds in a loop. Try using -M 900000, to
+exclude durations longer than 900 ms.
+
+Off-CPU Time Flame Graphs
+Despite only showing unique stacks, the full output from the previous example was still over
+200,000 lines. To make sense of it, it can be visualized as an off-CPU time flame graph. An
+example was shown in Figure 5.4. The commands to generate these are similar to those with
+profile(8):
+# git clone https://github.com/brendangregg/FlameGraph; cd FlameGraph
+# offcputime -f 5 | ./flamegraph.pl --bgcolors=blue \
+--title="Off-CPU Time Flame Graph"> out.svg
+
+This time I’ve set the background color to blue, as a visual reminder that this is an off-CPU flame
+graph rather than the commonly-used CPU flame graphs.
+
+5.5.4 strace
+The strace(1) command is the Linux system call tracer.13 It can trace syscalls, printing a one-line
+summary for each, and can also count syscalls and print a report.
+13
+Syscall tracers for other operating systems are: BSD has ktrace(1), Solaris has truss(1), OS X has dtruss(1) (a tool
+I originally developed), and Windows has a number of options including logger.exe and ProcMon.
+
+205
+
+206
+
+Chapter 5 Applications
+
+For example, tracing syscalls by PID 1884:
+$ strace -ttt -T -p 1884
+1356982510.395542 close(3)
+
+= 0 <0.000267>
+
+1356982510.396064 close(4)
+
+= 0 <0.000293>
+
+1356982510.396617 ioctl(255, TIOCGPGRP, [1975]) = 0 <0.000019>
+1356982510.396980 rt_sigprocmask(SIG_SETMASK, [], NULL, 8) = 0 <0.000024>
+1356982510.397288 rt_sigprocmask(SIG_BLOCK, [CHLD], [], 8) = 0 <0.000014>
+1356982510.397365 wait4(-1, [{WIFEXITED(s) && WEXITSTATUS(s) == 0}], WSTOPPED|
+WCONTINUED, NULL) = 1975 <0.018187>
+[...]
+
+The options in this invocation were (see the strace(1) man page for all):
+■
+
+■
+
+■
+
+-ttt: Prints the first column of time-since-epoch, in units of seconds with microsecond
+resolution.
+-T: Prints the last field (<time>), which is the duration of the system call, in units of seconds
+with microsecond resolution.
+-p PID: Trace this process ID. A command can also be specified so that strace(1) launches
+and traces it.
+
+Other options not used here include -f to follow child threads, and -o filename to write the
+strace(1) output to the given file name.
+A feature of strace(1) can be seen in the output—translation of syscall arguments into a
+human-readable form. This is especially useful for understanding ioctl(2) calls.
+The -c option can be used to summarize system call activity. The following example also
+invokes and traces a command (dd(1)) rather than attaching to a PID:
+$ strace -c dd if=/dev/zero of=/dev/null bs=1k count=5000k
+5120000+0 records in
+5120000+0 records out
+5242880000 bytes (5.2 GB) copied, 140.722 s, 37.3 MB/s
+% time
+
+seconds
+
+usecs/call
+
+calls
+
+errors syscall
+
+------ ----------- ----------- --------- --------- ---------------51.46
+
+0.008030
+
+0
+
+5120005
+
+48.54
+
+0.007574
+
+0
+
+5120003
+
+read
+write
+
+0.00
+
+0.000000
+
+0
+
+20
+
+13 open
+
+[...]
+------ ----------- ----------- --------- --------- ---------------100.00
+
+0.015604
+
+10240092
+
+19 total
+
+5.5 Observability Tools
+
+The output begins with three lines from dd(1) followed by the strace(1) summary. The columns are:
+■
+
+time: Percentage showing where system CPU time was spent
+
+■
+
+seconds: Total system CPU time, in seconds
+
+■
+
+usecs/call: Average system CPU time per call, in microseconds
+
+■
+
+calls: Number of system calls
+
+■
+
+syscall: System call name
+
+strace Overhead
+WARNING: The current version of strace(1) employs breakpoint-based tracing via the Linux
+ptrace(2) interface. This sets breakpoints for the entry and return of all syscalls (even if the -e
+option is used to select only some). This is invasive, and applications with high syscall rates may
+find their performance worsened by an order of magnitude. To illustrate this, here is the same
+dd(1) command without strace(1):
+$ dd if=/dev/zero of=/dev/null bs=1k count=5000k
+5120000+0 records in
+5120000+0 records out
+5242880000 bytes (5.2 GB) copied, 1.91247 s, 2.7 GB/s
+
+dd(1) includes throughput statistics on the final line: by comparing them, we can conclude that
+strace(1) slowed dd(1) by a factor of 73. This is a particularly severe case, as dd(1) performs a high
+rate of system calls.
+Depending on application requirements, this style of tracing may be acceptable to use for short
+durations to determine the syscall types being called. strace(1) would be of greater use if the
+overhead was not such a problem. Other tracers, including perf(1), Ftrace, BCC, and bpftrace,
+greatly reduce tracing overhead by using buffered tracing, where events are written to a shared
+kernel ring buffer and the user-level tracer periodically reads the buffer. This reduces context
+switching between user and kernel context, lowering overhead.
+A future version of strace(1) may solve its overhead problem by becoming an alias to the perf(1)
+trace subcommand (described earlier in Section 5.5.1, perf). Other higher-performing syscall
+tracers for Linux, based on BPF, include: vltrace by Intel [Intel 18], and a Linux version of the
+Windows ProcMon tool by Microsoft [Microsoft 20].
+
+5.5.5 execsnoop
+execsnoop(8)14 is a BCC and bpftrace tool that traces new process execution system-wide. It can
+find issues of short-lived processes that consume CPU resources and can also be used to debug
+software execution, including application start scripts.
+
+14
+
+Origin: I created the first execsnoop on 24-Mar-2004; I developed the Linux BCC version on 07-Feb-2016 and the
+bpftrace version on 15-Nov-2017. See [Gregg 19] for more origin details.
+
+207
+
+208
+
+Chapter 5 Applications
+
+Example output from the BCC version:
+# execsnoop
+PCOMM
+
+PID
+
+PPID
+
+RET ARGS
+
+oltp_read_write 13044 18184
+0 /usr/share/sysbench/oltp_read_write.lua --dbdriver=mysql --mysql-password=... --table-size=100000 run
+oltp_read_write 13047 18184
+0 /usr/share/sysbench/oltp_read_write.lua --dbdriver=mysql --mysql-password=... --table-size=100000 run
+sh
+13050
+debian-sa1 1 1 -S XALL
+
+13049
+
+0 /bin/sh -c command -v debian-sa1 > /dev/null &&
+
+debian-sa1
+
+13051
+
+13050
+
+0 /usr/lib/sysstat/debian-sa1 1 1 -S XALL
+
+sa1
+
+13051
+
+13050
+
+0 /usr/lib/sysstat/sa1 1 1 -S XALL
+
+sadc
+13051
+/var/log/sysstat
+
+13050
+
+0 /usr/lib/sysstat/sadc -F -L -S DISK 1 1 -S XALL
+
+[...]
+
+I ran this on my database system in case it would find anything interesting, and it did: the first
+two lines show that a read/write microbenchmark was still running, launching oltp_read_write
+commands in a loop—I had accidentally left this running for days! Since the database is handling a different workload, it wasn’t obvious from other system metrics that showed CPU and
+disk load. The lines after oltp_read_write show sar(1) collecting system metrics.
+execsnoop(8) works by tracing the execve(2) system call, and prints a one-line summary for
+each. The tool supports some options, including -t for timestamps.
+Chapter 1 shows another example of execsnoop(8). I have also published a threadsnoop(8) tool
+for bpftrace to trace the creation of threads via libpthread pthread_create().
+
+5.5.6 syscount
+syscount(8)15 is a BCC and bpftrace tool to count system calls system-wide.
+Example output from the BCC version:
+# syscount
+Tracing syscalls, printing top 10... Ctrl+C to quit.
+^C[05:01:28]
+SYSCALL
+
+COUNT
+
+recvfrom
+
+114746
+
+sendto
+
+57395
+
+ppoll
+
+28654
+
+futex
+
+953
+
+io_getevents
+
+55
+
+bpf
+
+33
+
+15
+Origin: I first created this using Ftrace and perf(1) for the perf-tools collection on 07-Jul-2014, and Sasha
+Goldshtein developed the BCC version on 15-Feb-2017.
+
+5.5 Observability Tools
+
+rt_sigprocmask
+
+12
+
+epoll_wait
+
+11
+
+select
+
+7
+
+nanosleep
+
+6
+
+Detaching...
+
+This shows the most frequent syscall was recvfrom(2), which was called 114,746 times while
+tracing. You can explore further using other tracing tools to examine the syscall arguments,
+latency, and calling stack trace. For example, you can use perf(1) trace with a -e recvfrom filter,
+or use bpftrace to instrument the syscalls:sys_enter_recvfrom tracepoint. See the tracers in
+Chapters 13 to 15.
+syscount(8) can also count by process using -P:
+# syscount -P
+Tracing syscalls, printing top 10... Ctrl+C to quit.
+^C[05:03:49]
+PID
+
+COMM
+
+COUNT
+
+10106
+
+mysqld
+
+155463
+
+13202
+
+oltp_read_only.
+
+61779
+
+9618
+
+sshd
+
+36
+
+344
+
+multipathd
+
+13
+
+13204
+
+syscount-bpfcc
+
+12
+
+519
+
+accounts-daemon
+
+5
+
+The output shows the processes and syscall counts.
+
+5.5.7 bpftrace
+bpftrace is a BPF-based tracer that provides a high-level programming language, allowing the
+creation of powerful one-liners and short scripts. It is well suited for custom application analysis
+based on clues from other tools.
+bpftrace is explained in Chapter 15. This section shows some examples for application analysis.
+
+Signal Tracing
+This bpftrace one-liner traces process signals (via the kill(2) syscall) showing the source PID and
+process name, and destination PID and signal number:
+# bpftrace -e 't:syscalls:sys_enter_kill { time("%H:%M:%S ");
+printf("%s (PID %d) send a SIG %d to PID %d\n",
+comm, pid, args->sig, args->pid); }'
+Attaching 1 probe...
+09:07:59 bash (PID 9723) send a SIG 2 to PID 9723
+
+209
+
+210
+
+Chapter 5 Applications
+
+09:08:00 systemd-journal (PID 214) send a SIG 0 to PID 501
+09:08:00 systemd-journal (PID 214) send a SIG 0 to PID 550
+09:08:00 systemd-journal (PID 214) send a SIG 0 to PID 392
+...
+
+The output shows a bash shell sending a signal 2 (Ctrl-C) to itself, followed by systemd-journal
+sending signal 0 to other PIDs. Signal 0 does nothing: it is typically used to check if another
+process still exists based on the syscall return value.
+This one-liner can be useful for debugging strange application issues, such as early terminations.
+Timestamps are included for cross-checking with performance issues in monitoring software.
+Tracing signals is also available as the standalone killsnoop(8) tool in BCC and bpftrace.
+
+I/O Profiling
+bpftrace can be used to analyze I/O in various ways: examining sizes, latency, return values, and
+stack traces.16 For example, the recvfrom(2) syscall was frequently called in previous examples,
+and can be examined further using bpftrace.
+Showing recvfrom(2) buffer sizes as a histogram:
+# bpftrace -e 't:syscalls:sys_enter_recvfrom { @bytes = hist(args->size); }'
+Attaching 1 probe...
+^C
+@bytes:
+[4, 8)
+
+40142 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|
+
+[8, 16)
+
+1218 |@
+
+|
+
+[16, 32)
+
+17042 |@@@@@@@@@@@@@@@@@@@@@@
+
+|
+
+[32, 64)
+
+0 |
+
+|
+
+[64, 128)
+
+0 |
+
+|
+
+[128, 256)
+
+0 |
+
+|
+
+[256, 512)
+
+0 |
+
+|
+
+[512, 1K)
+
+0 |
+
+|
+
+[1K, 2K)
+
+0 |
+
+|
+
+[2K, 4K)
+
+0 |
+
+|
+
+[4K, 8K)
+
+0 |
+
+|
+
+[8K, 16K)
+
+0 |
+
+|
+
+[16K, 32K)
+
+19477 |@@@@@@@@@@@@@@@@@@@@@@@@@
+
+|
+
+The output shows that about half of the sizes were very small, between 4 and 7 bytes, and the
+largest sizes were in the 16 to 32 Kbyte range. It may also be useful to compare this buffer size
+histogram to the actual bytes received, by tracing the syscall exit tracepoint:
+16
+
+E.g., ioprofile(8) from [Gregg 19], although in practice this often fails to capture full stacks due to glibc by default
+missing the frame pointer; see Section 5.3.1, Compiled Languages.
+
+5.5 Observability Tools
+
+# bpftrace -e 't:syscalls:sys_exit_recvfrom { @bytes = hist(args->ret); }'
+
+A large mismatch may show an application is allocating larger buffers that it needs to. (Note that
+this exit one-liner will include syscall errors in the histogram as a size of -1.)
+If the received sizes also show some small and some large I/O, this may also affect the latency of
+the syscall, with larger I/O taking longer. To measure recvfrom(2) latency, both the start and end
+of the syscall can be traced at the same time, as shown by the following bpftrace program. The
+syntax is explained in Chapter 15, BPF, Section 15.2.4, Programming, which ends with a similar
+latency histogram for a kernel function.
+# bpftrace -e 't:syscalls:sys_enter_recvfrom { @ts[tid] = nsecs; }
+t:syscalls:sys_exit_recvfrom /@ts[tid]/ {
+@usecs = hist((nsecs - @ts[tid]) / 1000); delete(@ts[tid]); }'
+Attaching 2 probes...
+^C
+@usecs:
+[0]
+
+23280 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+[1]
+
+40468 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|
+
+[2, 4)
+[4, 8)
+
+144 |
+31612 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+|
+|
+|
+
+[8, 16)
+
+98 |
+
+|
+
+[16, 32)
+
+98 |
+
+|
+
+[32, 64)
+
+20297 |@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+|
+
+[64, 128)
+
+5365 |@@@@@@
+
+|
+
+[128, 256)
+
+5871 |@@@@@@@
+
+|
+
+[256, 512)
+
+384 |
+
+|
+
+[512, 1K)
+
+16 |
+
+|
+
+[1K, 2K)
+
+14 |
+
+|
+
+[2K, 4K)
+
+8 |
+
+|
+
+[4K, 8K)
+
+0 |
+
+|
+
+[8K, 16K)
+
+1 |
+
+|
+
+The output shows that recvfrom(2) was often less than 8 microseconds, with a slower mode
+between 32 and 256 microseconds. Some latency outliers are present, the slowest reaching the 8
+to 16 millisecond range.
+You can continue to drill down further. For example, the output map declaration (@usecs = ...)
+can be changed to:
+■
+
+■
+
+@usecs[args->ret]: To break down by syscall return value, showing a histogram for each.
+Since the return value is the number of bytes received, or -1 for error, this breakdown will
+confirm if larger I/O sizes caused higher latency.
+@usecs[ustack]: To break down by user stack trace, showing a latency histogram for each
+code path.
+
+211
+
+212
+
+Chapter 5 Applications
+
+I would also consider adding a filter after the first tracepoint so that this showed the MySQL
+server only, and not other processes:
+# bpftrace -e 't:syscalls:sys_enter_recvfrom /comm == "mysqld"/ { ...
+
+You could also add filters to match on latency outliers or slow modes only.
+
+Lock Tracing
+bpftrace can be used to investigate application lock contention in a number of ways. For a typical
+pthread mutex lock, uprobes can be used to trace the pthread library functions: pthread_mutex_
+lock(), etc.; and tracepoints can be used to trace the futex(2) syscall that manages lock blocking.
+I previously developed the pmlock(8) and pmheld(8) bpftrace tools for instrumenting the pthread
+library functions, and have published these as open source [Gregg 20b] (also see Chapter 13 of
+[Gregg 19]). For example, tracing the pthread_mutex_lock() function duration:
+# pmlock.bt $(pgrep mysqld)
+Attaching 4 probes...
+Tracing libpthread mutex lock latency, Ctrl-C to end.
+^C
+[...]
+@lock_latency_ns[0x7f37280019f0,
+pthread_mutex_lock+36
+THD::set_query(st_mysql_const_lex_string const&)+94
+Prepared_statement::execute(String*, bool)+336
+Prepared_statement::execute_loop(String*, bool, unsigned char*, unsigned char*...
+mysqld_stmt_execute(THD*, unsigned long, unsigned long, unsigned char*, unsign...
+, mysqld]:
+[1K, 2K)
+
+47 |
+
+|
+
+[2K, 4K)
+
+945 |@@@@@@@@
+
+|
+
+[4K, 8K)
+
+3290 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+|
+
+[8K, 16K)
+
+5702 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|
+
+This output has been truncated to show only one of the many stacks printed. This stack shows
+that lock address 0x7f37280019f0 was acquired via the THD::setquery() codepath, and acquisition was often in the 8 to 16 microsecond range.
+Why did this lock take this long? pmheld.bt shows the stack trace of the holder, by tracing the
+lock to unlock duration:
+# pmheld.bt $(pgrep mysqld)
+Attaching 5 probes...
+Tracing libpthread mutex held times, Ctrl-C to end.
+^C
+[...]
+
+5.6 Gotchas
+
+@held_time_ns[0x7f37280019f0,
+__pthread_mutex_unlock+0
+THD::set_query(st_mysql_const_lex_string const&)+147
+dispatch_command(THD*, COM_DATA const*, enum_server_command)+1045
+do_command(THD*)+544
+handle_connection+680
+, mysqld]:
+[2K, 4K)
+
+3848 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+[4K, 8K)
+
+5038 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|
+
+|
+
+[8K, 16K)
+
+0 |
+
+|
+
+[16K, 32K)
+
+0 |
+
+|
+
+[32K, 64K)
+
+1 |
+
+|
+
+This shows a different code path for the holder.
+If the lock has a symbol name, it is printed instead of the address. Without the symbol name,
+you can identify the lock from the stack trace: this is a lock in THD::set_query() at instruction
+offset 147. The source code to that function shows it only acquires one lock: LOCK_thd_query.
+Tracing of locks does add overhead, and lock events can be frequent. See the uprobes overhead
+details in Chapter 4, Observability Tools, Section 4.3.7, uprobes. It may be possible to develop
+similar tools based on kprobes of kernel futex functions, reducing the overhead somewhat. An
+alternate approach with negligible overhead is to use CPU profiling instead. CPU profiling typically costs little overhead as it is bounded by the sample rate, and heavy lock contention can use
+enough CPU cycles to show up in a CPU profile.
+
+Application Internals
+If needed, you can develop custom tools to summarize application internals. Start by checking
+whether USDT probes are available, or can be made available (usually by recompilation with
+an option). If these cannot be made available or are insufficient, consider using uprobes. For
+examples of bpftrace and uprobes and USDT, see Chapter 4, Observability Tools, Sections 4.3.7,
+uprobes, and 4.3.8, USDT. Section 4.3.8 also describes dynamic USDT, which may be necessary
+for insight into JIT-compiled software, which uprobes may be unable to instrument.
+A complex example is Java: uprobes can instrument the JVM runtime (C++ code) and OS libraries, USDT can instrument high-level JVM events, and dynamic USDT can be placed in the Java
+code to provide insight for method execution.
+
+5.6 Gotchas
+The following sections describe common problems with application performance analysis,
+specifically missing symbols and stack traces. You may first encounter these problems when
+examining a CPU profile, such as a flame graph, and find that it is missing function names and
+stack traces.
+These problems are an advanced topic that I cover in more detail in Chapters 2, 12, and 18 of BPF
+Performance Tools, and have summarized here.
+
+213
+
+214
+
+Chapter 5 Applications
+
+5.6.1 Missing Symbols
+When a profiler or tracer cannot resolve an application instruction address to its function name
+(symbol), it may print it as a hexadecimal number or the string “[unknown]” instead. The fix for
+this depends on the application’s compiler, runtime, and tuning, and the profiler itself.
+
+ELF Binaries (C, C++, ...)
+Symbols may be missing from compiled binaries, especially those that are packaged and distributed, as they have been processed using strip(1) to reduce their file size. One fix is to adjust the
+build process to avoid stripping symbols; another is to use a different source of symbol information, such as debuginfo or BPF Type Format (BTF). Linux profiling via perf(1), BCC, and bpftrace
+support debuginfo symbols.
+
+JIT Runtimes (Java, Node.js, ...)
+Missing symbols commonly occur for just-in-time (JIT) compiler runtimes like Java and Node.
+js. In those cases, the JIT compiler has its own symbol table that is changing at runtime and is
+not part of the pre-compiled symbol tables in the binary. The common fix is to use supplemental
+symbol tables generated by the runtime, which are placed in /tmp/perf-<PID>.map files read by
+both perf(1) and BCC.
+For example, Netflix uses perf-map-agent [Rudolph 18], which can attach to a live Java process
+and dump a supplemental symbol file. I have automated its use with another tool called jmaps
+[Gregg 20c], which should be run immediately after the profile and before symbol translation.
+For example, using perf(1) (Chapter 13):
+# perf record -F 49 -a -g -- sleep 10; jmaps
+# perf script --header > out.stacks
+# [...]
+
+And using bpftrace (Chapter 15):
+# bpftrace --unsafe -e 'profile:hz:49 { @[ustack] = count(); }
+interval:s:10 { exit(); } END { system("jmaps"); }'
+
+A symbol mapping may change between the profile sample and the symbol table dump, producing
+invalid function names in the profile. This is called symbol churn, and running jmaps immediately after perf record reduces it. It has so far not been a serious problem; if it was, a symbol
+dump could be taken before and after the profile to look for changes.
+There are other approaches for resolving JIT symbols. One is to use symbol-timestamp logging,
+which is supported by perf(1) and solves the symbol churn problem, albeit with higher overhead while enabled. Another is for perf(1) to call into the runtime’s own stack walker (which
+typically exists for exception stacks). This approach is sometimes called using stack helpers, and
+for Java it has been implemented by the async-profiler [Pangin 20].
+Note that JIT runtimes also also have precompiled components: the JVM also uses libjvm and
+libc. See the previous ELF binaries section for addressing those components.
+
+5.6 Gotchas
+
+5.6.2 Missing Stacks
+Another common problem is missing or incomplete stack traces, perhaps as short as one or two
+frames. For example, from an off-CPU profile of MySQL server:
+finish_task_switch
+schedule
+futex_wait_queue_me
+futex_wait
+do_futex
+__x64_sys_futex
+do_syscall_64
+entry_SYSCALL_64_after_hwframe
+pthread_cond_timedwait@@GLIBC_2.3.2
+[unknown]
+
+This stack is incomplete: after pthread_cond_timedwait() is a single “[unknown]” frame. It’s
+missing the MySQL functions beneath this point, and it’s those MySQL functions we really need
+to understand application context.
+Sometimes the stack is a single frame:
+send
+
+In flame graphs this can appear as “grass”: many thin single frames at the bottom of the profile.
+Incomplete stack traces are unfortunately common, and are usually caused by a confluence of
+two factors: 1) the observability tool using a frame pointer-based approach for reading the stack
+trace, and 2) the target binary not reserving a register (RBP on x86_64) for the frame pointer,
+instead reusing it as a general-purpose register as a compiler performance optimization. The
+observability tool reads this register expecting it to be a frame pointer, but in fact it could now
+contain anything: numbers, object address, pointers to strings, etc. The observability tool tries
+to resolve this number in the symbol table and, if it is lucky, it doesn’t find it and can print
+“[unknown]”. If it is unlucky, that random number resolves to an unrelated symbol, and now the
+printed stack trace has a function name that is wrong, confusing you, the end user.
+Since the libc library is typically compiled without frame pointers, broken stacks are common
+in any path through libc, including the two examples earlier: pthread_cond_timedwait() and
+send().17
+The easiest solution is usually to fix the frame pointer register:
+■
+
+■
+
+17
+
+For C/C++ software, and others compiled with gcc(1) or LLVM: Recompile the software
+with -fno-omit-frame-pointer.
+For Java: Run java(1) with -XX:+PreserveFramePointer.
+
+I’ve sent build instructions to package maintainers asking for a libc with frame pointers to be packaged.
+
+215
+
+216
+
+Chapter 5 Applications
+
+This may come with a performance cost, but it has often been measured at less than 1%; the
+benefits of being able to use stack traces to find performance wins usually far outweigh this cost.
+The other approach is to switch to a stack walking technique that is not frame pointer-based.
+perf(1) supports DWARF-based stack walking, ORC, and last branch record (LBR). Other stack
+walking methods are mentioned in Chapter 13, perf, Section 13.9, perf record.
+At the time of writing, DWARF-based and LBR stack walking are not available from BPF, and
+ORC is not yet available for user-level software.
+
+5.7
+
+Exercises
+
+1. Answer the following questions about terminology:
+■
+
+What is a cache?
+
+■
+
+What is a ring buffer?
+
+■
+
+What is a spin lock?
+
+■
+
+What is an adaptive mutex lock?
+
+■
+
+What is the difference between concurrency and parallelism?
+
+■
+
+What is CPU affinity?
+
+2. Answer the following conceptual questions:
+■
+
+What are the general pros and cons of using a large I/O size?
+
+■
+
+What is a hash table of locks used for?
+
+■
+
+■
+
+Describe general performance characteristics of the runtime of compiled languages, interpreted languages, and those using virtual machines.
+Explain the role of garbage collection and how it can affect performance.
+
+3. Choose an application, and answer the following basic questions about it:
+■
+
+What is the role of the application?
+
+■
+
+What discrete operation does the application perform?
+
+■
+
+Does the application run in user mode or kernel mode?
+
+■
+
+How is the application configured? What key options are available regarding performance?
+
+■
+
+What performance metrics are provided by the application?
+
+■
+
+What logs does the application create? Do they contain performance information?
+
+■
+
+Has the most recent version of the application fixed performance issues?
+
+■
+
+Are there known performance bugs for the application?
+
+■
+
+Does the application have a community (e.g., IRC, meetups)? A performance community?
+
+■
+
+Are there books about the application? Performance books?
+
+■
+
+Are there well-known performance experts for the application? Who are they?
+
+5.8 References
+
+4. Choose an application that is under load, and perform these tasks (many of which may
+require the use of dynamic tracing):
+■
+
+■
+
+■
+
+■
+
+■
+
+■
+
+■
+
+■
+
+Before taking any measurements, do you expect the application to be CPU-bound or
+I/O-bound? Explain your reasoning.
+Determine using observability tools if it is CPU-bound or I/O-bound.
+Generate a CPU flame graph for the application. You may need to fix symbols and stack
+traces for this to work. What is the hottest CPU code path?
+Generate an off-CPU flame graph for the application. What is the longest blocking event
+during the application’s request (ignore idle stacks)?
+Characterize the size of I/O it performs (e.g., file system reads/writes, network sends/
+receives).
+Does the application have caches? Identify their size and hit rate.
+Measure the latency (response time) for the operation that the application serves. Show the
+average, minimum, maximum, and full distribution.
+Perform drill-down analysis of the operation, investigating the origin of the bulk of the
+latency.
+
+■
+
+Characterize the workload applied to the application (especially who and what).
+
+■
+
+Step through the static performance tuning checklist.
+
+■
+
+Does the application run concurrently? Investigate its use of synchronization primitives.
+
+5. (optional, advanced) Develop a tool for Linux called tsastat(8) that prints columns for
+multiple thread state analysis states, with time spent in each. This can behave similarly to
+pidstat(1) and produce a rolling output.18
+
+5.8 References
+[Knuth 76] Knuth, D., “Big Omicron and Big Omega and Big Theta,” ACM SIGACT News,
+1976.
+[Knuth 97] Knuth, D., The Art of Computer Programming, Volume 1: Fundamental Algorithms,
+3rd Edition, Addison-Wesley, 1997.
+[Zijlstra 09] Zijlstra, P., “mutex: implement adaptive spinning,” http://lwn.net/
+Articles/314512, 2009.
+[Gregg 17a] Gregg, B., “EuroBSDcon: System Performance Analysis Methodologies,”
+EuroBSDcon, http://www.brendangregg.com/blog/2017-10-28/bsd-performance-analysismethodologies.html, 2017.
+
+18
+
+Trivia: since the first edition I’m not aware of anyone solving this. I proposed a thread state analysis talk (TSA) for
+OSCON, and planned to develop a Linux TSA tool for the talk; however, my talk was rejected (my fault: my abstract
+was lousy), and I have yet to develop the tool. EuroBSDcon invited me to give a keynote, for which I covered TSA,
+and I did develop a tool for it: tstates.d, for FreeBSD [Gregg 17a].
+
+217
+
+218
+
+Chapter 5 Applications
+
+[Intel 18] “Tool tracing syscalls in a fast way using eBPF linux kernel feature,”
+https://github.com/pmem/vltrace, last updated 2018.
+[Microsoft 18] “Fibers,” Windows Dev Center, https://docs.microsoft.com/en-us/windows/
+win32/procthread/fibers, 2018.
+[Rudolph 18] Rudolph, J., “perf-map-agent,” https://github.com/jvm-profiling-tools/
+perf-map-agent, last updated 2018.
+[Schwartz 18] Schwartz, E., “Dynamic Optimizations for SBCL Garbage Collection,”
+11th European Lisp Symposium, https://european-lisp-symposium.org/static/proceedings/
+2018.pdf, 2018.
+[Axboe 19] Axboe, J., “Efficient IO with io_uring,” https://kernel.dk/io_uring.pdf, 2019.
+[Gregg 19] Gregg, B., BPF Performance Tools: Linux System and Application Observability,
+Addison-Wesley, 2019.
+[Apdex 20] Apdex Alliance, “Apdex,” https://www.apdex.org, accessed 2020.
+[Golang 20] “Why goroutines instead of threads?” Golang documentation, https://golang.org/
+doc/faq#goroutines, accessed 2020.
+[Gregg 20b] Gregg, B., “BPF Performance Tools,” https://github.com/brendangregg/
+bpf-perf-tools-book, last updated 2020.
+[Gregg 20c] Gregg, B., “jmaps,” https://github.com/brendangregg/FlameGraph/blob/master/
+jmaps, last updated 2020.
+[Linux 20e] “RCU Concepts,” Linux documentation, https://www.kernel.org/doc/html/
+latest/RCU/rcu.html, accessed 2020.
+[Microsoft 20] “Procmon Is a Linux Reimagining of the Classic Procmon Tool from the
+Sysinternals Suite of Tools for Windows,” https://github.com/microsoft/ProcMon-for-Linux,
+last updated 2020.
+[Molnar 20] Molnar, I., and Bueso, D., “Generic Mutex Subsystem,” Linux documentation,
+https://www.kernel.org/doc/Documentation/locking/mutex-design.rst, accessed 2020.
+[Node.js 20] “Node.js,” http://nodejs.org, accessed 2020.
+[Pangin 20] Pangin, A., “async-profiler,” https://github.com/jvm-profiling-tools/
+async-profiler, last updated 2020.
+
+Chapter 6
+CPUs
+
+CPUs drive all software and are often the first target for systems performance analysis. This
+chapter explains CPU hardware and software, and shows how CPU usage can be examined in
+detail to look for performance improvements.
+At a high level, system-wide CPU utilization can be monitored, and usage by process or thread
+can be examined. At a lower level, the code paths within applications and the kernel can be
+profiled and studied, as well as CPU usage by interrupts. At the lowest level, CPU instruction
+execution and cycle behavior can be analyzed. Other behaviors can also be investigated, including scheduler latency as tasks wait their turn on CPUs, which degrades performance.
+The learning objectives of this chapter are:
+■
+
+Understand CPU models and concepts.
+
+■
+
+Become familiar with CPU hardware internals.
+
+■
+
+Become familiar with CPU scheduler internals.
+
+■
+
+Follow different methodologies for CPU analysis.
+
+■
+
+Interpret load averages and PSI.
+
+■
+
+Characterize system-wide and per-CPU utilization.
+
+■
+
+Identify and quantify issues of scheduler latency.
+
+■
+
+Perform CPU cycle analysis to identify inefficiencies.
+
+■
+
+Investigate CPU usage using profilers and CPU flame graphs.
+
+■
+
+Identify soft and hard IRQ CPU consumers.
+
+■
+
+Interpret CPU flame graphs and other CPU visualizations.
+
+■
+
+Become aware of CPU tunable parameters.
+
+This chapter has six parts. The first three provide the basis for CPU analysis, and the last three
+show its practical application to Linux-based systems. The parts are:
+■
+
+Background introduces CPU-related terminology, basic models of CPUs, and key CPU
+performance concepts.
+
+220
+
+Chapter 6 CPUs
+
+■
+
+■
+
+■
+
+Architecture introduces processor and kernel scheduler architecture.
+Methodology describes performance analysis methodologies, both observational and
+experimental.
+Observability Tools describes CPU performance analysis tools on Linux-based systems,
+including profiling, tracing, and visualizations.
+
+■
+
+Experimentation summarizes CPU benchmark tools.
+
+■
+
+Tuning includes examples of tunable parameters.
+
+The effects of memory I/O on CPU performance are covered, including CPU cycles stalled on
+memory and the performance of CPU caches. Chapter 7, Memory, continues the discussion of
+memory I/O, including MMU, NUMA/UMA, system interconnects, and memory buses.
+
+6.1 Terminology
+For reference, CPU-related terminology used in this chapter includes the following:
+■
+
+■
+
+■
+
+■
+
+■
+
+■
+
+■
+
+Processor: The physical chip that plugs into a socket on the system or processor board and
+contains one or more CPUs implemented as cores or hardware threads.
+Core: An independent CPU instance on a multicore processor. The use of cores is a way to
+scale processors, called chip-level multiprocessing (CMP).
+Hardware thread: A CPU architecture that supports executing multiple threads in parallel on a single core (including Intel’s Hyper-Threading Technology), where each thread is
+an independent CPU instance. This scaling approach is called simultaneous multithreading
+(SMT).
+CPU instruction: A single CPU operation, from its instruction set. There are instructions
+for arithmetic operations, memory I/O, and control logic.
+Logical CPU: Also called a virtual processor,1 an operating system CPU instance (a schedulable CPU entity). This may be implemented by the processor as a hardware thread (in
+which case it may also be called a virtual core), a core, or a single-core processor.
+Scheduler: The kernel subsystem that assigns threads to run on CPUs.
+Run queue: A queue of runnable threads that are waiting to be serviced by CPUs. Modern
+kernels may use some other data structure (e.g., a red-black tree) to store runnable threads,
+but we still often use the term run queue.
+
+Other terms are introduced throughout this chapter. The Glossary includes basic terminology for
+reference, including CPU, CPU cycle, and stack. Also see the terminology sections in Chapters 2
+and 3.
+
+1
+
+It is also sometimes called a virtual CPU; however, that term is more commonly used to refer to virtual CPU
+instances provided by a virtualization technology. See Chapter 11, Cloud Computing.
+
+6.2 Models
+
+6.2 Models
+The following simple models illustrate some basic principles of CPUs and CPU performance.
+Section 6.4, Architecture, digs much deeper and includes implementation-specific details.
+
+6.2.1
+
+CPU Architecture
+
+Figure 6.1 shows an example CPU architecture, for a single processor with four cores and eight
+hardware threads in total. The physical architecture is pictured, along with how it is seen by the
+operating system.2
+
+Figure 6.1 CPU architecture
+Each hardware thread is addressable as a logical CPU, so this processor appears as eight CPUs. The
+operating system may have some additional knowledge of topology to improve its scheduling
+decisions, such as which CPUs are on the same core and how CPU caches are shared.
+
+6.2.2
+
+CPU Memory Caches
+
+Processors provide various hardware caches for improving memory I/O performance. Figure 6.2
+shows the relationship of cache sizes, which become smaller and faster (a trade-off) the closer
+they are to the CPU.
+The caches that are present, and whether they are on the processor (integrated) or external to the
+processor, depends on the processor type. Earlier processors provided fewer levels of integrated
+cache.
+
+2
+There is a tool for Linux, lstopo(1), that can generate diagrams similar to this figure for the current system, an
+example is in Section 6.6.21, Other Tools.
+
+221
+
+222
+
+Chapter 6 CPUs
+
+Figure 6.2 CPU cache sizes
+
+6.2.3
+
+CPU Run Queues
+
+Figure 6.3 shows a CPU run queue, which is managed by the kernel scheduler.
+
+Figure 6.3 CPU run queue
+The thread states shown in the figure, ready to run and on-CPU, are covered in Figure 3.8 in
+Chapter 3, Operating Systems.
+The number of software threads that are queued and ready to run is an important performance
+metric indicating CPU saturation. In this figure (at this instant) there are four, with an additional thread running on-CPU. The time spent waiting on a CPU run queue is sometimes called
+run-queue latency or dispatcher-queue latency. In this book, the term scheduler latency is often used,
+as it is appropriate for all schedulers, including those that do not use queues (see the discussion
+of CFS in Section 6.4.2, Software).
+For multiprocessor systems, the kernel typically provides a run queue for each CPU, and aims to
+keep threads on the same run queue. This means that threads are more likely to keep running
+on the same CPUs where the CPU caches have cached their data. These caches are described as
+having cache warmth, and this strategy to keep threads running on the same CPUs is called CPU
+affinity. On NUMA systems, per-CPU run queues also improve memory locality. This improves
+performance by keeping threads running on the same memory node (as described in Chapter 7,
+Memory), and avoids the cost of thread synchronization (mutex locks) for queue operations,
+which would hurt scalability if the run queue was global and shared among all CPUs.
+
+6.3
+
+Concepts
+
+6.3 Concepts
+The following are a selection of important concepts regarding CPU performance, beginning
+with a summary of processor internals: the CPU clock rate and how instructions are executed. This is background for later performance analysis, particularly for understanding the
+instructions-per-cycle (IPC) metric.
+
+6.3.1
+
+Clock Rate
+
+The clock is a digital signal that drives all processor logic. Each CPU instruction may take one or
+more cycles of the clock (called CPU cycles) to execute. CPUs execute at a particular clock rate; for
+example, a 4 GHz CPU performs 4 billion clock cycles per second.
+Some processors are able to vary their clock rate, increasing it to improve performance or
+decreasing it to reduce power consumption. The rate may be varied on request by the operating
+system, or dynamically by the processor itself. The kernel idle thread, for example, can request
+the CPU to throttle down to save power.
+Clock rate is often marketed as the primary feature of a processor, but this can be a little misleading. Even if the CPU in your system appears to be fully utilized (a bottleneck), a faster clock rate
+may not speed up performance—it depends on what those fast CPU cycles are actually doing.
+If they are mostly stall cycles while waiting on memory access, executing them more quickly
+doesn’t actually increase the CPU instruction rate or workload throughput.
+
+6.3.2 Instructions
+CPUs execute instructions chosen from their instruction set. An instruction includes the following steps, each processed by a component of the CPU called a functional unit:
+1. Instruction fetch
+2. Instruction decode
+3. Execute
+4. Memory access
+5. Register write-back
+The last two steps are optional, depending on the instruction. Many instructions operate on
+registers only and do not require the memory access step.
+Each of these steps takes at least a single clock cycle to be executed. Memory access is often the
+slowest, as it may take dozens of clock cycles to read or write to main memory, during which
+instruction execution has stalled (and these cycles while stalled are called stall cycles). This is why
+CPU caching is important, as described in Section 6.4.1, Hardware: it can dramatically reduce
+the number of cycles needed for memory access.
+
+223
+
+224
+
+Chapter 6 CPUs
+
+6.3.3 Instruction Pipeline
+The instruction pipeline is a CPU architecture that can execute multiple instructions in parallel by
+executing different components of different instructions at the same time. It is similar to a factory
+assembly line, where stages of production can be executed in parallel, increasing throughput.
+Consider the instruction steps previously listed. If each were to take a single clock cycle, it would
+take five cycles to complete the instruction. At each step of this instruction, only one functional
+unit is active and four are idle. By use of pipelining, multiple functional units can be active at
+the same time, processing different instructions in the pipeline. Ideally, the processor can then
+complete one instruction with every clock cycle.
+Instruction pipelining may involve breaking down an instruction into multiple simple steps for
+execution in parallel. (Depending on the processor, these steps may become simple operations
+called micro-operations (uOps) for execution by a processor area called the back-end. The front-end
+of such a processor is responsible for fetching instructions and branch prediction.)
+
+Branch Prediction
+Modern processors can perform out-of-order execution of the pipeline, where later instructions
+can be completed while earlier instructions are stalled, improving instruction throughput.
+However, conditional branch instructions pose a problem. Branch instructions jump execution
+to a different instruction, and conditional branches do so based on a test. With conditional
+branches, the processor does not know what the later instructions will be. As an optimization,
+processors often implement branch prediction, where they will guess the outcome of the test and
+begin processing the outcome instructions. If the guess later proves to be wrong, the progress
+in the instruction pipeline must be discarded, hurting performance. To improve the chances of
+guessing correctly, programmers can place hints in the code (e.g., likely() and unlikely() macros
+in the Linux Kernel sources).
+
+6.3.4 Instruction Width
+But we can go faster still. Multiple functional units of the same type can be included, so that
+even more instructions can make forward progress with each clock cycle. This CPU architecture is called superscalar and is typically used with pipelining to achieve a high instruction
+throughput.
+The instruction width describes the target number of instructions to process in parallel. Modern
+processors are 3-wide or 4-wide, meaning they can complete up to three or four instructions per
+cycle. How this works depends on the processor, as there may be different numbers of functional
+units for each stage.
+
+6.3.5 Instruction Size
+Another instruction characteristic is the instruction size: for some processor architectures it is
+variable: For example, x86, which is classified as a complex instruction set computer (CISC), allows
+up to 15-byte instructions. ARM, which is a reduced instruction set computer (RISC), has 4 byte
+instructions with 4-byte alignment for AArch32/A32, and 2- or 4-byte instructions for ARM
+Thumb.
+
+6.3
+
+Concepts
+
+6.3.6 SMT
+Simultaneous multithreading makes use of a superscalar architecture and hardware multithreading support (by the processor) to improve parallelism. It allows a CPU core to run more
+than one thread, effectively scheduling between them during instructions, e.g., when one
+instruction stalls on memory I/O. The kernel presents these hardware threads as virtual CPUs,
+and schedules threads and processes on them as usual. This was introduced and pictured in
+Section 6.2.1, CPU Architecture.
+An example implementation is Intel’s Hyper-Threading Technology, where each core often has
+two hardware threads. Another example is POWER8, which has eight hardware threads per core.
+The performance of each hardware thread is not the same as a separate CPU core, and depends
+on the workload. To avoid performance problems, kernels may spread out CPU load across cores
+so that only one hardware thread on each core is busy, avoiding hardware thread contention.
+Workloads that are stall cycle-heavy (low IPC) may also have better performance than those that
+are instruction-heavy (high IPC) because stall cycles reduce core contention.
+
+6.3.7
+
+IPC, CPI
+
+Instructions per cycle (IPC) is an important high-level metric for describing how a CPU is spending its clock cycles and for understanding the nature of CPU utilization. This metric may also be
+expressed as cycles per instruction (CPI), the inverse of IPC. IPC is more often used by the Linux
+community and by the Linux perf(1) profiler, and CPI more often used by Intel and elsewhere. 3
+A low IPC indicates that CPUs are often stalled, typically for memory access. A high IPC indicates that CPUs are often not stalled and have a high instruction throughput. These metrics
+suggest where performance tuning efforts may be best spent.
+Memory-intensive workloads, for example, may be improved by installing faster memory (DRAM),
+improving memory locality (software configuration), or reducing the amount of memory I/O.
+Installing CPUs with a higher clock rate may not improve performance to the degree expected,
+as the CPUs may need to wait the same amount of time for memory I/O to complete. Put differently, a faster CPU may mean more stall cycles but the same rate of completed instructions
+per second.
+The actual values for high or low IPC are dependent on the processor and processor features and
+can be determined experimentally by running known workloads. As an example, you may find
+that low-IPC workloads run with an IPC at 0.2 or lower, and high IPC workloads run with an
+IPC of over 1.0 (which is possible due to instruction pipelining and width, described earlier). At
+Netflix, cloud workloads range from an IPC of 0.2 (considered slow) to 1.5 (considered good).
+Expressed as CPI, this range is 5.0 to 0.66.
+It should be noted that IPC shows the efficiency of instruction processing, but not of the instructions themselves. Consider a software change that added an inefficient software loop, which
+operates mostly on CPU registers (no stall cycles): such a change may result in a higher overall
+IPC, but also higher CPU usage and utilization.
+
+3
+
+In the first edition of this book I used CPI; I’ve since switched to working more on Linux, including switching to IPC.
+
+225
+
+226
+
+Chapter 6 CPUs
+
+6.3.8 Utilization
+CPU utilization is measured by the time a CPU instance is busy performing work during an
+interval, expressed as a percentage. It can be measured as the time a CPU is not running the
+kernel idle thread but is instead running user-level application threads or other kernel threads,
+or processing interrupts.
+High CPU utilization may not necessarily be a problem, but rather a sign that the system is doing
+work. Some people also consider this a return of investment (ROI) indicator: a highly utilized
+system is considered to have good ROI, whereas an idle system is considered wasted. Unlike with
+other resource types (disks), performance does not degrade steeply under high utilization, as
+the kernel supports priorities, preemption, and time sharing. These together allow the kernel to
+understand what has higher priority, and to ensure that it runs first.
+The measure of CPU utilization spans all clock cycles for eligible activities, including memory
+stall cycles. This can be misleading: a CPU may be highly utilized because it is often stalled waiting for memory I/O, not just executing instructions, as described in the previous section. This is
+the case for the Netflix cloud, where the CPU utilization is mostly memory stall cycles [Gregg 17b].
+CPU utilization is often split into separate kernel- and user-time metrics.
+
+6.3.9 User Time/Kernel Time
+The CPU time spent executing user-level software is called user time, and kernel-level software is
+kernel time. Kernel time includes time during system calls, kernel threads, and interrupts. When
+measured across the entire system, the user time/kernel time ratio indicates the type of workload
+performed.
+Applications that are computation-intensive may spend almost all their time executing userlevel code and have a user/kernel ratio approaching 99/1. Examples include image processing,
+machine learning, genomics, and data analysis.
+Applications that are I/O-intensive have a high rate of system calls, which execute kernel code to
+perform the I/O. For example, a web server performing network I/O may have a user/kernel ratio
+of around 70/30.
+These numbers are dependent on many factors and are included to express the kinds of ratios
+expected.
+
+6.3.10
+
+Saturation
+
+A CPU at 100% utilization is saturated, and threads will encounter scheduler latency as they wait
+to run on-CPU, decreasing overall performance. This latency is the time spent waiting on the
+CPU run queue or other structure used to manage threads.
+Another form of CPU saturation involves CPU resource controls, as may be imposed in a multitenant cloud computing environment. While the CPU may not be 100% utilized, the imposed
+limit has been reached, and threads that are runnable must wait their turn. How visible this
+is to users of the system depends on the type of virtualization in use; see Chapter 11, Cloud
+Computing.
+
+6.3
+
+Concepts
+
+A CPU running at saturation is less of a problem than other resource types, as higher-priority
+work can preempt the current thread.
+
+6.3.11 Preemption
+Preemption, introduced in Chapter 3, Operating Systems, allows a higher-priority thread to
+preempt the currently running thread and begin its own execution instead. This eliminates the
+run-queue latency for higher-priority work, improving its performance.
+
+6.3.12 Priority Inversion
+Priority inversion occurs when a lower-priority thread holds a resource and blocks a higherpriority thread from running. This reduces the performance of the higher-priority work, as it
+is blocked waiting.
+This can be solved using a priority inheritance scheme. Here is an example of how this can work
+(based on a real-world case):
+1. Thread A performs monitoring and has a low priority. It acquires an address space lock for
+a production database, to check memory usage.
+2. Thread B, a routine task to perform compression of system logs, begins running.
+3. There is insufficient CPU to run both. Thread B preempts A and runs.
+4. Thread C is from the production database, has a high priority, and has been sleeping waiting for I/O. This I/O now completes, putting thread C back into the runnable state.
+5. Thread C preempts B, runs, but then blocks on the address space lock held by thread A.
+Thread C leaves CPU.
+6. The scheduler picks the next-highest-priority thread to run: B.
+7. With thread B running, a high-priority thread, C, is effectively blocked on a lower-priority
+thread, B. This is priority inversion.
+8. Priority inheritance gives thread A thread C’s high priority, preempting B, until it releases
+the lock. Thread C can now run.
+Linux since 2.6.18 has provided a user-level mutex that supports priority inheritance, intended
+for real-time workloads [Corbet 06a].
+
+6.3.13 Multiprocess, Multithreading
+Most processors provide multiple CPUs of some form. For an application to make use of them,
+it needs separate threads of execution so that it can run in parallel. For a 64-CPU system, for
+example, this may mean that an application can execute up to 64 times faster if it can make use
+of all CPUs in parallel, or handle 64 times the load. The degree to which the application can
+effectively scale with an increase in CPU count is a measure of scalability.
+The two techniques to scale applications across CPUs are multiprocess and multithreading, which
+are pictured in Figure 6.4. (Note that this is software multithreading, and not the hardwarebased SMT mentioned earlier.)
+
+227
+
+228
+
+Chapter 6 CPUs
+
+Figure 6.4 Software CPU scalability techniques
+On Linux both the multiprocess and multithread models may be used, and both are implemented
+by tasks.
+Differences between multiprocess and multithreading are shown in Table 6.1.
+
+Table 6.1
+
+Multiprocess and multithreading attributes
+
+Attribute
+
+Multiprocess
+
+Multithreading
+
+Development
+
+Can be easier. Use of fork(2) or
+clone(2).
+
+Use of threads API (pthreads).
+
+Memory overhead
+
+Separate address space per process
+consumes some memory resources
+(reduced to some degree by pagelevel copy-on-write).
+
+Small. Requires only extra
+stack and register space, and
+space for thread-local data.
+
+CPU overhead
+
+Cost of fork(2)/clone(2)/exit(2), which
+includes MMU work to manage
+address spaces.
+
+Small. API calls.
+
+Communication
+
+Via IPC. This incurs CPU cost including
+context switching for moving data
+between address spaces, unless
+shared memory regions are used.
+
+Fastest. Direct access to
+shared memory. Integrity via
+synchronization primitives
+(e.g., mutex locks).
+
+Crash resilience
+
+High, processes are independent.
+
+Low, any bug can crash the
+entire application.
+
+Memory Usage
+
+While some memory may be duplicated, Via system allocator. This may
+separate processes can exit(2) and
+incur some CPU contention
+return all memory back to the system. from multiple threads, and
+fragmentation before memory
+is reused.
+
+With all the advantages shown in the table, multithreading is generally considered superior,
+although more complicated for the developer to implement. Multithreaded programming is
+covered in [Stevens 13].
+
+6.4
+
+Architecture
+
+Whichever technique is used, it is important that enough processes or threads be created to
+span the desired number of CPUs—which, for maximum performance, may be all of the CPUs
+available. Some applications may perform better when running on fewer CPUs, when the cost
+of thread synchronization and reduced memory locality (NUMA) outweighs the benefit of running across more CPUs.
+Parallel architectures are also discussed in Chapter 5, Applications, Section 5.2.5, Concurrency
+and Parallelism, which also summarizes co-routines.
+
+6.3.14
+
+Word Size
+
+Processors are designed around a maximum word size—32-bit or 64-bit—which is the integer size
+and register size. Word size is also commonly used, depending on the processor, for the address
+space size and data path width (where it is sometimes called the bit width).
+Larger sizes can mean better performance, although it’s not as simple as it sounds. Larger
+sizes may cause memory overheads for unused bits in some data types. The data footprint also
+increases when the size of pointers (word size) increases, which can require more memory I/O.
+For the x86 64-bit architecture, these overheads are compensated by an increase in registers and
+a more efficient register calling convention, so 64-bit applications will likely be faster than their
+32-bit versions.
+Processors and operating systems can support multiple word sizes and can run applications compiled for different word sizes simultaneously. If software has been compiled for the smaller word
+size, it may execute successfully but perform relatively poorly.
+
+6.3.15
+
+Compiler Optimization
+
+The CPU runtime of applications can be significantly improved through compiler options
+(including setting the word size) and optimizations. Compilers are also frequently updated to take
+advantage of the latest CPU instruction sets and to implement other optimizations. Sometimes
+application performance can be significantly improved simply by using a newer compiler.
+This topic is covered in more detail in Chapter 5, Applications, Section 5.3.1, Compiled
+Languages.
+
+6.4 Architecture
+This section introduces CPU architecture and implementation, for both hardware and software.
+Simple CPU models were introduced in Section 6.2, Models, and generic concepts in the previous section.
+Here I summarize these topics as background for performance analysis. For more details, see vendor processor manuals and documentation on operating system internals. Some are listed at the
+end of this chapter.
+
+229
+
+230
+
+Chapter 6 CPUs
+
+6.4.1 Hardware
+CPU hardware includes the processor and its subsystems, and the CPU interconnect for multiprocessor systems.
+
+Processor
+Components of a generic two-core processor are shown in Figure 6.5.
+
+Figure 6.5 Generic two-core processor components
+The control unit is the heart of the CPU, performing instruction fetch, decoding, managing execution, and storing results.
+This example processor depicts a shared floating-point unit and (optional) shared Level 3 cache.
+The actual components in your processor will vary depending on its type and model. Other
+performance-related components that may be present include:
+■
+
+P-cache: Prefetch cache (per CPU core)
+
+■
+
+W-cache: Write cache (per CPU core)
+
+■
+
+Clock: Signal generator for the CPU clock (or provided externally)
+
+■
+
+Timestamp counter: For high-resolution time, incremented by the clock
+
+■
+
+Microcode ROM: Quickly converts instructions to circuit signals
+
+■
+
+Temperature sensors: For thermal monitoring
+
+■
+
+Network interfaces: If present on-chip (for high performance)
+
+Some processor types use the temperature sensors as input for dynamic overclocking of individual cores (including Intel Turbo Boost technology), increasing the clock rate while the core
+remains in its temperature envelope. The possible clock rates can be defined by P-states.
+
+6.4
+
+Architecture
+
+P-States and C-States
+The advanced configuration and power interface (ACPI) standard, in use by Intel processors, defines
+processor performance states (P-states) and processor power states (C-states) [ACPI 17].
+P-states provide different levels of performance during normal execution by varying the CPU
+frequency: P0 is the highest frequency (for some Intel CPUs this is the highest “turbo boost”
+level) and P1...N are lower-frequency states. These states can be controlled by both hardware
+(e.g., based on the processor temperature) or via software (e.g., kernel power saving modes). The
+current operating frequency and available states can be observed using model-specific registers
+(MSRs) (e.g., using the showboost(8) tool in Section 6.6.10, showboost).
+C-states provide different idle states for when execution is halted, saving power. The C-states are
+shown in Table 6.2: C0 is for normal operation, and C1 and above are for idle states: the higher
+the number, the deeper the state.
+
+Table 6.2
+
+Processor power states (C-states)
+
+C-state
+
+Description
+
+C0
+
+Executing. The CPU is fully on, processing instructions.
+
+C1
+
+Halts execution. Entered by the hlt instruction. Caches are maintained. Wakeup
+latency is the lowest from this state.
+
+C1E
+
+Enhanced halt with lower power consumption (supported by some processors).
+
+C2
+
+Halts execution. Entered by a hardware signal. This is a deeper sleep state with
+higher wakeup latency.
+
+C3
+
+A deeper sleep state with improved power savings over C1 and C2. The caches
+may maintain state, but stop snooping (cache coherency), deferring it to the OS.
+
+Processor manufacturers can define additional states beyond C3. Some Intel processors define
+additional levels up to C10 where more processor functionality is powered down, including
+cache contents.
+
+CPU Caches
+Various hardware caches are usually included in the processor (where they are referred to as
+on-chip, on-die, embedded, or integrated) or with the processor (external). These improve memory
+performance by using faster memory types for caching reads and buffering writes. The levels of
+cache access for a generic processor are shown in Figure 6.6.
+
+Figure 6.6 CPU cache hierarchy
+
+231
+
+232
+
+Chapter 6 CPUs
+
+They include:
+■
+
+Level 1 instruction cache (I$)
+
+■
+
+Level 1 data cache (D$)
+
+■
+
+Translation lookaside buffer (TLB)
+
+■
+
+Level 2 cache (E$)
+
+■
+
+Level 3 cache (optional)
+
+The E in E$ originally stood for external cache, but with the integration of Level 2 caches it has
+since been cleverly referred to as embedded cache. The “Level” terminology is used nowadays
+instead of the “E$”-style notation, which avoids such confusion.
+It is often desirable to refer to the last cache before main memory, which may or may not be level
+3. Intel uses the term last-level cache (LLC) for this, also described as the longest-latency cache.
+The caches available on each processor depend on its type and model. Over time, the number
+and sizes of these caches have been increasing. This is illustrated in Table 6.3, which lists example Intel processors since 1978, including advances in caches [Intel 19a][Intel 20a].
+
+Table 6.3
+
+Example Intel processor cache sizes from 1978 to 2019
+
+Processor
+
+Year
+
+Max Clock Cores/ Transistors Data
+Threads
+Bus
+(bits)
+
+Level 1 Level 2
+
+Level 3
+
+8086
+
+1978
+
+8 MHz
+
+1/1
+
+29 K
+
+16
+
+—
+
+Intel 286
+
+1982
+
+12.5 MHz
+
+1/1
+
+134 K
+
+16
+
+—
+
+Intel 386 DX
+
+1985
+
+20 MHz
+
+1/1
+
+275 K
+
+32
+
+—
+
+—
+
+—
+
+Intel 486 DX
+
+1989
+
+25 MHz
+
+1/1
+
+1.2 M
+
+32
+
+8 KB
+
+—
+
+—
+
+Pentium
+
+1993
+
+60 MHz
+
+1/1
+
+3.1 M
+
+64
+
+16 KB
+
+—
+
+—
+
+Pentium Pro
+
+1995
+
+200 MHz
+
+1/1
+
+5.5 M
+
+64
+
+16 KB
+
+256/
+512 KB
+
+—
+
+Pentium II
+
+1997
+
+266 MHz
+
+1/1
+
+7M
+
+64
+
+32 KB
+
+256/
+512 KB
+
+—
+
+Pentium III
+
+1999
+
+500 MHz
+
+1/1
+
+8.2 M
+
+64
+
+32 KB
+
+512 KB
+
+—
+
+Intel Xeon
+
+2001
+
+1.7 GHz
+
+1/1
+
+42 M
+
+64
+
+8 KB
+
+512 KB
+
+—
+
+Pentium M
+
+2003
+
+1.6 GHz
+
+1/1
+
+77 M
+
+64
+
+64 KB
+
+1 MB
+
+—
+
+Intel Xeon MP
+3.33
+
+2005
+
+3.33 GHz
+
+1/2
+
+675 M
+
+64
+
+16 KB
+
+1 MB
+
+8 MB
+
+Intel Xeon 7140M
+
+2006
+
+3.4 GHz
+
+2/4
+
+1.3 B
+
+64
+
+16 KB
+
+1 MB
+
+16 MB
+
+6.4
+
+Architecture
+
+Processor
+
+Year
+
+Max Clock Cores/ Transistors Data
+Threads
+Bus
+(bits)
+
+Level 1 Level 2
+
+Level 3
+
+Intel Xeon 7460
+
+2008
+
+2.67 GHz
+
+6/6
+
+1.9 B
+
+64
+
+64 KB
+
+3 MB
+
+16 MB
+
+Intel Xeon 7560
+
+2010
+
+2.26 GHz
+
+8/16
+
+2.3 B
+
+64
+
+64 KB
+
+256 KB
+
+24 MB
+
+Intel Xeon E78870
+
+2011
+
+2.4 GHz
+
+10/20
+
+2.2 B
+
+64
+
+64 KB
+
+256 KB
+
+30 MB
+
+Intel Xeon E78870v2
+
+2014
+
+3.1 GHz
+
+15/30
+
+4.3 B
+
+64
+
+64 KB
+
+256 KB
+
+37.5 MB
+
+Intel Xeon E78870v3
+
+2015
+
+2.9 GHz
+
+18/36
+
+5.6 B
+
+64
+
+64 KB
+
+256 KB
+
+45 MB
+
+Intel Xeon E78870v4
+
+2016
+
+3.0 GHz
+
+20/40
+
+7.2 B
+
+64
+
+64 KB
+
+256 KB
+
+50 MB
+
+Intel Platinum
+8180
+
+2017
+
+3.8 GHz
+
+28/56
+
+8.0 B
+
+64
+
+64 KB
+
+1 MB
+
+38.5 MB
+
+Intel Xeon
+Platinum 9282
+
+2019
+
+3.8 GHz
+
+56/112
+
+8.0 B
+
+64
+
+64 KB
+
+1 MB
+
+77 MB
+
+For multicore and multithreading processors, some caches may be shared between cores and
+threads. For the examples in Table 6.3, all processors since the Intel Xeon 7460 (2008) have
+multiple Level 1 and Level 2 caches, typically one for each core (the sizes in the table refer to the
+per-core cache, not the total size).
+Apart from the increasing number and sizes of CPU caches, there is also a trend toward providing these on-chip, where access latency can be minimized, instead of providing them externally
+to the processor.
+
+Latency
+Multiple levels of cache are used to deliver the optimum configuration of size and latency. The
+access time for the Level 1 cache is typically a few CPU clock cycles, and for the larger Level 2
+cache around a dozen clock cycles. Main memory access can take around 60 ns (around 240
+cycles for a 4 GHz processor), and address translation by the MMU also adds latency.
+The CPU cache latency characteristics for your processor can be determined experimentally
+using micro-benchmarking [Ruggiero 08]. Figure 6.7 shows the result of this, plotting memory
+access latency for an Intel Xeon E5620 2.4 GHz tested over increasing ranges of memory using
+LMbench [McVoy 12].
+Both axes are logarithmic. The steps in the graphs show when a cache level was exceeded, and
+access latency becomes a result of the next (slower) cache level.
+
+233
+
+234
+
+Chapter 6 CPUs
+
+Figure 6.7 Memory access latency testing
+
+Associativity
+Associativity is a cache characteristic describing a constraint for locating new entries in the
+cache. Types are:
+■
+
+■
+
+■
+
+Fully associative: The cache can locate new entries anywhere. For example, a least
+recently used (LRU) algorithm could be used for eviction across the entire cache.
+Direct mapped: Each entry has only one valid location in the cache, for example, a hash
+of the memory address, using a subset of the address bits to form an address in the cache.
+Set associative: A subset of the cache is identified by mapping (e.g., hashing) from within
+which another algorithm (e.g., LRU) may be performed. It is described in terms of the subset size; for example, four-way set associative maps an address to four possible locations, and
+then picks the best from those four (e.g., the least recently used location).
+
+CPU caches often use set associativity as a balance between fully associative (which is expensive
+to perform) and direct mapped (which has poor hit rates).
+
+Cache Line
+Another characteristic of CPU caches is their cache line size. This is a range of bytes that are
+stored and transferred as a unit, improving memory throughput. A typical cache line size for
+x86 processors is 64 bytes. Compilers take this into account when optimizing for performance.
+Programmers sometimes do as well; see Hash Tables in Chapter 5, Applications, Section 5.2.5,
+Concurrency and Parallelism.
+
+Cache Coherency
+Memory may be cached in multiple CPU caches on different processors at the same time. When
+one CPU modifies memory, all caches need to be aware that their cached copy is now stale and
+
+6.4
+
+Architecture
+
+should be discarded, so that any future reads will retrieve the newly modified copy. This process,
+called cache coherency, ensures that CPUs are always accessing the correct state of memory.
+One of the effects of cache coherency is LLC access penalties. The following examples are provided as a rough guide (these are from [Levinthal 09]):
+■
+
+LLC hit, line unshared: ~40 CPU cycles
+
+■
+
+LLC hit, line shared in another core: ~65 CPU cycles
+
+■
+
+LLC hit, line modified in another core: ~75 CPU cycles
+
+Cache coherency is one of the greatest challenges in designing scalable multiprocessor systems,
+as memory can be modified rapidly.
+
+MMU
+The memory management unit (MMU) is responsible for virtual-to-physical address translation.
+
+Figure 6.8 Memory management unit and CPU caches
+A generic MMU is pictured in Figure 6.8, along with CPU cache types. This MMU uses an
+on-chip translation lookaside buffer (TLB) to cache address translations. Cache misses are satisfied by translation tables in main memory (DRAM), called page tables, which are read directly by
+the MMU (hardware) and maintained by the kernel.
+These factors are processor-dependent. Some (older) processors handle TLB misses using kernel
+software to walk the page tables, and then populate the TLB with the requested mappings. Such
+software may maintain its own, larger, in-memory cache of translations, called the translation
+storage buffer (TSB). Newer processors can service TLB misses in hardware, greatly reducing
+their cost.
+
+Interconnects
+For multiprocessor architectures, processors are connected using either a shared system bus or a
+dedicated interconnect. This is related to the memory architecture of the system, uniform memory access (UMA) or NUMA, as discussed in Chapter 7, Memory.
+A shared system bus, called the front-side bus, used by earlier Intel processors is illustrated by the
+four-processor example in Figure 6.9.
+
+235
+
+236
+
+Chapter 6 CPUs
+
+Figure 6.9 Example Intel front-side bus architecture, four-processor
+The use of a system bus has scalability problems when the processor count is increased, due to
+contention for the shared bus resource. Modern servers are typically multiprocessor, NUMA,
+and use a CPU interconnect instead.
+Interconnects can connect components other than processors, such as I/O controllers. Example
+interconnects include Intel’s Quick Path Interconnect (QPI), Intel’s Ultra Path Interconnect
+(UPI), AMD’s HyperTransport (HT), ARM’s CoreLink Interconnects (there are three different
+types), and IBM’s Coherent Accelerator Processor Interface (CAPI). An example Intel QPI architecture for a four-processor system is shown in Figure 6.10.
+
+Figure 6.10 Example Intel QPI architecture, four-processor
+
+6.4
+
+Architecture
+
+The private connections between processors allow for non-contended access and also allow
+higher bandwidths than the shared system bus. Some example speeds for Intel FSB and QPI are
+shown in Table 6.4 [Intel 09][Mulnix 17].
+
+Table 6.4
+
+Intel CPU interconnect example bandwidths
+
+Intel
+
+Transfer Rate
+
+Width
+
+Bandwidth
+
+FSB (2007)
+
+1.6 GT/s
+
+8 bytes
+
+12.8 Gbytes/s
+
+QPI (2008)
+
+6.4 GT/s
+
+2 bytes
+
+25.6 Gbytes/s
+
+UPI (2017)
+
+10.4 GT/s
+
+2 bytes
+
+41.6 Gbytes/s
+
+To explain how transfer rates can relate to bandwidth, I will explain the QPI example, which is
+for a 3.2 GHz clock. QPI is double-pumped, performing a data transfer on both rising and falling
+edges of the clock.4 This doubles the transfer rate (3.2 GHz × 2 = 6.4 GT/s). The final bandwidth
+of 25.6 Gbytes/s is for both send and receive directions (6.4 GT/s × 2 byte width × 2 directions =
+25.6 Gbytes/s).
+An interesting detail of QPI is that its cache coherency mode could be tuned in the BIOS, with
+options including Home Snoop to optimize for memory bandwidth, Early Snoop to optimize
+for memory latency, and Directory Snoop to improve scalability (it involves tracking what is
+shared). UPI, which is replacing QPI, only supports Directory Snoop.
+Apart from external interconnects, processors have internal interconnects for core
+communication.
+Interconnects are typically designed for high bandwidth, so that they do not become a systemic
+bottleneck. If they do, performance will degrade as CPU instructions encounter stall cycles for
+operations that involve the interconnect, such as remote memory I/O. A key indicator for this is
+a drop in IPC. CPU instructions, cycles, IPC, stall cycles, and memory I/O can be analyzed using
+CPU performance counters.
+
+Hardware Counters (PMCs)
+Performance monitoring counters (PMCs) were summarized as a source of observability statistics in Chapter 4, Observability Tools, Section 4.3.9, Hardware Counters (PMCs). This section
+describes their CPU implementation in more detail, and provides additional examples.
+PMCs are processor registers implemented in hardware that can be programmed to count lowlevel CPU activity. They typically include counters for the following:
+
+4
+
+■
+
+CPU cycles: Including stall cycles and types of stall cycles
+
+■
+
+CPU instructions: Retired (executed)
+
+■
+
+Level 1, 2, 3 cache accesses: Hits, misses
+
+There is also quad-pumped, where data is transferred on the rising edge, peak, falling edge, and trough of the clock
+cycle. Quad pumping is used by the Intel FSB.
+
+237
+
+238
+
+Chapter 6 CPUs
+
+■
+
+Floating-point unit: Operations
+
+■
+
+Memory I/O: Reads, writes, stall cycles
+
+■
+
+Resource I/O: Reads, writes, stall cycles
+
+Each CPU has a small number of registers, usually between two and eight, that can be programmed to record events like these. Those available depend on the processor type and model
+and are documented in the processor manual.
+As a relatively simple example, the Intel P6 family of processors provide performance counters
+via four model-specific registers (MSRs). Two MSRs are the counters and are read-only. The other
+two MSRs, called event-select MSRs, are used to program the counters and are read-write. The
+performance counters are 40-bit registers, and the event-select MSRs are 32-bit. The format of
+the event-select MSRs is shown in Figure 6.11.
+
+Figure 6.11 Example Intel performance event-select MSR
+The counter is identified by the event select and the UMASK. The event select identifies the type
+of event to count, and the UMASK identifies subtypes or groups of subtypes. The OS and USR
+bits can be set so that the counter is incremented only while in kernel mode (OS) or user mode
+(USR), based on the processor protection rings. The CMASK can be set to a threshold of events
+that must be reached before the counter is incremented.
+The Intel processor manual (volume 3B [Intel 19b]) lists the dozens of events that can be counted
+by their event-select and UMASK values. The selected examples in Table 6.5 provide an idea of
+the different targets (processor functional units) that may be observable, including descriptions
+from the manual. You will need to refer to your current processor manual to see what you actually have.
+
+Table 6.5
+
+Selected examples of Intel CPU performance counters
+
+Event
+Select
+
+UMASK
+
+Unit
+
+Name
+
+0x43
+
+0x00
+
+Data cache DATA_MEM_REFS
+
+Description
+All loads from any memory type.
+All stores to any memory type.
+Each part of a split is counted
+separately. ... Does not include
+I/O accesses or other nonmemory accesses.
+
+6.4
+
+Name
+
+Architecture
+
+Event
+Select
+
+UMASK
+
+Unit
+
+Description
+
+0x48
+
+0x00
+
+Data cache DCU_MISS_ OUTSTANDING
+
+Weighted number of cycles while
+a DCU miss is outstanding,
+incremented by the number of
+outstanding cache misses at any
+particular time. Cacheable read
+requests only are considered. ...
+
+0x80
+
+0x00
+
+Instruction
+fetch unit
+
+IFU_IFETCH
+
+Number of instruction
+fetches, both cacheable and
+noncacheable, including UC
+(uncacheable) fetches.
+
+0x28
+
+0x0F
+
+L2 cache
+
+L2_IFETCH
+
+Number of L2 instruction
+fetches. ...
+
+0xC1
+
+0x00
+
+Floatingpoint unit
+
+FLOPS
+
+Number of computational
+floating-point operations retired.
+...
+
+0x7E
+
+0x00
+
+External
+bus logic
+
+BUS_SNOOP_ STALL
+
+Number of clock cycles during
+which the bus is snoop stalled.
+
+0xC0
+
+0x00
+
+Instruction
+decoding
+and
+retirement
+
+INST_RETIRED
+
+Number of instructions retired.
+
+0xC8
+
+0x00
+
+Interrupts
+
+HW_INT_RX
+
+Number of hardware interrupts
+received.
+
+0xC5
+
+0x00
+
+Branches
+
+BR_MISS_PRED_ RETIRED
+
+Number of mis-predicted
+branches retired.
+
+0xA2
+
+0x00
+
+Stalls
+
+RESOURCE_ STALLS
+
+Incremented by one during
+every cycle for which there is a
+resource-related stall. ...
+
+0x79
+
+0x00
+
+Clocks
+
+CPU_CLK_UNHALTED
+
+Number of cycles during which
+the processor is not halted.
+
+There are many, many more counters, especially for newer processors.
+Another processor detail to be aware of is how many hardware counter registers it provides. For
+example, the Intel Skylake microarchitecture provides three fixed counters per hardware thread,
+and an additional eight programmable counters per core (“general-purpose”). These are 48-bit
+counters when read.
+For more examples of PMCs, see Table 4.4 in Section 4.3.9 for the Intel architectural set.
+Section 4.3.9 also provides PMC references for AMD and ARM processor vendors.
+
+239
+
+240
+
+Chapter 6 CPUs
+
+GPUs
+Graphics processing units (GPUs) were created to support graphical displays, and are now
+finding use in other workloads including artificial intelligence, machine learning, analytics,
+image processing, and cryptocurrency mining. For servers and cloud instances, a GPU is a
+processor-like resource that can execute a portion of a workload, called the compute kernel, that
+is suited to highly parallel data processing such as matrix transformations. General-purpose
+GPUs from Nvidia using its Compute Unified Device Architecture (CUDA) have seen widespread
+adoption. CUDA provides APIs and software libraries for using Nvidia GPUs.
+While a processor (CPU) may contain a dozen cores, a GPU may contain hundreds or thousands
+of smaller cores called streaming processors (SPs),5 which each can execute a thread. Since GPU
+workloads are highly parallel, threads that can execute in parallel are grouped into thread blocks,
+where they may cooperate among themselves. These thread blocks may be executed by groups of
+SPs called streaming multiprocessors (SMs) that also provide other resources including a memory
+cache. Table 6.6 further compares processors (CPUs) with GPUs [Ather 19].
+
+Table 6.6
+
+CPUs versus GPUs
+
+Attribute
+
+CPU
+
+GPU
+
+Package
+
+A processor package plugs into
+a socket on the system board,
+connected directly to the system
+bus or CPU interconnect.
+
+A GPU is typically provided as an expansion
+card and connected via an expansion bus (e.g.,
+PCIe). They may also be embedded on a system
+board or in a processor package (on-chip).
+
+Package
+scalability
+
+Multi-socket configurations,
+connected via a CPU interconnect
+(e.g., Intel UPI).
+
+Multi-GPU configurations are possible,
+connected via a GPU-to-GPU interconnect (e.g.,
+NVIDIA's NVLink).
+
+Cores
+
+A typical processor of today
+contains 2 to 64 cores.
+
+A GPU may have a similar number of streaming
+multiprocessors (SMs).
+
+Threads
+
+A typical core may execute two
+hardware threads (or more,
+depending on the processor).
+
+An SM may contain dozens or hundreds of
+streaming processors (SPs). Each SP can only
+execute one thread.
+
+Caches
+
+Each core has L2 and L2 caches,
+and may share an L3 cache.
+
+Each SM has a cache, and may share an L2
+cache between them.
+
+Clock
+
+High (e.g., 3.4 GHz).
+
+Relatively lower (e.g., 1.0 GHz).
+
+Custom tools must be used for GPU observability. Possible GPU performance metrics include the
+instructions per cycle, cache hit ratios, and memory bus utilization.
+
+Other Accelerators
+Apart from GPUs, be aware that other accelerators may exist for offloading CPU work to faster
+application-specific integrated circuits. These include field-programmable gate arrays (FPGAs)
+
+5
+
+Nvidia also calls these CUDA cores [Verma 20].
+
+6.4
+
+Architecture
+
+and tensor processing units (TPUs). If in use, their usage and performance should be analyzed
+alongside CPUs, although they typically require custom tooling.
+GPUs and FPGAs are used to improve the performance of cryptocurrency mining.
+
+6.4.2 Software
+Kernel software to support CPUs includes the scheduler, scheduling classes, and the idle thread.
+
+Scheduler
+Key functions of the kernel CPU scheduler are shown in Figure 6.12.
+
+Figure 6.12 Kernel CPU scheduler functions
+These functions are:
+■
+
+■
+
+■
+
+Time sharing: Multitasking between runnable threads, executing those with the highest
+priority first.
+Preemption: For threads that have become runnable at a high priority, the scheduler can
+preempt the currently running thread, so that execution of the higher-priority thread can
+begin immediately.
+Load balancing: Moving runnable threads to the run queues of idle or less-busy CPUs.
+
+Figure 6.12 shows run queues, which is how scheduling was originally implemented. The term
+and mental model are still used to describe waiting tasks. However, the Linux CFS scheduler
+actually uses a red/black tree of future task execution.
+
+241
+
+242
+
+Chapter 6 CPUs
+In Linux, time sharing is driven by the system timer interrupt by calling scheduler_tick(), which
+calls scheduler class functions to manage priorities and the expiration of units of CPU time called
+time slices. Preemption is triggered when threads become runnable and the scheduler class
+check_preempt_curr() function is called. Thread switching is managed by __schedule(), which
+selects the highest-priority thread via pick_next_task() for running. Load balancing is performed
+by the load_balance() function.
+The Linux scheduler also uses logic to avoid migrations when the cost is expected to exceed the
+benefit, preferring to leave busy threads running on the same CPU where the CPU caches should
+still be warm (CPU affinity). In the Linux source, see the idle_balance() and task_hot() functions.
+Note that all these function names may change; refer to the Linux source code, including documentation in the Documentation directory, for more detail.
+
+Scheduling Classes
+Scheduling classes manage the behavior of runnable threads, specifically their priorities,
+whether their on-CPU time is time-sliced, and the duration of those time slices (also known as
+time quanta). There are also additional controls via scheduling policies, which may be selected
+within a scheduling class and can control scheduling between threads of the same priority.
+Figure 6.13 depicts them for Linux along with the thread priority range.
+
+Figure 6.13 Linux thread scheduler priorities
+The priority of user-level threads is affected by a user-defined nice value, which can be set to
+lower the priority of unimportant work (so as to be nice to other system users). In Linux, the nice
+value sets the static priority of the thread, which is separate from the dynamic priority that the
+scheduler calculates.
+For Linux kernels, the scheduling classes are:
+■
+
+RT: Provides fixed and high priorities for real-time workloads. The kernel supports both
+user- and kernel-level preemption, allowing RT tasks to be dispatched with low latency.
+The priority range is 0–99 (MAX_RT_PRIO-1).
+
+6.4
+
+■
+
+■
+
+■
+
+■
+
+Architecture
+
+O(1): The O(1) scheduler was introduced in Linux 2.6 as the default time-sharing scheduler
+for user processes. The name comes from the algorithm complexity of O(1) (see Chapter 5,
+Applications, for a summary of big O notation). The prior scheduler contained routines
+that iterated over all tasks, making it O(n), which became a scalability issue. The O(1)
+scheduler dynamically improved the priority of I/O-bound over CPU-bound workloads, to
+reduce the latency of interactive and I/O workloads.
+CFS: Completely fair scheduling was added to the Linux 2.6.23 kernel as the default
+time-sharing scheduler for user processes. The scheduler manages tasks on a red-black tree
+keyed from the task CPU time, instead of traditional run queues. This allows low CPU consumers to be easily found and executed in preference to CPU-bound workloads, improving
+the performance of interactive and I/O-bound workloads.
+Idle: Runs threads with the lowest possible priority.
+Deadline: Added to Linux 3.14, applies earliest deadline first (EDF) scheduling using three
+parameters: runtime, period, and deadline. A task should receive runtime microseconds of
+CPU time every period microseconds, and do so within the deadline.
+
+To select a scheduling class, user-level processes select a scheduling policy that maps to a class,
+using either the sched_setscheduler(2) syscall or the chrt(1) tool.
+Scheduler policies are:
+■
+
+■
+
+■
+
+■
+
+RR: SCHED_RR is round-robin scheduling. Once a thread has used its time quantum, it
+is moved to the end of the run queue for that priority level, allowing others of the same
+priority to run. Uses the RT scheduling class.
+FIFO: SCHED_FIFO is first-in, first-out scheduling, which continues running the thread
+at the head of the run queue until it voluntarily leaves, or until a higher-priority thread
+arrives. The thread continues to run, even if other threads of the same priority are on the
+run queue. Uses the RT class.
+NORMAL: SCHED_NORMAL (previously known as SCHED_OTHER) is time-sharing
+scheduling and is the default for user processes. The scheduler dynamically adjusts priority based on the scheduling class. For O(1), the time slice duration is set based on the static
+priority: longer durations for higher-priority work. For CFS, the time slice is dynamic. Uses
+the CFS scheduling class.
+BATCH: SCHED_BATCH is similar to SCHED_NORMAL, but with the expectation that
+the thread will be CPU-bound and should not be scheduled to interrupt other I/O-bound
+interactive work. Uses the CFS scheduling class.
+
+■
+
+IDLE: SCHED_IDLE uses the Idle scheduling class.
+
+■
+
+DEADLINE: SCHED_DEADLINE uses the Deadline scheduling class.
+
+Other classes and policies may be added over time. Scheduling algorithms have been researched
+that are hyperthreading-aware [Bulpin 05] and temperature-aware [Otto 06], which optimize performance by accounting for additional processor factors.
+When there is no thread to run, a special idle task (also called idle thread) is executed as a placeholder until another thread is runnable.
+
+243
+
+244
+
+Chapter 6 CPUs
+
+Idle Thread
+Introduced in Chapter 3, the kernel “idle” thread (or idle task) runs on-CPU when there is no
+other runnable thread and has the lowest possible priority. It is usually programmed to inform
+the processor that CPU execution may either be halted (halt instruction) or throttled down to
+conserve power. The CPU will wake up on the next hardware interrupt.
+
+NUMA Grouping
+Performance on NUMA systems can be significantly improved by making the kernel NUMA-aware,
+so that it can make better scheduling and memory placement decisions. This can automatically
+detect and create groups of localized CPU and memory resources and organize them in a topology to reflect the NUMA architecture. This topology allows the cost of any memory access to be
+estimated.
+On Linux systems, these are called scheduling domains, which are in a topology beginning with
+the root domain.
+A manual form of grouping can be performed by the system administrator, either by binding
+processes to run on one or more CPUs only, or by creating an exclusive set of CPUs for processes
+to run on. See Section 6.5.10, CPU Binding.
+
+Processor Resource-Aware
+The CPU resource topology can also be understood by the kernel so that it can make better
+scheduling decisions for power management, hardware cache usage, and load balancing.
+
+6.5 Methodology
+This section describes various methodologies and exercises for CPU analysis and tuning. Table 6.7
+summarizes the topics.
+
+Table 6.7
+
+CPU performance methodologies
+
+Section
+
+Methodology
+
+Types
+
+6.5.1
+
+Tools method
+
+Observational analysis
+
+6.5.2
+
+USE method
+
+Observational analysis
+
+6.5.3
+
+Workload characterization
+
+Observational analysis, capacity planning
+
+6.5.4
+
+Profiling
+
+Observational analysis
+
+6.5.5
+
+Cycle analysis
+
+Observational analysis
+
+6.5.6
+
+Performance monitoring
+
+Observational analysis, capacity planning
+
+6.5.7
+
+Static performance tuning
+
+Observational analysis, capacity planning
+
+6.5.8
+
+Priority tuning
+
+Tuning
+
+6.5.9
+
+Resource controls
+
+Tuning
+
+6.5.10
+
+CPU binding
+
+Tuning
+
+6.5.11
+
+Micro-benchmarking
+
+Experimental analysis
+
+6.5 Methodology
+
+See Chapter 2, Methodologies, for more methodologies and the introduction to many of these.
+You are not expected to use them all; treat this as a cookbook of recipes that may be followed
+individually or used in combination.
+My suggestion is to use the following, in this order: performance monitoring, the USE method,
+profiling, micro-benchmarking, and static performance tuning.
+Section 6.6, Observability Tools, and later sections, show the operating system tools for applying
+these methodologies.
+
+6.5.1 Tools Method
+The tools method is a process of iterating over available tools, examining key metrics that they
+provide. While this is a simple methodology, it can overlook issues for which the tools provide
+poor or no visibility, and it can be time-consuming to perform.
+For CPUs, the tools method can involve checking the following (Linux):
+■
+
+■
+
+■
+
+uptime/top: Check the load averages to see if load is increasing or decreasing over time. Bear
+this in mind when using the following tools, as load may be changing during your analysis.
+vmstat: Run vmstat(1) with a one-second interval and check the system-wide CPU utilization (“us” + “sy”). Utilization approaching 100% increases the likelihood of scheduler
+latency.
+mpstat: Examine statistics per-CPU and check for individual hot (busy) CPUs, identifying
+a possible thread scalability problem.
+
+■
+
+top: See which processes and users are the top CPU consumers.
+
+■
+
+pidstat: Break down the top CPU consumers into user- and system-time.
+
+■
+
+perf/profile: Profile CPU usage stack traces for both user- or kernel-time, to identify why
+the CPUs are in use.
+
+■
+
+perf: Measure IPC as an indicator of cycle-based inefficiencies.
+
+■
+
+showboost/turboboost: Check the current CPU clock rates, in case they are unusually low.
+
+■
+
+dmesg: Check for CPU temperature stall messages (“cpu clock throttled”).
+
+If an issue is found, examine all fields from the available tools to learn more context. See
+Section 6.6, Observability Tools, for more about each tool.
+
+6.5.2
+
+USE Method
+
+The USE method can be used to identify bottlenecks and errors across all components early in a
+performance investigation, before trying deeper and more time-consuming strategies.
+For each CPU, check for:
+■
+
+Utilization: The time the CPU was busy (not in the idle thread)
+
+■
+
+Saturation: The degree to which runnable threads are queued waiting their turn on-CPU
+
+■
+
+Errors: CPU errors, including correctable errors
+
+245
+
+246
+
+Chapter 6 CPUs
+
+You can check errors first since they are typically quick to check and the easiest to interpret. Some
+processors and operating systems will sense an increase in correctable errors (error-correction
+code, ECC) and will offline a CPU as a precaution, before an uncorrectable error causes a CPU
+failure. Checking for these errors can be a matter of checking that all CPUs are still online.
+Utilization is usually readily available from operating system tools as percent busy. This metric
+should be examined per CPU, to check for scalability issues. High CPU and core utilization can
+be understood by using profiling and cycle analysis.
+For environments that implement CPU limits or quotas (resource controls; e.g., Linux tasksets
+and cgroups), as is common in cloud computing environments, CPU utilization should be measured in terms of the imposed limit, in addition to the physical limit. Your system may exhaust
+its CPU quota well before the physical CPUs reach 100% utilization, encountering saturation
+earlier than expected.
+Saturation metrics are commonly provided system-wide, including as part of load averages. This
+metric quantifies the degree to which the CPUs are overloaded, or a CPU quota, if present, is
+used up.
+You can follow a similar process for checking the health of GPUs and other accelerators, if in use,
+depending on available metrics.
+
+6.5.3 Workload Characterization
+Characterizing the load applied is important in capacity planning, benchmarking, and simulating
+workloads. It can also lead to some of the largest performance gains by identifying unnecessary
+work that can be eliminated.
+Basic attributes for characterizing CPU workload are:
+■
+
+CPU load averages (utilization + saturation)
+
+■
+
+User-time to system-time ratio
+
+■
+
+Syscall rate
+
+■
+
+Voluntary context switch rate
+
+■
+
+Interrupt rate
+
+The intent is to characterize the applied load, not the delivered performance. The load averages
+on some operating systems (e.g., Solaris) show CPU demand only, making them a primary metric
+for CPU workload characterization. On Linux, however, load averages include other load types.
+See the example and further explanation in Section 6.6.1, uptime.
+The rate metrics are a little harder to interpret, as they reflect both the applied load and to some
+degree the delivered performance, which can throttle their rate.6
+The user-time to system-time ratio shows the type of load applied, as introduced earlier in
+Section 6.3.9, User Time/Kernel Time. High user time rates are due to applications spending time
+6
+
+E.g., imagine finding that a given batch computing workload has higher syscall rates when run on faster CPUs, even
+though the workload is the same. It completes sooner!
+
+
