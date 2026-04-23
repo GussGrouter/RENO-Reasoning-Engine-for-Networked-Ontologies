@@ -1,0 +1,462 @@
+                                                                     2.3 Network device architectures                         33
+
+
+
+that involve off- and on-chip memory. However, given that chip densities and power constraints limit
+parallelism to, say, a factor of at most 60, the bottom line is that all packet-processing functions at high
+speeds must complete using at most 200 memory accesses and limited on-chip memory.8 Despite these
+limitations, a rich variety of packet-processing functions have been implemented at high speeds.
+
+
+
+2.3 Network device architectures
+Optimizing network performance requires optimizing the path of data through the internals of the
+source node, the sink node, and every router. Thus it is important to understand the internal archi-
+tecture of endnodes and routers. The earlier part of this chapter argued that logic and memory can
+be combined to form state machines. In essence, both routers and endnodes are state machines. How-
+ever, their architectures are optimized for different purposes: endnode architectures (Section 2.3.1) for
+general computation and router architectures (Section 2.3.2) for Internet communication.
+
+
+2.3.1 Endnode architecture
+A processor such as a Pentium is a state machine that takes a sequence of instructions and data as
+input and writes output to I/O devices, such as printers and terminals. To allow programs that have a
+large state space, the bulk of the processor state is stored externally in cheap DRAM. In PCs, this is
+referred to as main memory and is often implemented using 1 GB or more of interleaved DRAM, such
+as SDRAM. However, recall that DRAM access times are large, say, 60 nsec. If the processor state
+were stored only in DRAM, an instruction would take 60 nsec to read or write to memory.
+    Processors gain speed using caches, which are comparatively small chunks of SRAM that can store
+commonly used pieces of state for faster access. Some SRAM (i.e., the L1 cache) is placed on the
+processor chip, and some more SRAM (i.e., the L2 cache) is placed external to the processor. A cache
+is a hash table that maps between memory address locations and contents. CPU caches use a simple
+hash function: They extract some bits from the address to index into an array and then search in parallel
+for all the addresses that map into the array element.9 When a memory location has to be read from
+DRAM, it is placed in the cache, and an existing cache element may be evicted. Commonly used data
+is stored in a data cache, and commonly used instructions in an instruction cache.
+    Caching works well if the instructions and data exhibit temporal locality (i.e., the corresponding
+location is reused frequently in a small time period) or spatial locality (i.e., accessing a location is
+followed by access to a nearby location). Spatial locality is taken advantage of as follows. Recall that
+accessing a DRAM location involves accessing a row R and then a column within the row. Thus reading
+words within row R are cheaper after R is accessed. A Pentium takes advantage of this observation by
+prefetching 128 (cache line size) contiguous bits into the cache whenever 32 bits of data are accessed.
+Access to the adjoining 96 bits will not incur a cache miss penalty.
+
+
+8 Of course, there are ways to work around these limits, for instance, by using multiple chips, but such implementations often
+do badly in terms of cost, complexity, and power consumption.
+9 The number of elements that can be searched in parallel in a hash bucket is called the associativity of the cache. While
+router designers rightly consider bit extraction to be a poor hash function, the addition of associativity improves overall hashing
+performance, especially on computing workloads.
+34       Chapter 2 Network implementation models
+
+
+
+
+FIGURE 2.8
+Model of a workstation.
+
+
+    Many computing benchmarks exhibit temporal and spatial locality; however, a stream of packets
+probably exhibits only spatial locality. Thus improving endnode protocol implementations often re-
+quires paying attention to cache effects.
+    The foregoing discussion should set the stage for the endnode architecture model shown in Fig. 2.8.
+The processor, or CPU—e.g., a Pentium or an Alpha—sits on a bus. A bus can be thought of as a
+network like an Ethernet, but optimized for the fact that the devices on the bus are close to each other.
+The processor interacts with other components by sending messages across the bus.
+    The input–output (I/O) devices are typically memory mapped. In other words, even I/O devices like
+the network adaptor and the disk look like pieces of memory. For example, the adaptor memory may
+be mapped to 100–200 in the memory address space. This allows uniform communication between
+the CPU and any device by using the same conventions used to interact with memory. In terms of
+networking, a Read (or Write) can be thought of as a message sent on the bus addressed to the memory
+location. Thus a Read 100 is sent on the bus, and the device that owns memory location 100 (e.g., the
+adaptor) will receive the message and reply with the contents of location 100.
+    Modern machines allow direct memory access (DMA), where devices such as the disk or the net-
+work adaptor send Reads and Writes directly to the memory via the bus without processor intervention.
+However, only one entity can use the bus at a time. Thus the adaptor has to contend for the bus; any
+device that gets hold of the bus “steals cycles” from the processor. This is because the processor is
+forced to wait to access memory while a device is sending messages across the bus.
+    In Fig. 2.8, also notice that the adaptor actually sits on a different bus (system bus or memory bus)
+from the bus on which the network adaptor and other peripherals (I/O bus) sit. The memory bus is
+designed for speed and is redesigned for every new processor; the I/O bus is a standard bus (e.g., a PCI
+bus) chosen to stay compatible with older I/O devices. Thus the I/O bus is typically slower than the
+memory bus.
+    A big lesson for networking in Fig. 2.8 is that the throughput of a networking application is crucially
+limited by the speed of the slowest bus, typically the I/O bus. Worse, the need for extra copies to
+preserve operating system structure causes every packet received or sent by a workstation to traverse
+the bus multiple times. Techniques to avoid redundant bus traversals are described in Chapter 5.
+    Modern processors are heavily pipelined with instruction fetch, instruction decode, data reads, and
+data writes split into separate stages. Superscalar and multithreaded machines go beyond pipelining
+                                                             2.3 Network device architectures                   35
+
+
+
+
+FIGURE 2.9
+Using parallel connections within an endnode architecture to allow concurrent processing and network traffic via a
+parallel switch.
+
+
+
+by issuing multiple instructions concurrently. While these innovations (see, for example, the classic
+reference on endnode architecture [Hennessey and Patterson, 1996]) remove computation bottlenecks,
+they do little for data-movement bottlenecks. Consider the following speculative architecture instead.
+
+Example 6. Endnode Architecture Using a Crossbar Switch: Fig. 2.9 shows the endnode bus being
+replaced by a programmable hardware switch, as is commonly used by routers. The switch internally
+contains a number of parallel buses so that any set of disjoint endpoint pairs can be connected in parallel
+by the switch. Thus in the figure, the processor is connected to Memory 1, while the network adaptor is
+connected to Memory 2. Thus packets from the network can be placed in Memory 2 without interfering
+with the processor’s reading from Memory 1. If the processor now wishes to read the incoming packet,
+the switch can be reprogrammed to connect the processor to Memory 2 and the adaptor to Memory 1.
+This can work well if the queue of empty packet buffers used by the adaptor alternates between the two
+memories.
+    There are recent proposals for Infiniband switch technology to replace the I/O bus in processors
+(Chapter 5). The ultimate message of this example is not that architectures such as Fig. 2.9 are nec-
+essarily good but that simple architectural idea to improve network performance, such as Fig. 2.9,
+are not hard for even protocol designers to conceive, given simple models of hardware and architec-
+ture.
+
+
+2.3.2 Router architecture
+A router model that covers both high-end routers (such as Juniper’s M-series routers) and low-end
+routers (such as the Cisco Catalyst) is shown in Fig. 2.10. Basically, a router is a box with a set of input
+links, shown on the left, and a set of output links, shown on the right; the task of the router is to switch
+a packet from an input link to the appropriate output link based on the destination address in the packet.
+While the input and output links are shown separately, the two links in each direction between two
+routers are often packaged together. We review three main bottlenecks in a router: lookup, switching,
+and output queuing.
+36        Chapter 2 Network implementation models
+
+
+
+
+FIGURE 2.10
+A model of a router labeled with the three main bottlenecks in the forwarding path: address lookup (B1), switching
+(B2), and output scheduling (B3).
+
+
+Lookup
+A packet arrives on, say, the left link, input link i. Every packet carries a 32-bit Internet Protocol (IP)
+address.10 Assume that the first six bits of the destination address of a sample packet are 100100. A
+processor in the router inspects the destination address to determine where to forward the packet.
+    The processor consults a forwarding table to determine the output link for the packet. The forward-
+ing table is sometimes called a FIB, for forwarding information base. The FIB contains a set of prefixes
+with corresponding output links. The reason for prefixes will be explained in Chapter 11; for now, think
+of prefixes as variable-length “area codes” that greatly reduce the FIB size. A prefix like 01*, where the
+* denotes the usual “don’t care” symbol, matches IP addresses that start with 01. Assume that prefix
+100* has associated output link 6, while prefix 1* has output link 2. Thus our sample packet, whose
+destination address starts with 100100, matches both prefixes 100* and 1*. The disambiguating rule
+that IP routers use is to match an address to the longest matching prefix. Assuming no longer matching
+prefixes, our sample packet should be forwarded to output link 6.
+    The processor that does the lookup and basic packet processing can be either shared or dedicated
+and can be either a general processor or a special-purpose chip. Early router designs used a shared
+processor (or processors), but this proved to be a bottleneck. Later designs, including Cisco’s GSR
+family, use a dedicated processor per input link interface. The earliest designs used a standard CPU
+processor, but many of the fastest routers today, such as Juniper’s M-160, use a dedicated chip (ASIC)
+with some degree of programmability. There has been a backlash to this trend toward ASICs, however,
+with customers asking routers to perform new functions, such as Web load balancing. Thus some new
+routers use network processors (see Example 7), which are general-purpose processors optimized for
+networking.
+
+
+10 Recall that while most users deal with domain names, these names are translated to an IP address by a directory service,
+called DNS, before packets are sent.
+                                                                     2.3 Network device architectures                         37
+
+
+
+    Algorithms for prefix lookups are described in Chapter 11. Many routers today also offer a more
+complex lookup called packet classification (Chapter 12), where the lookup takes as input the destina-
+tion address as well as source address and TCP ports.
+
+Switching
+After address lookup in the example of Fig. 2.10, the processor instructs an internal switching system
+to transfer the packet from link i to output link 6. In older processors, the switch was a simple bus,
+such as shown in Fig. 2.8. This proved to be a major bottleneck because, if the switch has N input links
+running at B bits per second, the bus would have to have a bandwidth of B · N . Unfortunately, as N
+increases, electrical effects (such as the capacitive load of a bus) predominate, limiting the bus speed.
+    Thus the fastest routers today internally use a parallel switch of the sort shown in Fig. 2.9. The
+throughput of the switch is increased by using N parallel buses, one for each input and one for each
+output. An input and an output are connected by turning on transistors connecting the corresponding
+input bus and output bus. While it is easy to build the data path, it is harder to schedule the switch, be-
+cause multiple inputs may wish to send to the same output link at the same time. The switch-scheduling
+problem boils down to matching available inputs and outputs every packet arrival time. Algorithms for
+this purpose are described in Chapter 13.
+
+Queuing
+Once the packet in Fig. 2.10 has been looked up and switched to output link 6, output link 6 may be
+congested, and thus the packet may have to be placed in a queue for output link 6. Many older routers
+simply place the packet in a first-in-first-out (FIFO) transmission queue. However, some routers employ
+more sophisticated output scheduling to provide fair bandwidth allocation and delay guarantees. Output
+scheduling is described in Chapter 14.
+    Besides the major tasks of lookups, switching, and queuing, there are a number of other tasks that
+are less time-critical.
+
+Header validation and checksums
+The version number of a packet is checked, and the header-length field is checked for options. Options
+are additional processing directives that are rarely used; such packets are often shunted to a separate
+route processor. The header also has a simple checksum that must be verified. Finally, a time-to-live
+(TTL) field must be decremented and the header checksum recalculated. Chapter 9 shows how to
+incrementally update the checksum. Header validation and checksum computation are often done in
+hardware.
+
+Route processing
+Section A.1.2 describes briefly how routers build forwarding tables using routing protocols. Routers
+within domains implement RIP and OSPF, while routers that link domains also must implement BGP.11
+
+
+11 It is possible to buy versions of these protocols, but the software must be customized for each new hardware platform. A more
+insidious problem, especially with BGP and OSPF, is that many of the first implementations of these protocols vary in subtle
+ways from the actual specifications. Thus a new implementation that meets the specification may not interoperate with existing
+routers. Thus ISPs are reluctant to buy new routers unless they can trust the “quality” of the BGP code, in terms of its ability to
+interoperate with existing routers.
+38         Chapter 2 Network implementation models
+
+
+
+These protocols are implemented in one or more route processors. For example, when a LSP is sent
+to the router in Fig. 2.10, lookup will recognize that this is a packet destined for the router itself and
+will cause the packet to be switched to the route processor. The route processor maintains the link-state
+database and computes shortest paths; after computation, the route processor loads the new forwarding
+databases in each of the forwarding processors through either the switch or a separate out-of-band path.
+    In the early days, Cisco won its spurs by processing not just Internet packets but also other routing
+protocols, such as DECNET, SNA, and AppleTalk. The need for such multiprotocol processing is less
+clear now. A much more important trend is multi-protocol-label switching (MPLS), which appears to
+be de rigeur for core routers. In MPLS, the IP header is augmented with a header containing simple
+integer indices that can be looked up directly without a prefix lookup; Chapter 11 provides more details
+about MPLS.
+
+Protocol processing
+All routers today have to implement the simple network management protocol (SNMP) and provide a
+set of counters that can be inspected remotely. To allow remote communication with the router, most
+routers also implement TCP and UDP. In addition, routers have to implement the Internet control mes-
+sage protocol (ICMP), which is basically a protocol for sending error messages, such as “time-to-live
+exceeded.”
+
+Fragmentation, redirects, and ARPs
+While it is clear that route and protocol processing is best relegated to a route processor on a so-called
+“slow path,” there are a few router functions that are more ambiguous. For example, if a packet of 3000
+bytes is to be sent over a link with a maximum packet size (MTU) of 1500 bytes, the packet has to
+be fragmented into two pieces.12 While the prevailing trend is for sources, instead of routers, to do
+fragmentation, some routers do fragmentation in the fast path. Another such function is the sending of
+Redirects. If an endnode sends a message to the wrong router, the router is supposed to send a Redirect
+back to the endnode. A third such function is the sending of address resolution protocol (ARP) requests,
+whose operation is explored in the exercises.
+    Finally, routers today have a number of other tasks they may be called on to perform. Many routers
+within enterprises do content-based handling of packets, where the packet processing depends on
+strings found in the packet data. For example, a router that fronts a Web farm of many servers may
+wish to forward packets with the same Web URL to the same Web server. There are also the issues of
+accounting and traffic measurement. Some of these new services are described in Chapter 16.
+Example 7. Network Processors: Network processors are general-purpose programmable processors
+optimized for network traffic. Their proponents say that they are needed because the unpredictable
+nature of router tasks (such as content-based delivery) makes committing router forwarding to silicon a
+risky proposition. For example, the Intel IXP1200 network processor evaluated in Spalink et al. (2000)
+internally contains six processors, each running at 177 MHz with a 5.6-nsec clock cycle. Each processor
+receives packets from an input queue; packets are stored in a large DRAM; after the processor has
+looked up the packet destination, the packet is placed on the output queue with a tag describing the
+output link it should be forwarded to.
+
+
+12 Strictly speaking, since each fragment adds headers, there will be three pieces.
+                                                                    2.4 Operating systems              39
+
+
+
+    The biggest problem is that the processors are responsible for moving packets in and out of DRAM.
+In the IXP1200, moving 32 bytes from the queue to the DRAM takes 45 clock cycles, and moving from
+the DRAM to the queue takes 55 cycles. Since a minimum-size packet is at least 40 bytes, this requires
+a total of 200 cycles = 1.12 usec, which translates to a forwarding rate of only around 900 K pack-
+ets/second. The IXP1200 gets around this limit by using six parallel processors and an old architectural
+idea called multithreading. The main idea is that each processor works on multiple packets, each packet
+being a thread; when the processing for one packet stalls because of a memory reference, processing
+for the next thread is resumed. Using fast context switching between threads, and four contexts per
+processor, the IXP1200 can theoretically obtain 6 * 4 * 900 K = 21.6 M packets/second.
+    Network processors also offer special-purpose instructions for address lookup and other common
+forwarding functions. Some network processors also streamline the movement of data packets by hav-
+ing hardware engines that present only the header of each data packet to the processor. The remainder
+of the data packet flows directly to the output queue. The processor(s) read the header, do the lookup,
+and write the updated header to the output queue. The hardware magically glues together the updated
+header with the original packet and keeps all packets in order. While this approach avoids the move-
+ment of the remainder of the packet through the processor, it does nothing for the case of minimum-size
+packets.
+
+                            Case Study 2: Buffering and optical switching
+      As fiber-optic links scale to higher speeds, electronics implementing combinational logic and
+  memories in core routers becomes a bottleneck. Currently, packets arrive over fiber-optic links
+  with each bit encoded as a light pulse. Optics at the receiver convert light to electrical pulses; the
+  packet is then presented to forwarding logic implemented electronically. The packet is then queued
+  to an outbound link for transmission, upon which the transmitting link optics convert electrical
+  bits back to light. The electronic bottleneck can be circumvented by creating an all-optical router
+  without any electro-optical conversions.
+      Unfortunately, doing IP lookups optically, and especially building dense optical packet mem-
+  ories, seems hard today. But switching light between several endpoints is feasible. Thus the
+  numerous start-ups in the buzzing optical space tend to build optical circuit switches that use
+  electronics to set up the circuit switch. A circuit switch connects input X to output Y for a large
+  duration, as opposed to the duration of a single packet as in a packet switch. Such circuit switches
+  have found use as a flexible “core” of an ISP’s network to connect conventional routers. If traf-
+  fic between, say, routers R1 and R2 increases, an ISP operator can (at a large time scale of, say,
+  minutes) change the circuit switches to increase the bandwidth of the R1-to-R2 path. However,
+  the wastefulness of reserving switch paths for small flow durations makes it likely that packet-
+  switched routers will continue to be popular in the near future.
+
+
+
+
+2.4 Operating systems
+An operating system is a software that sits above hardware in order to make life easier for application
+programmers. For most Internet routers, time-critical packet forwarding runs directly on the hardware
+(Fig. 2.10) and is not mediated by an operating system. Less time-critical code runs on a router oper-
+40        Chapter 2 Network implementation models
+
+
+
+
+FIGURE 2.11
+The programmer sees the illusion of an uninterrupted timeline shown above, while the real processor timeline may
+switch back and forth between several processes.
+
+
+ating system that is stripped down, such as Cisco’s IOS. However, to improve end-to-end performance
+for, say, Web browsing, an implementor needs to understand the costs and benefits of operating systems.
+    Abstractions are idealizations or illusions we invent to deal with the perversity and irregularity of
+the real world. To finesse the difficulties of programming on a bare machine, operating systems offer
+abstractions to application programmers. Three central difficulties of dealing with raw hardware are
+dealing with interruptions, managing memory, and controlling I/O devices. To deal with these diffi-
+culties, operating systems offer the abstractions of uninterrupted computation, infinite memory, and
+simple I/O.
+    A good abstraction increases programmer productivity but has two costs. First, the mechanism im-
+plementing the abstraction has a price. For example, scheduling processes can cause overhead for a Web
+server. A second, less obvious cost is that the abstraction can hide power, preventing the programmer
+from making optimal use of resources. For example, operating system memory management may pre-
+vent the programmer of an Internet lookup algorithm from keeping the lookup data structure in memory
+in order to maximize performance. We now provide a model of the costs and underlying mechanisms of
+the process (Section 2.4.1), virtual memory (Section 2.4.2), and I/O (Section 2.4.3) abstractions. More
+details can be found in Tanenbaum (1992).
+
+
+2.4.1 Uninterrupted computation via processes
+A program may not run very long on the processor before being interrupted by the network adaptor.
+If application programmers had to deal with interrupts, a working 100-line program would be a mir-
+acle. Thus operating systems provide programmers with the abstraction of uninterrupted, sequential
+computation under the name of a process.
+    The process abstraction is realized by three mechanisms: context switching, scheduling, and protec-
+tion, the first two of which are depicted in Fig. 2.11. In Fig. 2.11, Process P1 has the illusion that it runs
+on the processor by itself. In reality, as shown on the timeline below, Process P1 may be interrupted by a
+timer interrupt, which causes the OS scheduler program to run on the processor. Displacing P1 requires
+the operating system to save the state of P1 in memory. The scheduler may run briefly and decide to give
+Process P2 a turn. Restoring P2 to run on the processor requires restoring the state of P2 from memory.
+Thus the actual time line of a processor may involve frequent context switches between processes, as
+orchestrated by the scheduler. Finally, protection ensures that incorrect or malicious behavior of one
+process cannot affect other processes.
+    As agents of computation, “processes” come in three flavors—interrupt handlers, threads, and user
+processes—ranked in order of increasing generality and cost. Interrupt handlers are small pieces of
+                                                                           2.4 Operating systems                  41
+
+
+
+
+FIGURE 2.12
+The processing of a received Internet packet in BSD is divided between the network adaptor, the kernel, and the
+destined process.
+
+
+computation used to service urgent requests, such as the arrival of a message to the network adaptor;
+interrupt handlers use only a small amount of state, typically a few registers. User processes use the
+complete state of the machine, such as memory as well as registers; thus, it is expensive to switch
+between user processes as directed by the scheduler. Within the context of a single process, threads offer
+a cheaper alternative to processes. A thread is a lightweight process that requires less state, because
+threads within the same process share the same memory (i.e., same variables). Thus context switching
+between two threads in the same process is cheaper than switching processes, because memory does
+not have to be remapped. The following example shows the relevance of these concepts to endnode
+networking.
+Example 8. Receiver Livelock in BSD Unix: In BSD UNIX, as shown in Fig. 2.12, the arrival of a
+packet generates an interrupt. The interrupt is a hardware signal that causes the processor to save the
+state of the currently running process, say, a Java program. The processor then jumps to the interrupt
+handler code, bypassing the scheduler for speed. The interrupt handler copies the packet to a kernel
+queue of IP packets waiting to be consumed, makes a request for an operating system thread (called a
+software interrupt), and exits. Assuming no further interrupts, the interrupt exit passes control to the
+scheduler, which is likely to cede the processor to the software interrupt, which has higher priority than
+user processes.
+    The kernel thread does TCP and IP processing and queues the packet to the appropriate application
+queue, called a socket queue (Fig. 2.12). Assume that the application is a browser such as Netscape.
+Netscape runs as a process that may have been asleep waiting for data and is now considered for being
+run on the processor by the scheduler. After the software interrupt exits and control passes back to the
+scheduler, the scheduler may decide to run Netscape in place of the original Java program.
+42        Chapter 2 Network implementation models
+
+
+
+    Under high network load, the computer can enter what is called receiver livelock (Mogul and Ra-
+makrishnan, 1997), in which the computer spends all its time processing incoming packets, only to
+discard them later because the applications never run. In our example, if there is a series of back-to-
+back packet arrivals, only the highest-priority interrupt handler will run, possibly leaving no time for
+the software interrupt and certainly leaving none for the browser process. Thus either the IP or socket
+queues will fill up, causing packets to be dropped after resources have been invested in their processing.
+Methods to mitigate this effect are described in Chapter 6.
+    Notice also that the latency and throughput of network code in an endnode depend on “process”
+activation times. For example, current figures for Pentium IV machines show around 2 µsec of interrupt
+latency for a null interrupt call, around 10 µsec for a Process Context switch on a Linux machine
+with two processes, and much more time for Windows and Solaris on the same machine. These times
+may seem small, but recall that 30 minimum-size (40-byte) packets can arrive in 10 µsec on a Gigabit
+Ethernet link.
+
+
+
+2.4.2 Infinite memory via virtual memory
+In virtual memory (Fig. 2.13), the programmer works with an abstraction of memory that is a linear
+array into which a compiler assigns variable locations. Variable X could be stored in location 1010 in
+this imaginary (or virtual) array. The virtual memory abstraction is implemented using the twin mech-
+
+
+
+
+FIGURE 2.13
+The programmer sees the illusion of contiguous virtual memory, which is, in reality, mapped to a collection of main
+memory and disk memory pages via page tables.
+                                                                    2.4 Operating systems             43
+
+
+
+anisms of page table mapping and demand paging. Both these mechanisms are crucial to understand in
+order to optimize data transfer costs in an endnode.
+    Any virtual address must be mapped to a physical memory address. The easiest mapping is to use
+an offset into physical memory. For example, a virtual array of 15,000 locations could be mapped into
+physical memory from, say, 12,000 to 27,000. This has two disadvantages. First, when the program
+runs, a block of 15,000 contiguous locations has to be found. Second, the programmer is limited to
+using a total memory equal to the size of physical memory.
+    Both problems can be avoided by a mapping based on table lookup. Since it takes too much memory
+to implement a mapping from any virtual location to any physical location, a more restricted mapping
+based on pages is used. Thus for any virtual address, let us say that the high-order bits (e.g., 20 bits)
+form the page number and that the low-order bits (e.g., 12 bits) form the location within a page. All
+locations within a virtual page are mapped to the same relative location, but individual virtual pages
+can be mapped to arbitrary locations. Main memory is also divided into physical pages, such that every
+group of 212 memory words is a physical page.
+    To map a virtual into a physical address, the corresponding virtual page (i.e., high-order 20 bits) is
+mapped to a physical page number while retaining the same location within the page. The mapping is
+done by looking up a page table indexed by the virtual page number. A virtual page can be located on
+any physical memory page. More generally, some pages (e.g., Virtual Page 2 in Fig. 2.13) may not be
+memory resident and can be marked as being on disk. When such a page is accessed, the hardware will
+generate an exception and cause the operating system to read the page from the disk page into a main
+memory page. This second mechanism is called demand paging.
+    Together, page mapping and demand paging solve the two problems of storage allocation and
+bounded memory allocations. Instead of solving the harder variable size storage allocation problem,
+the OS needs only to keep a list of fixed size free pages and to assign some free pages to a new pro-
+gram. Also, the programmer can work with an abstraction of memory whose size is bounded only by
+the size of the disk and the number of instruction address bits.
+    The extra mapping can slow down each instruction considerably. A Read to virtual location X may
+require two main memory accesses: a page table access to translate X to physical address P , followed
+by a Read to address P . Modern processors get around this overhead by caching the most recently used
+mappings between virtual and physical addresses in a translation look-aside buffer (TLB), which is
+a processor-resident cache. The actual translation is done by a piece of hardware called the memory
+management unit (MMU), as shown in Fig. 2.8.
+    The page table mapping also provides a mechanism for protection between processes. When a
+process makes a Read to virtual location X, unless there is a corresponding entry in the page table, the
+hardware will generate a page fault exception. By ensuring that only the operating system can change
+page table entries, the operating system can ensure that one process cannot read from or write to the
+memory of another process in an unauthorized fashion.
+    While router forwarding works directly on physical memory, all endnode and server networking
+code works on virtual memory. While virtual memory is a potential cost (e.g., for TLB misses), it
+also reflects a possible opportunity. For example, it offers the potential for packet copying between the
+operating system and the application (see Example 8) to be done more efficiently by manipulating page
+tables. This idea is explored further in Chapter 5.
+

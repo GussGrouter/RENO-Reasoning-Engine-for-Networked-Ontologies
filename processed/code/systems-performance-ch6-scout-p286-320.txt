@@ -1,0 +1,3564 @@
+6.5 Methodology
+
+performing their own compute. High system time shows time spent in the kernel instead, which
+may be further understood by the syscall and interrupt rate. I/O-bound workloads have higher
+system time, syscalls, and higher voluntary context switches than CPU-bound workloads as
+threads block waiting for I/O.
+Here is an example workload description, designed to show how these attributes can be
+expressed together:
+On an average 48-CPU application server, the load average varies between 30 and 40
+during the day. The user/system ratio is 95/5, as this is a CPU-intensive workload. There
+are around 325 K syscalls/s, and around 80 K voluntary context switches/s.
+These characteristics can vary over time as different load is encountered.
+
+Advanced Workload Characterization/Checklist
+Additional details may be included to characterize the workload. These are listed here as
+questions for consideration, which may also serve as a checklist when studying CPU issues
+thoroughly:
+■
+
+What is the CPU utilization system-wide? Per CPU? Per core?
+
+■
+
+How parallel is the CPU load? Is it single-threaded? How many threads?
+
+■
+
+Which applications or users are using the CPUs? How much?
+
+■
+
+Which kernel threads are using the CPUs? How much?
+
+■
+
+What is the CPU usage of interrupts?
+
+■
+
+What is the CPU interconnect utilization?
+
+■
+
+Why are the CPUs being used (user- and kernel-level call paths)?
+
+■
+
+What types of stall cycles are encountered?
+
+See Chapter 2, Methodologies, for a higher-level summary of this methodology and the characteristics to measure (who, why, what, how). The sections that follow expand upon the last two
+questions in this list: how call paths can be analyzed using profiling, and stall cycles using cycle
+analysis.
+
+6.5.4 Profiling
+Profiling builds a picture of the target for study. CPU profiling can be performed in different
+ways, typically either:
+■
+
+Timer-based sampling: Collecting timer-based samples of the currently running
+function or stack trace. A typical rate used is 99 Hertz (samples per second) per CPU. This
+provides a coarse view of CPU usage, with enough detail for large and small issues. 99 is
+used to avoid lock-step sampling that may occur at 100 Hertz, which would produce a
+skewed profile. If needed, the timer rate can be lowered and the time span enlarged until
+the overhead is negligible and suitable for production use.
+
+247
+
+248
+
+Chapter 6 CPUs
+
+■
+
+Function tracing: Instrumenting all or some function calls to measure their duration.
+This provides a fine-level view, but the overhead can be prohibitive for production use,
+often 10% or more, because function tracing adds instrumentation to every function call.
+
+Most profilers used in production, and those in this book, use timer-based sampling. This is pictured in Figure 6.14, where an application calls function A(), which calls function B(), and so on,
+while stack trace samples are collected. See Chapter 3, Operating Systems, Section 3.2.7, Stacks,
+for an explanation of stack traces and how to read them.
+
+Figure 6.14 Sample-based CPU profiling
+Figure 6.14 shows how samples are only collected when the process is on-CPU: two samples
+show function A() on-CPU, and two samples show function B() on-CPU called by A(). The time
+off-CPU during a syscall was not sampled. Also, the short-lived function C() was entirely missed
+by sampling.
+Kernels typically maintain two stack traces for processes: a user-level stack and a kernel stack
+when in kernel context (e.g., syscalls). For a complete CPU profile, the profiler must record both
+stacks when available.
+Apart from sampling stack traces, profilers can also record just the instruction pointer, which
+shows the on-CPU function and instruction offset. Sometimes this is sufficient for solving
+issues, without the extra overhead of collecting stack traces.
+
+Sample Processing
+As described in Chapter 5, a typical CPU profile at Netflix collects user and kernel stack traces
+at 49 Hertz across (around) 32 CPUs for 30 seconds: this produces a total of 47,040 samples, and
+presents two challenges:
+1. Storage I/O: Profilers typically write samples to a profile file, which can then be read and
+examined in different ways. However, writing so many samples to the file system can
+generate storage I/O that perturbs the performance of the production application. The
+
+6.5 Methodology
+
+BPF-based profile(8) tool solves the storage I/O problem by summarizing the samples in
+kernel memory, and only emitting the summary. No intermediate profile file is used.
+2. Comprehension: It is impractical to read 47,040 multi-line stack traces one by one:
+summaries and visualizations must be used to make sense of the profile. A commonly
+used stack trace visualization is flame graphs, some examples of which are shown in earlier
+chapters (1 and 5); and there are more examples in this chapter.
+Figure 6.15 shows the overall steps to generate CPU flame graphs from perf(1) and profile, solving the comprehension problem. It also shows how the storage I/O problem is solved: profile(8)
+does not use an intermediate file, saving overhead. The exact commands used are listed in
+Section 6.6.13, perf.
+
+Figure 6.15 CPU flame graph generation
+While the BPF-based approach has lower overhead, the perf(1) approach saves the raw samples (with timestamps), which can be reprocessed using different tools, including FlameScope
+(Section 6.7.4).
+
+Profile Interpretation
+Once you have collected and summarized or visualized a CPU profile, your next task is to
+understand it and search for performance problems. A CPU flame graph excerpt is shown
+in Figure 6.16, and the instructions for reading this visualization are in Section 6.7.3, Flame
+Graphs. How would you summarize the profile?
+
+249
+
+250
+
+Chapter 6 CPUs
+
+Figure 6.16 CPU flame graph excerpt
+My method for finding performance wins in a CPU flame graphs is as follows:
+1. Look top-down (leaf to root) for large “plateaus.” These show that a single function is
+on-CPU during many samples, and can lead to some quick wins. In Figure 6.16, there are
+two plateaus on the right, in unmap_page_range() and page_remove_rmap(), both related
+to memory pages. Perhaps a quick win is to switch the application to use large pages.
+2. Look bottom-up to understand the code hierarchy. In this example, the bash(1) shell was
+calling the execve(2) syscall, which eventually called the page functions. Perhaps an even
+bigger win is to avoid execve(2) somehow, such as by using bash builtins instead of external processes, or switching to another language.
+3. Look more carefully top-down for scattered but common CPU usage. Perhaps there
+are many small frames related to the same problem, such as lock contention. Inverting
+the merge order of flame graphs so that they are merged from leaf to root and become
+icicle graphs can help reveal these cases.
+Another example of interpreting a CPU flame graph is provided in Chapter 5, Applications,
+Section 5.4.1, CPU Profiling.
+
+Further Information
+The commands for CPU profiling and flame graphs are provided in Section 6.6, Observability
+Tools. Also see Section 5.4.1 on CPU analysis of applications, and Section 5.6, Gotchas, which
+describes common profiling problems with missing stack traces and symbols.
+For the usage of specific CPU resources, such as caches and interconnects, profiling can use
+PMC-based event triggers instead of timed intervals. This is described in the next section.
+
+6.5 Methodology
+
+6.5.5
+
+Cycle Analysis
+
+You can use Performance Monitoring Counters (PMCs) to understand CPU utilization at the
+cycle level. This may reveal that cycles are spent stalled on Level 1, 2, or 3 cache misses, memory
+or resource I/O, or spent on floating-point operations or other activity. This information may
+show performance wins you can achieve by adjusting compiler options or changing the code.
+Begin cycle analysis by measuring IPC (inverse of CPI). If IPC is low, continue to investigate
+types of stall cycles. If IPC is high, look for ways in the code to reduce instructions performed.
+The values for “high” or “low” IPC depend on your processor: low could be less than 0.2, and
+high could be greater than 1. You can get a sense of these values by performing known workloads that are either memory I/O-intensive or instruction-intensive, and measuring the resulting
+IPC for each.
+Apart from measuring counter values, PMCs can be configured to interrupt the kernel on the
+overflow of a given value. For example, at every 10,000 Level 3 cache misses, the kernel could be
+interrupted to gather a stack backtrace. Over time, the kernel builds a profile of the code paths
+that are causing Level 3 cache misses, without the prohibitive overhead of measuring every single miss. This is typically used by integrated developer environment (IDE) software, to annotate
+code with the locations that are causing memory I/O and stall cycles.
+As described in Chapter 4, Observability Tools, Section 4.3.9 under PMC Challenges, overflow
+sampling can miss recording the correct instruction due to skid and out-of-order execution. On
+Intel the solution is PEBS, which is supported by the Linux perf(1) tool.
+Cycle analysis is an advanced activity that can take days to perform with command-line tools, as
+demonstrated in Section 6.6, Observability Tools. You should also expect to spend some quality
+time with your CPU vendor’s processor manuals. Performance analyzers such as Intel vTune
+[Intel 20b] and AMD uprof [AMD 20] can save time as they are programmed to find the PMCs of
+interest to you.
+
+6.5.6 Performance Monitoring
+Performance monitoring can identify active issues and patterns of behavior over time. Key
+metrics for CPUs are:
+■
+
+Utilization: Percent busy
+
+■
+
+Saturation: Either run-queue length or scheduler latency
+
+Utilization should be monitored on a per-CPU basis to identify thread scalability issues. For
+environments that implement CPU limits or quotas (resource controls), such as cloud computing
+environments, CPU usage compared to these limits should also be recorded.
+Choosing the right interval to measure and archive is a challenge in monitoring CPU usage.
+Some monitoring tools use five-minute intervals, which can hide the existence of shorter bursts
+of CPU utilization. Per-second measurements are preferable, but you should be aware that there
+can be bursts even within one second. These can be identified from saturation, and examined
+using FlameScope (Section 6.7.4), which was created for subsecond analysis.
+
+251
+
+252
+
+Chapter 6 CPUs
+
+6.5.7 Static Performance Tuning
+Static performance tuning focuses on issues of the configured environment. For CPU performance, examine the following aspects of the static configuration:
+■
+
+How many CPUs are available for use? Are they cores? Hardware threads?
+
+■
+
+Are GPUs or other accelerators available and in use?
+
+■
+
+Is the CPU architecture single- or multiprocessor?
+
+■
+
+What is the size of the CPU caches? Are they shared?
+
+■
+
+■
+
+■
+
+■
+
+What is the CPU clock speed? Is it dynamic (e.g., Intel Turbo Boost and SpeedStep)? Are
+those dynamic features enabled in the BIOS?
+What other CPU-related features are enabled or disabled in the BIOS? E.g., turboboost, bus
+settings, power saving settings?
+Are there performance issues (bugs) with this processor model? Are they listed in the
+processor errata sheet?
+What is the microcode version? Does it include performance-impacting mitigations for
+security vulnerabilities (e.g., Spectre/Meltdown)?
+
+■
+
+Are there performance issues (bugs) with this BIOS firmware version?
+
+■
+
+Are there software-imposed CPU usage limits (resource controls) present? What are they?
+
+The answers to these questions may reveal previously overlooked configuration choices.
+The last question is especially true for cloud computing environments, where CPU usage is
+commonly limited.
+
+6.5.8 Priority Tuning
+Unix has always provided a nice(2) system call for adjusting process priority, which sets a niceness value. Positive nice values result in lower process priority (nicer), and negative values—
+which can be set only by the superuser (root)7—result in higher priority. A nice(1) command
+became available to launch programs with nice values, and a renice(1M) command was later
+added (in BSD) to adjust the nice value of already running processes. The man page from Unix
+4th edition provides this example [TUHS 73]:
+The value of 16 is recommended to users who wish to execute long-running programs
+without flak from the administration.
+The nice value is still useful today for adjusting process priority. This is most effective when
+there is contention for CPUs, causing scheduler latency for high-priority work. Your task is to
+identify low-priority work, which may include monitoring agents and scheduled backups, that
+can be modified to start with a nice value. Analysis may also be performed to check that the
+tuning is effective, and that the scheduler latency remains low for high-priority work.
+7
+Since Linux 2.6.12, a “nice ceiling” can be modified per process, allowing non-root processes to have lower nice
+values. E.g., using: prlimit --nice=-19 -p PID.
+
+6.5 Methodology
+
+Beyond nice, the operating system may provide more advanced controls for process priority such
+as changing the scheduler class and scheduler policy, and tunable parameters. Linux includes
+a real-time scheduling class, which can allow processes to preempt all other work. While this can
+eliminate scheduler latency (other than for other real-time processes and interrupts), make sure
+that you understand the consequences. If the real-time application encounters a bug where
+multiple threads enter an infinite loop, it can cause all CPUs to become unavailable for all other
+work—including the administrative shell required to manually fix the problem.8
+
+6.5.9 Resource Controls
+The operating system may provide fine-grained controls for allocating CPU cycles to processes
+or groups of processes. These may include fixed limits for CPU utilization and shares for a more
+flexible approach—allowing idle CPU cycles to be consumed based on a share value. How these
+work is implementation-specific and discussed in Section 6.9, Tuning.
+
+6.5.10
+
+CPU Binding
+
+Another way to tune CPU performance involves binding processes and threads to individual
+CPUs, or collections of CPUs. This can increase CPU cache warmth for the process, improving its
+memory I/O performance. For NUMA systems it also improves memory locality, further improving performance.
+There are generally two ways this is performed:
+■
+
+■
+
+CPU binding: Configuring a process to run only on a single CPU, or only on one CPU
+from a defined set.
+Exclusive CPU sets: Partitioning a set of CPUs that can be used only by the process(es)
+assigned to them. This can further improve CPU cache warmth, as when the process is idle
+other processes cannot use those CPUs.
+
+On Linux-based systems, the exclusive CPU sets approach can be implemented using cpusets.
+Configuration examples are provided in Section 6.9, Tuning.
+
+6.5.11 Micro-Benchmarking
+Tools for CPU micro-benchmarking typically measure the time taken to perform a simple operation many times. The operation may be based on:
+■
+
+■
+
+■
+
+CPU instructions: Integer arithmetic, floating-point operations, memory loads and
+stores, branch and other instructions
+Memory access: To investigate latency of different CPU caches and main memory
+throughput
+Higher-level languages: Similar to CPU instruction testing, but written in a higher-level
+interpreted or compiled language
+
+8
+Linux has a solution since 2.6.25 for this problem: RLIMIT_RTTIME, which sets a limit in microseconds of CPU time
+a real-time thread may consume before making a blocking syscall.
+
+253
+
+254
+
+Chapter 6 CPUs
+
+■
+
+Operating system operations: Testing system library and system call functions that are
+CPU-bound, such as getpid(2) and process creation
+
+An early example of a CPU benchmark is Whetstone by the National Physical Laboratory, written
+in 1972 in Algol 60 and intended to simulate a scientific workload. The Dhrystone benchmark
+was developed in 1984 to simulate integer workloads of the time, and became a popular means
+to compare CPU performance. These, and various Unix benchmarks including process creation
+and pipe throughput, were included in a collection called UnixBench, originally from Monash
+University and published by BYTE magazine [Hinnant 84]. More recent CPU benchmarks have
+been created to test compression speeds, prime number calculation, encryption, and encoding.
+Whichever benchmark you use, when comparing results between systems, it’s important that
+you understand what is really being tested. Benchmarks like those listed earlier often end
+up testing differences in compiler optimizations between compiler versions, rather than the
+benchmark code or CPU speed. Many benchmarks execute single-threaded, and their results
+lose meaning in systems with multiple CPUs. (A four-CPU system may benchmark slightly faster
+than an eight-CPU system, but the latter is likely to deliver much greater throughput when given
+enough parallel runnable threads.)
+For more on benchmarking, see Chapter 12, Benchmarking.
+
+6.6 Observability Tools
+This section introduces CPU performance observability tools for Linux-based operating systems.
+See the previous section for methodologies to follow when using them.
+The tools in this section are listed in Table 6.8.
+
+Table 6.8
+
+Linux CPU observability tools
+
+Section
+
+Tool
+
+Description
+
+6.6.1
+
+uptime
+
+Load averages
+
+6.6.2
+
+vmstat
+
+Includes system-wide CPU averages
+
+6.6.3
+
+mpstat
+
+Per-CPU statistics
+
+6.6.4
+
+sar
+
+Historical statistics
+
+6.6.5
+
+ps
+
+Process status
+
+6.6.6
+
+top
+
+Monitor per-process/thread CPU usage
+
+6.6.7
+
+pidstat
+
+Per-process/thread CPU breakdowns
+
+6.6.8
+
+time, ptime
+
+Time a command, with CPU breakdowns
+
+6.6.9
+
+turboboost
+
+Show CPU clock rate and other states
+
+6.6.10
+
+showboost
+
+Show CPU clock rate and turbo boost
+
+6.6.11
+
+pmcarch
+
+Show high-level CPU cycle usage
+
+6.6.12
+
+tlbstat
+
+Summarize TLB cycles
+
+6.6 Observability Tools
+
+Section
+
+Tool
+
+Description
+
+6.6.13
+
+perf
+
+CPU profiling and PMC analysis
+
+6.6.14
+
+profile
+
+Sample CPU stack traces
+
+6.6.15
+
+cpudist
+
+Summarize on-CPU time
+
+6.6.16
+
+runqlat
+
+Summarize CPU run queue latency
+
+6.6.17
+
+runqlen
+
+Summarize CPU run queue length
+
+6.6.18
+
+softirqs
+
+Summarize soft interrupt time
+
+6.6.19
+
+hardirqs
+
+Summarize hard interrupt time
+
+6.6.20
+
+bpftrace
+
+Tracing programs for CPU analysis
+
+This is a selection of tools and capabilities to support Section 6.5, Methodology. We begin with
+traditional tools for CPU statistics, then proceed to tools for deeper analysis using code-path
+profiling, CPU cycle analysis, and tracing tools. Some of the traditional tools are likely available
+on (and sometimes originated on) other Unix-like operating systems, including: uptime(1),
+vmstat(8), mpstat(1), sar(1), ps(1), top(1), and time(1). The tracing tools are based on BPF and the
+BCC and bpftrace frontends (Chapter 15), and are: profile(8), cpudist(8), runqlat(8), runqlen(8),
+softirqs(8), and hardirqs(8).
+See the documentation for each tool, including its man pages, for full references for its features.
+
+6.6.1 uptime
+uptime(1) is one of several commands that print the system load averages:
+$ uptime
+9:04pm
+
+up 268 day(s), 10:16,
+
+2 users,
+
+load average: 7.76, 8.32, 8.60
+
+The last three numbers are the 1-, 5-, and 15-minute load averages. By comparing the three numbers, you can determine if the load is increasing, decreasing, or steady during the last 15 minutes
+(or so). This can be useful to know: if you are responding to a production performance issue and
+find that the load is decreasing, you may have missed the issue; if the load is increasing, the issue
+may be getting worse!
+The following sections explain load averages in more detail, but they are only a starting point,
+so you shouldn’t spend more than five minutes considering them before moving on to other
+metrics.
+
+Load Averages
+The load averages indicate the demand for system resources: higher means more demand. On
+some operating systems (e.g., Solaris) the load averages show CPU demand, as did early versions of
+Linux. But in 1993, Linux changed load averages to show system-wide demand: CPUs, disks, and
+
+255
+
+256
+
+Chapter 6 CPUs
+
+other resources.9 This was implemented by including threads in the TASK_UNINTERRUPTIBLE
+thread state, shown by some tools as state “D” (this state was mentioned in Chapter 5,
+Applications, Section 5.4.5, Thread State Analysis).
+The load is measured as the current resource usage (utilization) plus queued requests (saturation).
+Imagine a car toll plaza: you could measure the load at various points during the day by counting
+how many cars were being serviced (utilization) plus how many cars were queued (saturation).
+The average is an exponentially damped moving average, which reflects load beyond the 1-, 5-,
+and 15-minute times (the times are actually constants used in the exponential moving sum
+[Myer 73]). Figure 6.17 shows the results of a simple experiment where a single CPU-bound
+thread was launched and the load averages plotted.
+
+Figure 6.17 Exponentially damped load averages
+By the 1-, 5-, and 15-minute marks, the load averages had reached about 61% of the known load
+of 1.0.
+Load averages were introduced to Unix in early BSD and were based on scheduler average queue
+length and load averages commonly used by earlier operating systems (CTSS, Multics [Saltzer 70],
+TENEX [Bobrow 72]). They were described in RFC 546 [Thomas 73]:
+[1] The TENEX load average is a measure of CPU demand. The load average is an
+average of the number of runable processes over a given time period. For example, an
+hourly load average of 10 would mean that (for a single CPU system) at any time during
+that hour one could expect to see 1 process running and 9 others ready to run (i.e., not
+blocked for I/O) waiting for the CPU.
+9
+
+The change happened so long ago that the reason for it had been forgotten and was undocumented, predating the
+Linux history in git and other resources; I eventually found the original patch in an online tarball from an old mail
+system archive. Matthias Urlichs made that change, pointing out that if demand moved from CPUs to disks, then the
+load averages should stay the same because the demand hadn’t changed [Gregg 17c]. I emailed him (for the first
+time ever) about his 24-year old change, and got a reply in one hour!
+
+6.6 Observability Tools
+
+As a modern example, consider a 64-CPU system with a load average of 128. If the load was CPU
+only, it would mean that on average there is always one thread running on each CPU, and one
+thread waiting for each CPU. The same system with a CPU load average of 20 would indicate
+significant headroom, as it could run another 44 CPU-bound threads before all CPUs are busy.
+(Some companies monitor a normalized load average metric, where it is automatically divided by
+the CPU count, allowing it to be interpreted without knowing the CPU count.)
+
+Pressure Stall Information (PSI)
+In the first edition of this book, I described how load averages could be provided for each resource
+type to aid interpretation. An interface has now been added in Linux 4.20 that provides such
+a breakdown: pressure stall information (PSI), which gives averages for CPU, memory, and I/O.
+The average shows the percent of time something was stalled on a resource (saturation only).
+This is compared with load averages in Table 6.9.
+
+Table 6.9
+
+Linux load averages versus pressure stall information
+
+Attribute
+
+Load Averages
+
+Pressure Stall Information
+
+Resources
+
+System-wide
+
+cpu, memory, io (each individually)
+
+Metric
+
+Number of busy and queued tasks
+
+Percent of time stalled (waiting)
+
+Times
+
+1 min, 5 min, 15 min
+
+10 s, 60 s, 300 s
+
+Average
+
+Exponentially damped moving sum
+
+Exponentially damped moving sum
+
+Table 6.10 shows what the metric shows for different scenarios:
+
+Table 6.10
+
+Linux load average examples versus pressure stall information
+
+Example Scenario
+
+Load Averages
+
+Pressure Stall Information
+
+2 CPUs, 1 busy thread
+
+1.0
+
+0.0
+
+2 CPUs, 2 busy threads
+
+2.0
+
+0.0
+
+2 CPUs, 3 busy threads
+
+3.0
+
+50.0
+
+2 CPUs, 4 busy threads
+
+4.0
+
+100.0
+
+2 CPUs, 5 busy threads
+
+5.0
+
+100.0
+
+For example, showing the 2 CPU with 3 busy threads scenario:
+$ uptime
+07:51:13 up 4 days,
+
+9:56,
+
+2 users,
+
+load average: 3.00, 3.00, 2.55
+
+$ cat /proc/pressure/cpu
+some avg10=50.00 avg60=50.00 avg300=49.70 total=1031438206
+
+257
+
+258
+
+Chapter 6 CPUs
+
+This 50.0 value means a thread (“some”) has stalled 50% of the time. The io and memory metrics
+include a second line for when all non-idle threads have stalled (“full”). PSI best answers the
+question: how likely is it that a task will have to wait on the resources?
+Whether you use load averages or PSI, you should quickly move to more detailed metrics to
+understand load, such as those provided by vmstat(1) and mpstat(1).
+
+6.6.2 vmstat
+The virtual memory statistics command, vmstat(8), prints system-wide CPU averages in the last
+few columns, and a count of runnable threads in the first column. Here is example output from
+the Linux version:
+$ vmstat 1
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu----r
+
+b
+
+cache
+
+si
+
+so
+
+bi
+
+bo
+
+in
+
+cs us sy id wa st
+
+15
+
+0
+
+swpd
+
+0 451732
+
+free
+
+70588 866628
+
+buff
+
+0
+
+0
+
+1
+
+10
+
+43
+
+38
+
+15
+
+0
+
+0 450968
+
+70588 866628
+
+0
+
+0
+
+0
+
+612 1064 2969 72 28
+
+15
+
+0
+
+0 450660
+
+70588 866632
+
+0
+
+0
+
+0
+
+0
+
+15
+
+0
+
+0 450952
+
+70588 866632
+
+0
+
+0
+
+0
+
+2
+
+1 97
+
+0
+
+0
+
+0
+
+0
+
+0
+
+961 2932 72 28
+
+0
+
+0
+
+0
+
+0 1015 3238 74 26
+
+0
+
+0
+
+0
+
+[...]
+
+The first line of output is supposed to be the summary-since-boot. However, on Linux the procs
+and memory columns begin by showing the current state. (Perhaps one day they will be fixed.)
+CPU-related columns are:
+■
+
+r: Run-queue length—the total number of runnable threads
+
+■
+
+us: User-time percent
+
+■
+
+sy: System-time (kernel) percent
+
+■
+
+id: Idle percent
+
+■
+
+wa: Wait I/O percent, which measures CPU idle when threads are blocked on disk I/O
+
+■
+
+st: Stolen percent, which for virtualized environments shows CPU time spent servicing
+other tenants
+
+All of these values are system-wide averages across all CPUs, with the exception of r, which is the
+total.
+On Linux, the r column is the total number of tasks waiting plus those running. For other
+operating systems (e.g., Solaris) the r column only shows tasks waiting, not those running. The
+original vmstat(1) by Bill Joy and Ozalp Babaoglu for 3BSD in 1979 begins with an RQ column
+for the number of runnable and running processes, as the Linux vmstat(8) currently does.
+
+6.6 Observability Tools
+
+6.6.3 mpstat
+The multiprocessor statistics tool, mpstat(1), can report statistics per CPU. Here is example output from the Linux version:
+$ mpstat -P ALL 1
+Linux 5.3.0-1009-aws (ip-10-0-239-218)
+
+02/01/20
+
+_x86_64_
+
+(2 CPU)
+
+18:00:32
+
+CPU
+
+%usr
+
+%nice
+
+%sys %iowait
+
+%irq
+
+%soft %steal %guest %gnice
+
+%idle
+
+18:00:33
+
+all
+
+32.16
+
+0.00
+
+61.81
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+6.03
+
+18:00:33
+
+0
+
+32.00
+
+0.00
+
+64.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+4.00
+
+18:00:33
+
+1
+
+32.32
+
+0.00
+
+59.60
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+8.08
+
+18:00:33
+
+CPU
+
+%usr
+
+%nice
+
+%sys %iowait
+
+%irq
+
+%soft %steal %guest %gnice
+
+%idle
+
+18:00:34
+
+all
+
+33.83
+
+0.00
+
+61.19
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+4.98
+
+18:00:34
+
+0
+
+34.00
+
+0.00
+
+62.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+4.00
+
+18:00:34
+
+1
+
+33.66
+
+0.00
+
+60.40
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+5.94
+
+[...]
+
+The -P ALL option was used to print the per-CPU report. By default, mpstat(1) prints only the
+system-wide summary line (all). The columns are:
+■
+
+CPU: Logical CPU ID, or all for summary
+
+■
+
+%usr: User-time, excluding %nice
+
+■
+
+%nice: User-time for processes with a nice’d priority
+
+■
+
+%sys: System-time (kernel)
+
+■
+
+%iowait: I/O wait
+
+■
+
+%irq: Hardware interrupt CPU usage
+
+■
+
+%soft: Software interrupt CPU usage
+
+■
+
+%steal: Time spent servicing other tenants
+
+■
+
+%guest: CPU time spent in guest virtual machines
+
+■
+
+%gnice: CPU time to run a niced guest
+
+■
+
+%idle: Idle
+
+Key columns are %usr, %sys, and %idle. These identify CPU usage per CPU and show the usertime/kernel-time ratio (see Section 6.3.9, User-Time/Kernel-Time). This can also identify “hot”
+CPUs—those running at 100% utilization (%usr + %sys) while others are not—which can be
+caused by single-threaded application workloads or device interrupt mapping.
+Note that the CPU times reported by this and other tools that source the same kernel statistics
+(/proc/stat etc.), and the accuracy of these statistics depends on the kernel configuration. See the
+CPU Statistic Accuracy heading in Chapter 4, Observability Tools, Section 4.3.1, /proc.
+
+259
+
+260
+
+Chapter 6 CPUs
+
+6.6.4 sar
+The system activity reporter, sar(1), can be used to observe current activity and can be configured
+to archive and report historical statistics. It was introduced in Chapter 4, Observability Tools,
+Section 4.4, sar, and is mentioned in other chapters as appropriate.
+The Linux version provides the following options for CPU analysis:
+■
+
+-P ALL: Same as mpstat -P ALL
+
+■
+
+-u: Same as mpstat(1)’s default output: system-wide average only
+
+■
+
+-q: Includes run-queue size as runq-sz (waiting plus running, the same as vmstat(1)’s r)
+and load averages
+
+sar(1) data collection may be enabled so that these metrics can be observed from the past. See
+Section 4.4, sar, for more detail.
+
+6.6.5 ps
+The process status command, ps(1), can list details on all processes, including CPU usage statistics.
+For example:
+$ ps aux
+USER
+
+RSS TTY
+
+STAT START
+
+TIME COMMAND
+
+root
+
+PID %CPU %MEM
+1
+
+0.0
+
+0.0
+
+23772
+
+VSZ
+
+1948 ?
+
+Ss
+
+2012
+
+0:04 /sbin/init
+
+root
+
+2
+
+0.0
+
+0.0
+
+0
+
+0 ?
+
+S
+
+2012
+
+0:00 [kthreadd]
+
+root
+
+3
+
+0.0
+
+0.0
+
+0
+
+0 ?
+
+S
+
+2012
+
+0:26 [ksoftirqd/0]
+
+root
+
+4
+
+0.0
+
+0.0
+
+0
+
+0 ?
+
+S
+
+2012
+
+0:00 [migration/0]
+
+root
+
+5
+
+0.0
+
+0.0
+
+0
+
+0 ?
+
+S
+
+2012
+
+0:00 [watchdog/0]
+
+[...]
+web
+
+11715 11.3
+
+0.0 632700 11540 pts/0
+
+Sl
+
+01:36
+
+0:27 node indexer.js
+
+web
+
+11721 96.5
+
+0.1 638116 52108 pts/1
+
+Rl+
+
+01:37
+
+3:33 node proxy.js
+
+[...]
+
+This style of operation originated from BSD, as can be recognized by the lack of a dash before the
+aux options. These list all users (a), with extended user details (u), and include processes without
+a terminal (x). The terminal is shown in the teletype (TTY) column.
+A different style, from SVR4, uses options preceded by a dash:
+$ ps -ef
+PID
+
+PPID
+
+root
+
+1
+
+0
+
+0 Nov13 ?
+
+00:00:04 /sbin/init
+
+root
+
+2
+
+0
+
+0 Nov13 ?
+
+00:00:00 [kthreadd]
+
+root
+
+3
+
+2
+
+0 Nov13 ?
+
+00:00:00 [ksoftirqd/0]
+
+root
+
+4
+
+2
+
+0 Nov13 ?
+
+00:00:00 [migration/0]
+
+root
+
+5
+
+2
+
+0 Nov13 ?
+
+00:00:00 [watchdog/0]
+
+[...]
+
+C STIME TTY
+
+TIME CMD
+
+UID
+
+6.6 Observability Tools
+
+This lists every process (-e) with full details (-f). Various other options are available for ps(1)
+including -o to customize the output and columns shown.
+Key columns for CPU usage are TIME and %CPU (earlier example).
+The TIME column shows the total CPU time consumed by the process (user + system) since it was
+created, in hours:minutes:seconds.
+On Linux, the %CPU column from the first example shows the average CPU utilization over the
+lifetime of the process, summed across all CPUs. A single-threaded process that has always been
+CPU-bound will report 100%. A two-thread CPU-bound process will report 200%. Other operating systems may normalize %CPU to the CPU count so that its maximum is 100%, and they may
+only show recent or current CPU usage rather than the average over the lifetime. On Linux, to
+see the current CPU usage of processes, you can use top(1).
+
+6.6.6 top
+top(1) was created by William LeFebvre in 1984 for BSD. He was inspired by the VMS command
+MONITOR PROCESS/TOPCPU, which showed the top CPU-consuming jobs with CPU percentages and
+an ASCII bar chart histogram (but not columns of data).
+The top(1) command monitors top running processes, updating the screen at regular intervals.
+For example, on Linux:
+$ top
+top - 01:38:11 up 63 days,
+Tasks: 256 total,
+Cpu(s):
+Mem:
+
+1:17,
+
+2 users,
+
+load average: 1.57, 1.81, 1.77
+
+2.0%us,
+
+2 running, 254 sleeping,
+3.6%sy,
+
+0 stopped,
+
+0.0%ni, 94.2%id,
+
+0.0%wa,
+
+0.0%hi,
+
+49548744k total, 16746572k used, 32802172k free,
+
+Swap: 100663292k total,
+
+0 zombie
+0.2%si,
+
+0.0%st
+
+182900k buffers
+
+0k used, 100663292k free, 14925240k cached
+
+PID USER
+
+PR
+
+NI
+
+VIRT
+
+RES
+
+11721 web
+
+20
+
+0
+
+623m
+
+50m 4984 R
+
+SHR S %CPU %MEM
+93
+
+0.1
+
+0:59.50 node
+
+TIME+
+
+COMMAND
+
+11715 web
+
+20
+
+0
+
+619m
+
+20m 4916 S
+
+0:07.52 node
+
+10 root
+
+20
+
+0
+
+0
+
+0
+
+0
+
+25
+
+0.0
+
+0 S
+
+1
+
+0.0 248:52.56 ksoftirqd/2
+
+51 root
+
+20
+
+0
+
+0
+
+0 S
+
+0
+
+0.0
+
+0:35.66 events/0
+
+11724 admin
+
+20
+
+0 19412 1444
+
+960 R
+
+0
+
+0.0
+
+0:00.07 top
+
+1 root
+
+20
+
+0 23772 1948 1296 S
+
+0
+
+0.0
+
+0:04.35 init
+
+A system-wide summary is at the top and a process/task listing at the bottom, sorted by the top
+CPU consumer by default. The system-wide summary includes the load averages and CPU states:
+%us, %sy, %ni, %id, %wa, %hi, %si, %st. These states are equivalent to those printed by mpstat(1), as
+described earlier, and are averaged across all CPUs.
+CPU usage is shown by the TIME and %CPU columns. TIME is the total CPU time consumed by the
+process at a resolution of hundredths of a second. For example, “1:36.53” means 1 minute and
+36.53 seconds of on-CPU time in total. Some versions of top(1) provide an optional “cumulative
+time” mode, which includes the CPU time from child processes that have exited.
+
+261
+
+262
+
+Chapter 6 CPUs
+
+The %CPU column shows the total CPU utilization for the current screen update interval. On
+Linux, this is not normalized by the CPU count, and so a two-thread CPU-bound process will
+report 200%; top(1) calls this “Irix mode,” after its behavior on IRIX. This can be switched to
+“Solaris mode” (by pressing I to toggle the modes), which divides the CPU usage by the CPU
+count. In that case, the two-thread process on a 16-CPU server would report CPU as 12.5%.
+Though top(1) is often a tool for beginning performance analysts, you should be aware that the
+CPU usage of top(1) itself can become significant and place top(1) as the top CPU-consuming
+process! This has been due to the system calls it uses to read /proc—open(2), read(2), close(2)—
+and calling these over many processes. Some versions of top(1) on other operating systems have
+reduced the overhead by leaving file descriptors open and calling pread(2).
+There is a variant of top(1) called htop(1), which provides more interactive features, customizations, and ASCII bar charts for CPU usage. It also calls four times as many syscalls, perturbing
+the system even further. I rarely use it.
+Since top(1) takes snapshots of /proc, it can miss short-lived processes that exit before a snapshot
+is taken. This commonly happens during software builds, where the CPUs can be heavily loaded
+by many short-lived tools from the build process. A variant of top(1) for Linux, called atop(1), uses
+process accounting to catch the presence of short-lived processes, which it includes in its display.
+
+6.6.7
+
+pidstat
+
+The Linux pidstat(1) tool prints CPU usage by process or thread, including user- and system-time
+breakdowns. By default, a rolling output is printed of only active processes. For example:
+$ pidstat 1
+Linux 2.6.35-32-server (dev7)
+
+11/12/12
+
+_x86_64_
+
+(16 CPU)
+
+22:24:42
+
+PID
+
+%usr %system
+
+%guest
+
+%CPU
+
+CPU
+
+22:24:43
+
+7814
+
+0.00
+
+1.98
+
+0.00
+
+1.98
+
+3
+
+Command
+tar
+
+22:24:43
+
+7815
+
+97.03
+
+2.97
+
+0.00
+
+100.00
+
+11
+
+gzip
+
+22:24:43
+
+PID
+
+%usr %system
+
+%guest
+
+%CPU
+
+CPU
+
+Command
+
+22:24:44
+
+448
+
+0.00
+
+1.00
+
+0.00
+
+1.00
+
+0
+
+kjournald
+
+22:24:44
+
+7814
+
+0.00
+
+2.00
+
+0.00
+
+2.00
+
+3
+
+tar
+
+22:24:44
+
+7815
+
+97.00
+
+3.00
+
+0.00
+
+100.00
+
+11
+
+gzip
+
+22:24:44
+
+7816
+
+0.00
+
+2.00
+
+0.00
+
+2.00
+
+2
+
+pidstat
+
+[...]
+
+This example captured a system backup, involving a tar(1) command to read files from the
+file system, and the gzip(1) command to compress them. The user-time for gzip(1) is high, as
+expected, as it becomes CPU-bound in compression code. The tar(1) command spends more
+time in the kernel, reading from the file system.
+The -p ALL option can be used to print all processes, including those that are idle. -t prints perthread statistics. Other pidstat(1) options are included in other chapters of this book.
+
+6.6 Observability Tools
+
+6.6.8 time, ptime
+The time(1) command can be used to run programs and report CPU usage. It is provided in the
+operating system under /usr/bin, and as a shell built-in.
+This example runs time twice on a cksum(1) command, calculating the checksum of a large file:
+$ time cksum ubuntu-19.10-live-server-amd64.iso
+1044945083 883949568 ubuntu-19.10-live-server-amd64.iso
+real
+
+0m5.590s
+
+user
+
+0m2.776s
+
+sys
+
+0m0.359s
+
+$ time cksum ubuntu-19.10-live-server-amd64.iso
+1044945083 883949568 ubuntu-19.10-live-server-amd64.iso
+real
+
+0m2.857s
+
+user
+
+0m2.733s
+
+sys
+
+0m0.114s
+
+The first run took 5.6 seconds, of which 2.8 seconds was in user mode, calculating the checksum.
+There was 0.4 seconds in system-time, spanning the system calls required to read the file. There
+is a missing 2.4 seconds (5.6 – 2.8 – 0.4), which is likely time spent blocked on disk I/O reads as
+this file was only partially cached. The second run completed more quickly, in 2.9 seconds, with
+almost no blocked time. This is expected, as the file may be fully cached in main memory for the
+second run.
+On Linux, the /usr/bin/time version supports verbose details. For example:
+$ /usr/bin/time -v cp fileA fileB
+Command being timed: "cp fileA fileB"
+User time (seconds): 0.00
+System time (seconds): 0.26
+Percent of CPU this job got: 24%
+Elapsed (wall clock) time (h:mm:ss or m:ss): 0:01.08
+Average shared text size (kbytes): 0
+Average unshared data size (kbytes): 0
+Average stack size (kbytes): 0
+Average total size (kbytes): 0
+Maximum resident set size (kbytes): 3792
+Average resident set size (kbytes): 0
+Major (requiring I/O) page faults: 0
+Minor (reclaiming a frame) page faults: 294
+Voluntary context switches: 1082
+Involuntary context switches: 1
+Swaps: 0
+
+263
+
+264
+
+Chapter 6 CPUs
+
+File system inputs: 275432
+File system outputs: 275432
+Socket messages sent: 0
+Socket messages received: 0
+Signals delivered: 0
+Page size (bytes): 4096
+Exit status: 0
+
+The -v option is not typically provided in the shell built-in version.
+
+6.6.9 turbostat
+turbostat(1) is a model-specific register (MSR)–based tool that shows the state of the CPUs,
+and is often available in a linux-tools-common package. MSRs were mentioned in Chapter 4,
+Observability Tools, Section 4.3.10, Other Observability Sources. Here is some sample output:
+# turbostat
+turbostat version 17.06.23 - Len Brown <lenb@kernel.org>
+CPUID(0): GenuineIntel 22 CPUID levels; family:model:stepping 0x6:8e:a (6:142:10)
+CPUID(1): SSE3 MONITOR SMX EIST TM2 TSC MSR ACPI-TM TM
+CPUID(6): APERF, TURBO, DTS, PTM, HWP, HWPnotify, HWPwindow, HWPepp, No-HWPpkg, EPB
+cpu0: MSR_IA32_MISC_ENABLE: 0x00850089 (TCC EIST No-MWAIT PREFETCH TURBO)
+CPUID(7): SGX
+cpu0: MSR_IA32_FEATURE_CONTROL: 0x00040005 (Locked SGX)
+CPUID(0x15): eax_crystal: 2 ebx_tsc: 176 ecx_crystal_hz: 0
+TSC: 2112 MHz (24000000 Hz * 176 / 2 / 1000000)
+CPUID(0x16): base_mhz: 2100 max_mhz: 4200 bus_mhz: 100
+[...]
+Core
+
+CPU
+
+Avg_MHz
+
+Busy%
+
+Bzy_MHz
+
+TSC_MHz
+
+IRQ
+
+SMI
+
+C1
+
+C1E
+
+C3
+
+C6
+
+C7s
+
+C8
+
+C9
+
+C10
+
+C1%
+
+C1E%
+
+C3%
+
+C6%
+
+C7s%
+
+C8%
+
+C9%
+
+C10%
+
+CPU%c1
+
+CPU%c3
+
+CPU%c6
+
+CPU%c7
+
+GFX%C0
+
+CPUGFX% Pkg%pc2
+
+CoreTmp PkgTmp
+
+GFX%rc6 GFXMHz
+
+Totl%C0
+
+Any%C0
+
+Pkg%pc3 Pkg%pc6
+
+Pkg%pc7 Pkg%pc8
+
+Pkg%pc9
+
+Pk%pc10 PkgWatt CorWatt GFXWatt
+
+RAMWatt PKG_%
+
+RAM_%
+
+0
+
+97
+
+2.70
+
+3609
+
+2112
+
+1370
+
+0
+
+41
+
+293
+
+41
+
+453
+
+0
+
+693
+
+0
+
+311
+
+0.24
+
+1.23
+
+0.15
+
+5.35
+
+0.00
+
+39.33
+
+0.00
+
+50.97
+
+7.50
+
+0.18
+
+6.26
+
+83.37
+
+52
+
+75
+
+91.41
+
+300
+
+118.58
+
+100.38
+
+8.47
+
+8.30
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+17.69
+
+14.84
+
+0.65
+
+1.23
+
+0.00
+
+0.00
+
+[...]
+0
+
+[...]
+
+6.6 Observability Tools
+
+turbostat(8) begins by printing information about the CPU and MSRs, which can be over 50
+lines of output, truncated here. It then prints interval summaries of metrics for all CPUs and
+per-CPU, at a default five-second interval. This interval summary output is 389 characters wide
+in this example, and the lines have wrapped five times, making it difficult to read. The columns
+include the CPU number (CPU), average clock rate in MHz (Avg_MHz), C-state information,
+temperatures (*Tmp), and power (*Watt).
+
+6.6.10 showboost
+Prior to the availability of turbostat(8) on the Netflix cloud, I developed showboost(1) to show
+the CPU clock rate with a per-interval summary. showboost(1) is short for “show turbo boost”
+and also uses MSRs. Some sample output:
+# showboost
+Base CPU MHz : 3000
+Set CPU MHz
+
+: 3000
+
+Turbo MHz(s) : 3400 3500
+Turbo Ratios : 113% 116%
+CPU 0 summary every 1 seconds...
+TIME
+
+C0_MCYC
+
+C0_ACYC
+
+UTIL
+
+RATIO
+
+MHz
+
+21:41:43
+
+3021819807
+
+3521745975
+
+100%
+
+116%
+
+3496
+
+21:41:44
+
+3021682653
+
+3521564103
+
+100%
+
+116%
+
+3496
+
+21:41:45
+
+3021389796
+
+3521576679
+
+100%
+
+116%
+
+3496
+
+[...]
+
+This output shows a clock rate of 3496 MHz on CPU0. The base CPU frequency is 3000 MHz: it is
+reaching 3496 via Intel turbo boost. The possible turbo boost levels, or “steps,” are also listed in
+the output: 3400 and 3500 MHz.
+showboost(8) is in my msr-cloud-tools repository [Gregg 20d], so named as I developed these for
+use in the cloud. Because I only keep it working for the Netflix environment, it may not work
+elsewhere due to CPU differences, in which case try turboboost(1).
+
+6.6.11 pmcarch
+pmcarch(8) shows a high-level view of CPU cycle performance. It is a PMC-based tool based
+on the Intel “architectural set” of PMCs, hence the name (PMCs were explained in Chapter 4,
+Observability Tools, Section 4.3.9, Hardware Counters (PMCs)). In some cloud environments,
+these architectural PMCs are the only ones available (e.g., some AWS EC2 instances). Some sample output:
+# pmcarch
+K_CYCLES
+
+K_INSTR
+
+IPC BR_RETIRED
+
+BR_MISPRED
+
+BMR% LLCREF
+
+96163187
+
+87166313
+
+0.91 19730994925
+
+679187299
+
+3.44 656597454 174313799
+
+LLCMISS
+
+73.45
+
+LLC%
+
+93988372
+
+87205023
+
+0.93 19669256586
+
+724072315
+
+3.68 666041693 169603955
+
+74.54
+
+265
+
+266
+
+Chapter 6 CPUs
+
+93863787
+
+86981089
+
+0.93 19548779510
+
+669172769
+
+3.42 649844207 176100680
+
+72.90
+
+93739565
+
+86349653
+
+0.92 19339320671
+
+634063527
+
+3.28 642506778 181385553
+
+71.77
+
+[...]
+
+The tool prints raw counters as well as some ratios as percents. Columns include:
+■
+
+K_CYCLES: CPU Cycles x 1000
+
+■
+
+K_INSTR: CPU Instructions x 1000
+
+■
+
+IPC: Instructions-Per-Cycle
+
+■
+
+BMR%: Branch Misprediction Ratio, as a percentage
+
+■
+
+LLC%: Last Level Cache hit ratio, as a percentage
+
+IPC was explained in Section 6.3.7, IPC, CPI, along with example values. The other ratios provided, BMR% and LLC%, provide some insight as to why IPC may be low and where the stall
+cycles may be.
+I developed pmcarch(8) for my pmc-cloud-tools repository, which also has cpucache(8) for
+more CPU cache statistics [Gregg 20e]. These tools employ workarounds and use processor-specific PMCs so that they work on the AWS EC2 cloud, and may not work elsewhere. Even if this
+never works for you, it provides examples of useful PMCs that you can instrument using perf(1)
+directly (Section 6.6.13, perf).
+
+6.6.12
+
+tlbstat
+
+tlbstat(8) is another tool from pmc-cloud-tools, which shows the TLB cache statistics. Example
+output:
+# tlbstat -C0 1
+K_CYCLES
+
+K_INSTR
+
+IPC DTLB_WALKS ITLB_WALKS K_DTLBCYC
+
+K_ITLBCYC
+
+DTLB% ITLB%
+
+2875793
+
+276051
+
+0.10 89709496
+
+65862302
+
+787913
+
+650834
+
+27.40 22.63
+
+2860557
+
+273767
+
+0.10 88829158
+
+65213248
+
+780301
+
+644292
+
+27.28 22.52
+
+2885138
+
+276533
+
+0.10 89683045
+
+65813992
+
+787391
+
+650494
+
+27.29 22.55
+
+2532843
+
+243104
+
+0.10 79055465
+
+58023221
+
+693910
+
+573168
+
+27.40 22.63
+
+[...]
+
+This particular output showed a worst-case scenario for the KPTI patches that work around the
+Meltdown CPU vulnerability (the KPTI performance impact was summarized in Chapter 3,
+Operating Systems, Section 3.4.3, KPTI (Meltdown)). KPTI flushes the TLB caches on syscalls and
+other events, causing stall cycles during TLB walks: this is shown in the last two columns. In this
+output, the CPU is spending roughly half its time on TLB walks, and would be expected to run
+the application workload roughly half as fast.
+Columns include:
+■
+
+K_CYCLES: CPU Cycles × 1000
+
+■
+
+K_INSTR: CPU Instructions × 1000
+
+6.6 Observability Tools
+
+■
+
+IPC: Instructions-Per-Cycle
+
+■
+
+DTLB_WALKS: Data TLB walks (count)
+
+■
+
+ITLB_WALKS: Instruction TLB walks (count)
+
+■
+
+K_DTLBCYC: Cycles at least one PMH is active with data TLB walks × 1000
+
+■
+
+K_ITLBCYC: Cycles at least one PMH is active with instr. TLB walks × 1000
+
+■
+
+DTLB%: Data TLB active cycles as a ratio of total cycles
+
+■
+
+ITLB%: Instruction TLB active cycles as a ratio of total cycles
+
+As with pmcarch(8), this tool may not work for your environment due to processor differences. It
+is nonetheless a useful source of ideas.
+
+6.6.13
+
+perf
+
+perf(1) is the official Linux profiler, a multi-tool with many capabilities. Chapter 13 provides a
+summary of perf(1). This section covers its usage for CPU analysis.
+
+One-Liners
+The following one-liners are both useful and demonstrate different perf(1) capabilities for CPU
+analysis. Some are explained in more detail in the following sections.
+Sample on-CPU functions for the specified command, at 99 Hertz:
+perf record -F 99 command
+
+Sample CPU stack traces (via frame pointers) system-wide for 10 seconds:
+perf record -F 99 -a -g -- sleep 10
+
+Sample CPU stack traces for the PID, using dwarf (dbg info) to unwind stacks:
+perf record -F 99 -p PID --call-graph dwarf -- sleep 10
+
+Record new process events via exec:
+perf record -e sched:sched_process_exec -a
+
+Record context switch events for 10 seconds with stack traces:
+perf record -e sched:sched_switch -a -g -- sleep 10
+
+Sample CPU migrations for 10 seconds:
+perf record -e migrations -a -- sleep 10
+
+Record all CPU migrations for 10 seconds:
+perf record -e migrations -a -c 1 -- sleep 10
+
+267
+
+268
+
+Chapter 6 CPUs
+
+Show perf.data as a text report, with data coalesced and counts and percentages:
+perf report -n --stdio
+
+List all perf.data events, with data header (recommended):
+perf script --header
+
+Show PMC statistics for the entire system, for 5 seconds:
+perf stat -a -- sleep 5
+
+Show CPU last level cache (LLC) statistics for the command:
+perf stat -e LLC-loads,LLC-load-misses,LLC-stores,LLC-prefetches command
+
+Show memory bus throughput system-wide every second:
+perf stat -e uncore_imc/data_reads/,uncore_imc/data_writes/ -a -I 1000
+
+Show the rate of context switches per-second:
+perf stat -e sched:sched_switch -a -I 1000
+
+Show the rate of involuntary context switches per-second (previous state was TASK_RUNNING):
+perf stat -e sched:sched_switch --filter 'prev_state == 0' -a -I 1000
+
+Show the rate of mode switches and context switches per second:
+perf stat -e cpu_clk_unhalted.ring0_trans,cs -a -I 1000
+
+Record a scheduler profile for 10 seconds:
+perf sched record -- sleep 10
+
+Show per-process scheduler latency from a scheduler profile:
+perf sched latency
+
+List per-event scheduler latency from a scheduler profile:
+perf sched timehist
+
+For more perf(1) one-liners see Chapter 13, perf, Section 13.2, One-Liners.
+
+System-Wide CPU Profiling
+perf(1) can be used to profile CPU call paths, summarizing where CPU time is spent in both
+kernel- and user-space. This is performed by the record command, which captures sample to a
+perf.data file. A report command can then be used to view the contents of the file. It works by
+using the most accurate timer available: CPU-cycle-based if available, otherwise software based
+(the cpu-clock event).
+
+6.6 Observability Tools
+
+In the following example, all CPUs (-a10) are sampled with call stacks (-g) at 99 Hz (-F 99) for
+10 seconds (sleep 10). The --stdio option for report is used to print all the output, instead of
+operating in interactive mode.
+# perf record -a -g -F 99 -- sleep 10
+[ perf record: Woken up 20 times to write data ]
+[ perf record: Captured and wrote 5.155 MB perf.data (1980 samples) ]
+# perf report --stdio
+[...]
+# Children
+
+Self
+
+Command
+
+Shared Object
+
+Symbol
+
+# ........ ........ ............... ......................... ...................
+...................................................................
+#
+29.49%
+
+0.00%
+
+mysqld
+
+libpthread-2.30.so
+
+[.] start_thread
+
+|
+---start_thread
+0x55dadd7b473a
+0x55dadc140fe0
+|
+--29.44%--do_command
+|
+|--26.82%--dispatch_command
+|
+
+|
+
+|
+
+--25.51%--mysqld_stmt_execute
+
+|
+|
+Prepared_statement::execute_loop
+|
+
+|
+--25.05%-|
+
+|
+Prepared_statement::execute
+
+--24.90%--
+
+|
+
+|
+
+|
+
+--24.34%--
+
+|
+
+|
+
+mysql_execute_command
+[...]
+
+The full output is many pages long, in descending sample count order. These sample counts are
+given as percentages, which show where the CPU time was spent. In this example, 29.44% of
+time was spent in the do_command() and its children, including mysql_execute_command().
+These kernel and process symbols are available only if their debuginfo files are available; otherwise, hex addresses are shown.
+
+10
+
+The -a option became the default in Linux 4.11.
+
+269
+
+270
+
+Chapter 6 CPUs
+
+The stack ordering changed in Linux 4.4 from callee (beginning with the on-CPU function and
+listing ancestry) to caller (beginning with the parent function and listing children). You can
+switch back to callee using -g:
+# perf report -g callee --stdio
+[...]
+19.75%
+0.00% mysqld
+Sql_cmd_dml::execute_inner
+
+mysqld
+
+[.]
+
+|
+---Sql_cmd_dml::execute_inner
+Sql_cmd_dml::execute
+mysql_execute_command
+Prepared_statement::execute
+Prepared_statement::execute_loop
+mysqld_stmt_execute
+dispatch_command
+do_command
+0x55dadc140fe0
+0x55dadd7b473a
+start_thread
+[...]
+
+To understand a profile, you can try both orderings. If you are unable to make sense of it quickly
+at the command line, try a visualization such as flame graphs.
+
+CPU Flame Graphs
+CPU flame graphs can be generated from the same perf.data profile by using the flamegraph
+report added in Linux 5.8.11 For example:
+# perf record -F 99 -a -g -- sleep 10
+# perf script report flamegraph
+
+This creates a flamegraph using a d3-flame-graph template file in /usr/share/d3-flame-graph/
+d3-flamegraph-base.html (if you do not have this file, it can be built by the d3-flame-graph software [Spier 20b]). These can also be combined as one command:
+# perf script flamegraph -a -F 99 sleep 10
+
+For older versions of Linux, you can use my original flamegraph software to visualize the samples reported by perf script. The steps (also included in Chapter 5) are:
+# perf record -F 99 -a -g -- sleep 10
+# perf script --header > out.stacks
+11
+
+Thanks to Andreas Gerstmayr for adding this option.
+
+6.6 Observability Tools
+
+$ git clone https://github.com/brendangregg/FlameGraph; cd FlameGraph
+$ ./stackcollapse-perf.pl < ../out.stacks | ./flamegraph.pl --hash > out.svg
+
+The out.svg file is the CPU flame graph, which can be loaded in a web browser. It includes
+JavaScript for interactivity: click to zoom, and Ctrl-F to search. See Section 6.5.4, Profiling,
+which illustrates these steps in Figure 6.15.
+You can modify these steps to pipe perf script directly to stackcollapse-perf.pl, avoiding the
+out.stacks file. However, I’ve found these files useful to archive for later reference and use with
+other tools (e.g., FlameScope).
+
+Options
+flamegraph.pl supports various options, including:
+■
+
+--title TEXT: Set the title.
+
+■
+
+--subtitle TEXT: Set a subtitle.
+
+■
+
+--width NUM: Set the image width (default 1200 pixels).
+
+■
+
+--countname TEXT: Change the count label (default “samples”).
+
+■
+
+■
+
+--colors PALETTE: Set a palette for the frame colors. Some of these use search terms or
+annotations to use different color hues for different code paths. Options include hot (the
+default), mem, io, java, js, perl, red, green, blue, yellow.
+--bgcolors COLOR: Set the background color. Gradient choices are yellow (the default),
+blue, green, grey; for flat (non-gradient) colors use “#rrggbb”.
+
+■
+
+--hash: Colors are keyed by a function name hash for consistency.
+
+■
+
+--reverse: Generate a stack-reversed flame graph, merging from leaf to root.
+
+■
+
+--inverted: Flip the y-axis to generate an icicle graph.
+
+■
+
+--flamechart: Generate a flame chart (time on the x-axis).
+
+For example, this is the set of options I use for Java CPU flame graphs:
+$ ./flamegraph.pl --colors=java --hash
+--title="CPU Flame Graph, $(hostname), $(date)" < ...
+
+This includes the hostname and date in the flame graph.
+See Section 6.7.3, Flame Graphs, for interpreting flame graphs.
+
+Process CPU Profiling
+Apart from profiling across all CPUs, individual processes can be targeted using -p PID, and
+perf(1) can execute a command directly and profile it:
+# perf record -F 99 -g command
+
+271
+
+272
+
+Chapter 6 CPUs
+
+A “--” is often inserted before the command to stop perf(1) processing command line options
+from the command.
+
+Scheduler Latency
+The sched command records and reports scheduler statistics. For example:
+# perf sched record -- sleep 10
+[ perf record: Woken up 63 times to write data ]
+[ perf record: Captured and wrote 125.873 MB perf.data (1117146 samples) ]
+# perf sched latency
+------------------------------------------------------------------------------------Task
+
+| Runtime ms
+
+| Switches | Average delay ms | Maximum delay ms |
+
+------------------------------------------------------------------------------------jbd2/nvme0n1p1-:175
+
+|
+
+0.209 ms |
+
+3 | avg:
+
+0.549 ms | max:
+
+1.630 ms |
+
+kauditd:22
+
+|
+
+0.180 ms |
+
+6 | avg:
+
+0.463 ms | max:
+
+2.300 ms |
+
+oltp_read_only.:(4)
+
+| 3969.929 ms |
+
+184629 | avg:
+
+0.007 ms | max:
+
+5.484 ms |
+
+mysqld:(27)
+
+| 8759.265 ms |
+
+96025 | avg:
+
+0.007 ms | max:
+
+4.133 ms |
+
+bash:21391
+
+|
+
+1 | avg:
+
+0.007 ms | max:
+
+0.007 ms |
+
+0.275 ms |
+
+[...]
+------------------------------------------------------------------------------------TOTAL:
+
+|
+
+12916.132 ms |
+
+281395 |
+
+-------------------------------------------------
+
+This latency report summarizes average and maximum scheduler latency (aka run queue
+latency) per process. While there were many context switches for the oltp_read_only and mysqld
+processes, their average and maximum scheduler latencies were still low. (To fit the output width
+here, I elided a final “Maximum delay at” column.)
+Scheduler events are frequent, so this type of tracing incurs significant CPU and storage overhead. The perf.data file in this case was 125 Mbytes from only ten seconds of tracing. The rate
+of scheduler events may inundate perf(1)’s per-CPU ring buffers, causing events to be lost: the
+report will state this at the end if it happened. Be careful with this overhead, as it may perturb
+production applications.
+perf(1) sched also has map and timehist reports for displaying the scheduler profile in different
+ways. The timehist report shows per-event details:
+# perf sched timehist
+Samples do not have callchains.
+time
+
+cpu
+
+task name
+
+wait time
+
+sch delay
+
+[tid/pid]
+
+(msec)
+
+(msec)
+
+run time
+(msec)
+
+---------
+
+---------
+
+---------
+
+-------------- ------
+
+----------------------------
+
+437752.840756 [0000]
+
+mysqld[11995/5187]
+
+0.000
+
+0.000
+
+0.000
+
+437752.840810 [0000]
+
+oltp_read_only.[21483/21482]
+
+0.000
+
+0.000
+
+0.054
+
+6.6 Observability Tools
+
+437752.840845 [0000]
+
+mysqld[11995/5187]
+
+0.054
+
+0.000
+
+0.034
+
+437752.840847 [0000]
+
+oltp_read_only.[21483/21482]
+
+0.034
+
+0.002
+
+0.002
+
+10000.080
+
+0.004
+
+0.127
+
+[...]
+437762.842139 [0001]
+
+sleep[21487]
+
+This report shows each context switch event with the time sleeping (wait time), scheduler
+latency (sch delay), and time spent on CPU (runtime), all in milliseconds. The final line shows
+the dummy sleep(1) command used to set the duration of perf record, which slept for 10
+seconds.
+
+PMCs (Hardware Events)
+The stat subcommand counts events and produces a summary, rather than recording events
+to perf.data. By default, perf stat counts several PMCs to show a high-level summary of CPU
+cycles. For example, summarizing a gzip(1) command:
+$ perf stat gzip ubuntu-19.10-live-server-amd64.iso
+Performance counter stats for 'gzip ubuntu-19.10-live-server-amd64.iso':
+25235.652299
+
+task-clock (msec)
+
+#
+
+0.997 CPUs utilized
+
+142
+
+context-switches
+
+#
+
+0.006 K/sec
+
+25
+
+cpu-migrations
+
+#
+
+0.001 K/sec
+
+128
+
+page-faults
+
+#
+
+0.005 K/sec
+
+94,817,146,941
+
+cycles
+
+#
+
+3.757 GHz
+
+152,114,038,783
+
+instructions
+
+#
+
+1.60
+
+28,974,755,679
+
+branches
+
+# 1148.167 M/sec
+
+1,020,287,443
+
+branch-misses
+
+#
+
+insn per cycle
+
+3.52% of all branches
+
+25.312054797 seconds time elapsed
+
+The statistics include the cycle and instruction count, and the IPC. As described earlier, this is
+an extremely useful high-level metric for determining the types of cycles occurring and how
+many of them are stall cycles. In this case, the IPC of 1.6 is “good.”
+Here is a system-wide example of measuring IPC, this time from a Shopify benchmark to investigate NUMA tuning, which ultimately improved application throughput by 20–30%. These
+commands measure on all CPUs for 30 seconds.
+Before:
+# perf stat -a -- sleep 30
+[...]
+404,155,631,577
+[100.00%]
+[...]
+
+instructions
+
+#
+
+0.72
+
+insns per cycle
+
+273
+
+274
+
+Chapter 6 CPUs
+
+After NUMA tuning:
+# perf stat -a -- sleep 30
+[...]
+490,026,784,002
+[100.00%]
+
+instructions
+
+#
+
+0.89
+
+insns per cycle
+
+[...]
+
+IPC improved from 0.72 to 0.89: 24%, matching the final win. (See Chapter 16, Case Study, for
+another production example of measuring IPC.)
+
+Hardware Event Selection
+There are many more hardware events that can be counted. You can list them using perf list:
+# perf list
+[...]
+branch-instructions OR branches
+
+[Hardware event]
+
+branch-misses
+
+[Hardware event]
+
+bus-cycles
+
+[Hardware event]
+
+cache-misses
+
+[Hardware event]
+
+cache-references
+
+[Hardware event]
+
+cpu-cycles OR cycles
+
+[Hardware event]
+
+instructions
+
+[Hardware event]
+
+ref-cycles
+
+[Hardware event]
+
+[...]
+LLC-load-misses
+
+[Hardware cache event]
+
+LLC-loads
+
+[Hardware cache event]
+
+LLC-store-misses
+
+[Hardware cache event]
+
+LLC-stores
+
+[Hardware cache event]
+
+[...]
+
+Look for both “Hardware event” and “Hardware cache event.” For some processors you will find
+additional groups of PMCs; a longer example is provided in Chapter 13, perf, Section 13.3, perf
+Events. Those available depend on the processor architecture and are documented in the processor manuals (e.g., the Intel Software Developer’s Manual).
+These events can be specified using –e. For example (this is from an Intel Xeon):
+$ perf stat -e instructions,cycles,L1-dcache-load-misses,LLC-load-misses,dTLB-loadmisses gzip ubuntu-19.10-live-server-amd64.iso
+Performance counter stats for 'gzip ubuntu-19.10-live-server-amd64.iso':
+152,226,453,131
+
+instructions
+
+94,697,951,648
+
+cycles
+
+#
+
+1.61
+
+insn per cycle
+
+6.6 Observability Tools
+
+2,790,554,850
+
+L1-dcache-load-misses
+
+9,612,234
+
+LLC-load-misses
+
+357,906
+
+dTLB-load-misses
+
+25.275276704 seconds time elapsed
+
+Apart from instructions and cycles, this example also measured the following:
+■
+
+■
+
+■
+
+L1-dcache-load-misses: Level 1 data cache load misses. This gives you a measure of the
+memory load caused by the application, after some loads have been returned from the
+Level 1 cache. It can be compared with other L1 event counters to determine cache hit ratio.
+LLC-load-misses: Last level cache load misses. After the last level, this accesses main
+memory, and so this is a measure of main memory load. The difference between this and
+L1-dcache-load-misses gives an idea of the effectiveness of the CPU caches beyond Level 1,
+but other counters are needed for completeness.
+dTLB-load-misses: Data translation lookaside buffer misses. This shows the effectiveness
+of the MMU to cache page mappings for the workload, and can measure the size of the
+memory workload (working set).
+
+Many other counters can be inspected. perf(1) supports both descriptive names (like those used
+for this example) and hexadecimal values. The latter may be necessary for esoteric counters you
+find in processor manuals, for which a descriptive name isn’t provided.
+
+Software Tracing
+perf can also record and count software events. Listing some CPU-related events:
+# perf list
+[...]
+context-switches OR cs
+
+[Software event]
+
+cpu-migrations OR migrations
+
+[Software event]
+
+[...]
+sched:sched_kthread_stop
+
+[Tracepoint event]
+
+sched:sched_kthread_stop_ret
+
+[Tracepoint event]
+
+sched:sched_wakeup
+
+[Tracepoint event]
+
+sched:sched_wakeup_new
+
+[Tracepoint event]
+
+sched:sched_switch
+
+[Tracepoint event]
+
+[...]
+
+The following example uses the context switch software event to trace when applications leave
+the CPU, and collects call stacks for one second:
+# perf record -e sched:sched_switch -a -g -- sleep 1
+[ perf record: Woken up 46 times to write data ]
+[ perf record: Captured and wrote 11.717 MB perf.data (50649 samples) ]
+
+275
+
+276
+
+Chapter 6 CPUs
+
+# perf report --stdio
+[...]
+16.18%
+16.18% prev_comm=mysqld prev_pid=11995 prev_prio=120 prev_state=S ==>
+next_comm=swapper/1 next_pid=0 next_prio=120
+|
+---__sched_text_start
+schedule
+schedule_hrtimeout_range_clock
+schedule_hrtimeout_range
+poll_schedule_timeout.constprop.0
+do_sys_poll
+__x64_sys_ppoll
+do_syscall_64
+entry_SYSCALL_64_after_hwframe
+ppoll
+vio_socket_io_wait
+vio_read
+my_net_read
+Protocol_classic::read_packet
+Protocol_classic::get_command
+do_command
+start_thread
+[...]
+
+This truncated output shows mysql context switching to block on a socket via poll(2). To investigate further, see the Off-CPU analysis methodology in Chapter 5, Applications, Section 5.4.2,
+Off-CPU Analysis, and supporting tools in Section 5.5.3, offcputime.
+Chapter 9, Disks, includes another example of static tracing with perf(1): block I/O tracepoints.
+Chapter 10, Network, includes an example of dynamic instrumentation with perf(1) for the
+tcp_sendmsg() kernel function.
+
+Hardware Tracing
+perf(1) is also able to use hardware tracing for per-instruction analysis, if supported by the processor. This is a low-level advanced activity not covered here, but is mentioned again in Chapter 13,
+perf, Section 13.13, Other Commands.
+
+Documentation
+For more on perf(1), see Chapter 13, perf. Also see its man pages, documentation in the Linux
+kernel source under tools/perf/Documentation, my “perf Examples” page [Gregg 20f], the “Perf
+Tutorial” [Perf 15], and “The Unofficial Linux Perf Events Web-Page” [Weaver 11].
+
+6.6 Observability Tools
+
+6.6.14
+
+profile
+
+profile(8) is a BCC tool that samples stack traces at timed intervals and reports a frequency
+count. This is the most useful tool in BCC for understanding CPU consumption as it summarizes almost all code paths that are consuming CPU resources. (See the hardirqs(8) tool in
+Section 6.6.19 for more CPU consumers.) profile(8) has lower overhead than perf(1) as only the
+stack trace summary is passed to user space. This overhead difference is pictured in Figure 6.15.
+profile(8) is also summarized in Chapter 5, Applications, Section 5.5.2, profile, for its use as an
+application profiler.
+By default, profile(8) samples both user and kernel stack traces at 49 Hertz across all CPUs. This can
+be customized using options, and the settings are printed at the start of the output. For example:
+# profile
+Sampling at 49 Hertz of all threads by user + kernel stack... Hit Ctrl-C to end.
+^C
+[...]
+finish_task_switch
+__sched_text_start
+schedule
+schedule_hrtimeout_range_clock
+schedule_hrtimeout_range
+poll_schedule_timeout.constprop.0
+do_sys_poll
+__x64_sys_ppoll
+do_syscall_64
+entry_SYSCALL_64_after_hwframe
+ppoll
+vio_socket_io_wait(Vio*, enum_vio_io_event)
+vio_read(Vio*, unsigned char*, unsigned long)
+my_net_read(NET*)
+Protocol_classic::read_packet()
+Protocol_classic::get_command(COM_DATA*, enum_server_command*)
+do_command(THD*)
+start_thread
+-
+
+mysqld (5187)
+151
+
+The output shows the stack traces as a list of functions, followed by a dash (“-”) and the process name and PID in parentheses, and finally a count for that stack trace. The stack traces are
+printed in frequency count order, from least to most frequent.
+The full output in this example was 8,261 lines long and has been truncated here to show only
+the last, most frequent, stack trace. It shows that scheduler functions were on-CPU, called from a
+poll(2) code path. This particular stack trace was sampled 151 times while tracing.
+
+277
+
+278
+
+Chapter 6 CPUs
+
+profile(8) supports various options, including:
+■
+
+-U: Includes user-level stacks only
+
+■
+
+-K: Includes kernel-level stacks only
+
+■
+
+-a: Includes frame annotations (e.g., “_[k]” for kernel frames)
+
+■
+
+-d: Includes delimiters between kernel/user stacks
+
+■
+
+-f: Provides output in folded format
+
+■
+
+-p PID: Profiles this process only
+
+■
+
+--stack-storage-size SIZE: Number of unique stack traces (default 16,384)
+
+If profile(8) prints this type of warning:
+WARNING: 5 stack traces could not be displayed.
+
+It means that the stack storage was exceeded. You can increase it using the --stack-storage-size
+option.
+
+profile CPU Flame Graphs
+The -f option provides output suitable for importing by my flame graph software. Example
+instructions:
+# profile -af 10 > out.stacks
+# git clone https://github.com/brendangregg/FlameGraph; cd FlameGraph
+# ./flamegraph.pl --hash < out.stacks > out.svg
+
+The out.svg file can then be loaded in a web browser.
+profile(8) and the following tools (runqlat(8), runqlen(8), softirqs(8), hardirqs(8)) are BPF-based
+tools from the BCC repository, which is covered in Chapter 15.
+
+6.6.15 cpudist
+cpudist(8)12 is a BCC tool for showing the distribution of on-CPU time for each thread wakeup.
+This can be used to help characterize CPU workloads, providing details for later tuning and
+design decisions. For example, from a 2-CPU database instance:
+# cpudist 10 1
+Tracing on-CPU time... Hit Ctrl-C to end.
+usecs
+
+: count
+
+distribution
+
+0 -> 1
+
+: 0
+
+|
+
+|
+
+2 -> 3
+
+: 135
+
+|
+
+|
+
+12
+Origin: Sasha Goldshtein developed the BCC cpudist(8) on 29-Jun-2016. I developed a cpudists histogram tool for
+Solaris in 2005.
+
+6.6 Observability Tools
+
+4 -> 7
+
+: 26961
+
+|********
+
+|
+
+8 -> 15
+
+: 123341
+
+|****************************************|
+
+16 -> 31
+
+: 55939
+
+|******************
+
+|
+
+32 -> 63
+
+: 70860
+
+|**********************
+
+|
+
+64 -> 127
+
+: 12622
+
+|****
+
+|
+
+128 -> 255
+
+: 13044
+
+|****
+
+|
+
+256 -> 511
+
+: 3090
+
+|*
+
+|
+
+512 -> 1023
+
+: 2
+
+|
+
+|
+
+1024 -> 2047
+
+: 6
+
+|
+
+|
+
+2048 -> 4095
+
+: 1
+
+|
+
+|
+
+4096 -> 8191
+
+: 2
+
+|
+
+|
+
+The output shows that the database usually spent between 4 and 63 microseconds on-CPU.
+That’s pretty short.
+Options include:
+■
+
+-m: Prints output in milliseconds
+
+■
+
+-O: Shows off-CPU time instead of on-CPU time
+
+■
+
+-P: Prints a histogram per process
+
+■
+
+-p PID: Traces this process ID only
+
+This can be used in conjunction with profile(8) to summarize how long an application ran
+on-CPU, and what it was doing.
+
+6.6.16
+
+runqlat
+13
+
+runqlat(8) is a BCC and bpftrace tool for measuring CPU scheduler latency, often called run
+queue latency (even when no longer implemented using run queues). It is useful for identifying
+and quantifying issues of CPU saturation, where there is more demand for CPU resources than
+they can service. The metric measured by runqlat(8) is the time each thread (task) spends waiting for its turn on CPU.
+The following shows BCC runqlat(8) running on a 2-CPU MySQL database cloud instance operating at about 15% CPU utilization system-wide. The arguments to runqlat(8) are “10 1” to set a
+10-second interval and output only once:
+# runqlat 10 1
+Tracing run queue latency... Hit Ctrl-C to end.
+usecs
+
+: count
+
+distribution
+
+0 -> 1
+
+: 9017
+
+|*****
+
+|
+
+2 -> 3
+
+: 7188
+
+|****
+
+|
+
+4 -> 7
+
+: 5250
+
+|***
+
+|
+
+13
+Origin: I developed the BCC runqlat version on 7-Feb-2016, and bpftrace on 17-Sep-2018, inspired by my earlier
+Solaris dispqlat.d tool (dispatcher queue latency: Solaris terminology for run queue latency).
+
+279
+
+280
+
+Chapter 6 CPUs
+
+8 -> 15
+
+: 67668
+
+|****************************************|
+
+16 -> 31
+
+: 3529
+
+|**
+
+|
+
+32 -> 63
+
+: 315
+
+|
+
+|
+
+64 -> 127
+
+: 98
+
+|
+
+|
+
+128 -> 255
+
+: 99
+
+|
+
+|
+
+256 -> 511
+
+: 9
+
+|
+
+|
+
+512 -> 1023
+
+: 15
+
+|
+
+|
+
+1024 -> 2047
+
+: 6
+
+|
+
+|
+
+2048 -> 4095
+
+: 2
+
+|
+
+|
+
+4096 -> 8191
+
+: 3
+
+|
+
+|
+
+8192 -> 16383
+
+: 1
+
+|
+
+|
+
+16384 -> 32767
+
+: 1
+
+|
+
+|
+
+32768 -> 65535
+
+: 2
+
+|
+
+|
+
+65536 -> 131071
+
+: 88
+
+|
+
+|
+
+The output may be surprising for such a lightly-loaded system: there appears to be a high scheduler latency with 88 events in the 65 to 131 millisecond range. It turns out this instance was
+CPU throttled by the hypervisor, injecting scheduler latency.
+Options include:
+■
+
+-m: Prints output in milliseconds
+
+■
+
+-P: Prints a histogram per process ID
+
+■
+
+--pidnss: Prints a histogram per PID namespace
+
+■
+
+-p PID: Traces this process ID only
+
+■
+
+-T: Includes timestamps on output
+
+runqlat(8) works by instrumenting scheduler wakeup and context switch events to determine
+the time from wakeup to running. These events can be very frequent on busy production
+systems, exceeding one million events per second. Even though BPF is optimized, at these rates
+even adding one microsecond per event can cause noticeable overhead. Use with caution, and
+consider using runqlen(8) instead.
+
+6.6.17
+
+runqlen
+14
+
+runqlen(8) is a BCC and bpftrace tool for sampling the length of the CPU run queues, counting
+how many tasks are waiting their turn, and presenting this as a linear histogram. This can be
+used to further characterize issues of run queue latency, or as a cheaper approximation. Since it
+uses sampling at 99 Hertz across all CPUs, the overhead is typically negligible. runqlat(8), on the
+other hand, samples every context switch, which can become millions of events per second.
+
+14
+
+Origin: I developed the BCC version on 12-Dec-2016 and the bpftrace version on 7-Oct-2018, inspired by my
+earlier dispqlen.d tool.
+
+6.6 Observability Tools
+
+The following shows runqlen(8) from BCC running on a 2-CPU MySQL database instance that
+is at about 15% CPU utilization system-wide (the same instance shown earlier with runqlat(8)).
+The arguments to runqlen(8) are “10 1” to set a 10-second interval and output only once:
+# runqlen 10 1
+Sampling run queue length... Hit Ctrl-C to end.
+runqlen
+
+: count
+
+distribution
+
+0
+
+: 1824
+
+|****************************************|
+
+1
+
+: 158
+
+|***
+
+|
+
+This output shows that for much of the time the run queue length was zero, and about 8% of the
+time the run queue length was one, meaning that threads needed to wait their turn.
+Options include:
+■
+
+-C: Prints a histogram per CPU
+
+■
+
+-O: Prints run queue occupancy
+
+■
+
+-T: Includes timestamps on output
+
+Run queue occupancy is a separate metric that shows the percentage of time that there were
+threads waiting. This is sometimes useful when a single metric is needed for monitoring, alerting, and graphing.
+
+6.6.18
+
+softirqs
+15
+
+softirqs(8) is a BCC tool that shows the time spent servicing soft IRQs (soft interrupts). The
+system-wide time in soft interrupts is readily available from different tools. For example,
+mpstat(1) shows it as %soft. There is also /proc/softirqs to show counts of soft IRQ events. The
+BCC softirqs(8) tool differs in that it can show time per soft IRQ rather than an event count.
+For example, from a 2-CPU database instance and a 10-second trace:
+# softirqs 10 1
+Tracing soft irq event time... Hit Ctrl-C to end.
+SOFTIRQ
+net_tx
+
+TOTAL_usecs
+9
+
+rcu
+
+751
+
+sched
+
+3431
+
+timer
+
+5542
+
+tasklet
+
+11368
+
+net_rx
+
+12225
+
+15
+
+Origin: I developed the BCC version on 20-Oct-2015.
+
+281
+
+

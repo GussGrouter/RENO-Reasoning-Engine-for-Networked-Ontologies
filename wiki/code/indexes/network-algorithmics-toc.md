@@ -1,0 +1,347 @@
+# Network Algorithmics — source index
+
+- Tag: structure
+
+This page is a **navigation spine** for the per-section source pages generated from the full-text extraction of *Network Algorithmics* (Second Edition).
+
+## Links
+
+- Concepts:
+  - [[network-algorithmics]]
+
+## Sections (ordered)
+
+- [[network-algorithmics-1-1-the-problem-network-bottlenecks]] — 1.1 — The problem: network bottlenecks
+- [[network-algorithmics-1-1-1-endnode-bottlenecks-endnodes-are-the-endpoints-of-the-network-they-inclu]] — 1.1.1 — Endnode bottlenecks Endnodes are the endpoints of the network. They include personal computers and workstations as well
+- [[network-algorithmics-1-1-2-router-bottlenecks-though-we-concentrate-on-internet-routers-almost-all]] — 1.1.2 — Router bottlenecks Though we concentrate on Internet routers, almost all the techniques described in this book apply
+- [[network-algorithmics-1-2-the-techniques-network-algorithmics]] — 1.2 — The techniques: network algorithmics
+- [[network-algorithmics-1-2-1-warm-up-example-scenting-an-evil-packet]] — 1.2.1 — Warm-up example: scenting an evil packet
+- [[network-algorithmics-1-2-2-strawman-solution-the-check-of-overall-length-is-straightforward-to-impl]] — 1.2.2 — Strawman solution The check of overall length is straightforward to implement, so we concentrate on checking for a
+- [[network-algorithmics-1-2-3-thinking-algorithmically]] — 1.2.3 — Thinking algorithmically
+- [[network-algorithmics-1-2-4-refining-the-algorithm-exploiting-hardware]] — 1.2.4 — Refining the algorithm: exploiting hardware
+- [[network-algorithmics-1-2-5-cleaning-up-we-have-postponed-one-thorny-issue-to-this-point-the-termina]] — 1.2.5 — Cleaning up We have postponed one thorny issue to this point. The terminal loop has been eliminated while leaving
+- [[network-algorithmics-1-2-6-characteristics-of-network-algorithmics]] — 1.2.6 — Characteristics of network algorithmics
+- [[network-algorithmics-1-3-exercise-1-implementing-chi-square-the-chi-square-statistic-can-be-used]] — 1.3 — Exercise 1. Implementing chi-square: The chi-square statistic can be used to find if the overall set of observed
+- [[network-algorithmics-2-1-protocols-section-2-1-1-describes-the-transport-protocol-tcp-and-the-ip]] — 2.1 — Protocols Section 2.1.1 describes the transport protocol TCP and the IP routing protocol. These two examples are
+- [[network-algorithmics-2-1-1-transport-and-routing-protocols]] — 2.1.1 — Transport and routing protocols
+- [[network-algorithmics-abstract-protocol-model-p45-47]] — 2.1.2 — abstract protocol model (PDF pages 45–47)
+- [[network-algorithmics-perf-measures-2-1-3]] — 2.1.3 — performance environment and measures
+- [[network-algorithmics-2-2-hardware-as-links-approach-40-gigabit-sec-oc-768-speeds-a-40-byte-packet]] — 2.2 — Hardware As links approach 40-gigabit/sec OC-768 speeds, a 40-byte packet must be forwarded in 8 nsec. At such
+- [[network-algorithmics-2-2-1-combinatorial-logic]] — 2.2.1 — combinatorial logic
+- [[network-algorithmics-2-2-2-timing-and-power]] — 2.2.2 — timing and power
+- [[network-algorithmics-2-2-3-hardware-building-blocks]] — 2.2.3 — hardware building blocks
+- [[network-algorithmics-2-2-4-memories-registers-sram-dram]] — 2.2.4 — memories (2.2.4) intro: registers, SRAM, DRAM
+- [[network-algorithmics-2-2-5-memory-subsystem-design-techniques]] — 2.2.5 — Memory subsystem design techniques
+- [[network-algorithmics-2-2-6-component-level-design]] — 2.2.6 — Component-level design
+- [[network-algorithmics-2-2-7-final-hardware-lessons]] — 2.2.7 — Final hardware lessons
+- [[network-algorithmics-2-3-network-device-architectures]] — 2.3 — Network device architectures
+- [[network-algorithmics-2-3-1-endnode-architecture]] — 2.3.1 — endnode architecture
+- [[network-algorithmics-2-3-2-router-architecture]] — 2.3.2 — router architecture
+- [[network-algorithmics-2-4-operating-systems-an-operating-system-is-a-software-that-sits-above-hard]] — 2.4 — Operating systems An operating system is a software that sits above hardware in order to make life easier for application
+- [[network-algorithmics-2-4-1-processes]] — 2.4.1 — operating systems: processes
+- [[network-algorithmics-2-4-2-virtual-memory]] — 2.4.2 — operating systems: virtual memory
+- [[network-algorithmics-2-4-3-system-calls-io]] — 2.4.3 — operating systems: I/O via system calls
+- [[network-algorithmics-2-5-summary]] — 2.5 — summary
+- [[network-algorithmics-2-6-exercises-1-tcp-protocols-and-denial-of-service-attacks-a-common-exploit]] — 2.6 — Exercises 1. TCP Protocols and Denial-of-Service Attacks: A common exploit for a hacker is to attempt to
+- [[network-algorithmics-3-1-ternary-cam-update]] — 3.1 — motivating principles: ternary CAM updates
+- [[network-algorithmics-3-2-algorithms-vs-algorithmics]] — 3.2 — algorithms vs algorithmics
+- [[network-algorithmics-3-3-fifteen-implementation-principles-categorization-and-description]] — 3.3 — Fifteen implementation principles—categorization and description
+- [[network-algorithmics-3-3-1-systems-principles]] — 3.3.1 — fifteen principles: systems principles
+- [[network-algorithmics-3-3-2-modularity-with-efficiency]] — 3.3.2 — fifteen principles: modularity with efficiency
+- [[network-algorithmics-3-3-3-speeding-up-routines]] — 3.3.3 — fifteen principles: speeding up routines
+- [[network-algorithmics-3-4-design-vs-implementation]] — 3.4 — design vs implementation principles
+- [[network-algorithmics-3-5-caveats]] — 3.5 — caveats
+- [[network-algorithmics-3-5-1-eight-cautionary-questions]] — 3.5.1 — Eight cautionary questions
+- [[network-algorithmics-3-6-summary]] — 3.6 — summary
+- [[network-algorithmics-3-7-exercises-1-batching-disk-locality-and-logs-most-serious-databases-use-l]] — 3.7 — Exercises 1. Batching, Disk Locality, and Logs: Most serious databases use log files for performance. Because
+- [[network-algorithmics-4-1-buffer-validation]] — 4.1 — buffer validation of application device channels
+- [[network-algorithmics-4-2-atm-flow-control-scheduler]] — 4.2 — ATM flow control scheduler
+- [[network-algorithmics-4-3-dijkstra-route-computation]] — 4.3 — route computation using Dijkstra
+- [[network-algorithmics-4-4-ethernet-monitor-bridge-hardware]] — 4.4 — Ethernet monitor using bridge hardware
+- [[network-algorithmics-4-5-demultiplexing-in-the-x-kernel]] — 4.5 — Demultiplexing in the x-kernel
+- [[network-algorithmics-4-6-tries-with-node-compression]] — 4.6 — Tries with node compression
+- [[network-algorithmics-4-7-packet-filtering-in-routers]] — 4.7 — Packet filtering in routers
+- [[network-algorithmics-4-8-avoiding-fragmentation-of-lsps]] — 4.8 — Avoiding fragmentation of LSPs
+- [[network-algorithmics-4-9-policing-traffic-patterns]] — 4.9 — Policing traffic patterns
+- [[network-algorithmics-4-10-identifying-a-resource-hog]] — 4.10 — Identifying a resource hog
+- [[network-algorithmics-4-11-getting-rid-of-the-tcp-open-connection-list]] — 4.11 — Getting rid of the TCP open connection list
+- [[network-algorithmics-4-12-acknowledgment-withholding]] — 4.12 — Acknowledgment withholding
+- [[network-algorithmics-4-13-incrementally-reading-a-large-database]] — 4.13 — Incrementally reading a large database
+- [[network-algorithmics-4-14-binary-search-of-long-identifiers]] — 4.14 — Binary search of long identifiers
+- [[network-algorithmics-4-15-video-conferencing-via-asynchronous-transfer-mode]] — 4.15 — Video conferencing via asynchronous transfer mode
+- [[network-algorithmics-5-1-why-data-copies-in-fig-a-1-in-the-appendix-we-describe-how-tcp-works-in]] — 5.1 — Why data copies In Fig. A.1 in the Appendix we describe how TCP works in the context of a Web server. Fig. A.1 only
+- [[network-algorithmics-5-2-reducing-copying-via-local-restructuring]] — 5.2 — Reducing copying via local restructuring
+- [[network-algorithmics-5-2-1-exploiting-adaptor-memory]] — 5.2.1 — Exploiting adaptor memory
+- [[network-algorithmics-5-2-2-using-copy-on-write-while-the-basic-idea-in-the-witless-approach-can-be]] — 5.2.2 — Using copy-on-write While the basic idea in the Witless approach can be considered to be eliminating the kernel-to-adaptor
+- [[network-algorithmics-5-2-3-fbufs-optimizing-page-remapping]] — 5.2.3 — Fbufs: optimizing page remapping
+- [[network-algorithmics-5-2-4-transparently-emulating-copy-semantics]] — 5.2.4 — Transparently emulating copy semantics
+- [[network-algorithmics-5-2-5-are-zero-copies-used-today]] — 5.2.5 — Are zero copies used today?
+- [[network-algorithmics-5-3-avoiding-copying-using-remote-dma]] — 5.3 — Avoiding copying using remote DMA
+- [[network-algorithmics-5-3-1-avoiding-copying-in-a-cluster]] — 5.3.1 — Avoiding copying in a cluster
+- [[network-algorithmics-5-3-2-modern-day-incarnations-of-rdma]] — 5.3.2 — Modern-day incarnations of RDMA
+- [[network-algorithmics-5-4-broadening-to-file-systems]] — 5.4 — Broadening to file systems
+- [[network-algorithmics-5-4-1-shared-memory-modern-unix-variants-stevens-1998-provide-a-convenient-sys]] — 5.4.1 — Shared memory Modern UNIX variants (Stevens, 1998) provide a convenient system call known as mmap() to allow an
+- [[network-algorithmics-5-4-2-io-lite-a-unified-view-of-buffering]] — 5.4.2 — IO-lite: A unified view of buffering
+- [[network-algorithmics-5-4-3-avoiding-file-system-copies-via-i-o-splicing]] — 5.4.3 — Avoiding file system copies via I/O splicing
+- [[network-algorithmics-5-5-broadening-beyond-copies]] — 5.5 — Broadening beyond copies
+- [[network-algorithmics-5-6-broadening-beyond-data-manipulations]] — 5.6 — Broadening beyond data manipulations
+- [[network-algorithmics-5-6-1-using-caches-effectively]] — 5.6.1 — Using caches effectively
+- [[network-algorithmics-5-6-2-direct-memory-access-versus-programmed-i-o]] — 5.6.2 — Direct memory access versus programmed I/O
+- [[network-algorithmics-5-8-exercises-1-data-caches-and-copies-a-normal-data-cache-is-a-mapping-from]] — 5.8 — Exercises 1. Data caches and copies: A normal data cache is a mapping from a memory location address to a
+- [[network-algorithmics-6-1-why-control-overhead]] — 6.1 — Why control overhead?
+- [[network-algorithmics-6-2-avoiding-scheduling-overhead-in-networking-code]] — 6.2 — Avoiding scheduling overhead in networking code
+- [[network-algorithmics-6-2-1-making-user-level-protocol-implementations-real]] — 6.2.1 — Making user-level protocol implementations real
+- [[network-algorithmics-6-3-avoiding-context-switching-overhead-in-applications]] — 6.3 — Avoiding context-switching overhead in applications
+- [[network-algorithmics-6-3-1-process-per-client-in-terms-of-programming-the-simplest-way-to-implement]] — 6.3.1 — Process per client In terms of programming, the simplest way to implement a Web server is to structure the processing of
+- [[network-algorithmics-6-3-3-event-driven-scheduler]] — 6.3.3 — Event-driven scheduler
+- [[network-algorithmics-6-3-4-event-driven-server-with-helper-processes]] — 6.3.4 — Event-driven server with helper processes
+- [[network-algorithmics-6-3-5-task-based-structuring]] — 6.3.5 — Task-based structuring
+- [[network-algorithmics-6-4-scalable-i-o-notification]] — 6.4 — Scalable I/O Notification
+- [[network-algorithmics-6-4-1-a-server-mystery-the-previous-section-suggested-that-avoiding-process-sc]] — 6.4.1 — A server mystery The previous section suggested that avoiding process-scheduling overheads was important in a Web
+- [[network-algorithmics-6-4-2-problems-with-implementations-of-select]] — 6.4.2 — Problems with implementations of select()
+- [[network-algorithmics-6-4-3-analysis-of-select]] — 6.4.3 — Analysis of select()
+- [[network-algorithmics-6-4-4-speeding-up-select-without-changing-the-api]] — 6.4.4 — Speeding up select() without changing the API
+- [[network-algorithmics-6-4-5-speeding-up-select-by-changing-the-api]] — 6.4.5 — Speeding up select() by changing the API
+- [[network-algorithmics-6-5-avoiding-system-calls-or-kernel-bypass]] — 6.5 — Avoiding system calls or Kernel Bypass
+- [[network-algorithmics-6-5-1-the-virtual-interface-architecture-proposal]] — 6.5.1 — The virtual interface architecture proposal
+- [[network-algorithmics-6-5-2-data-plane-development-kit-dpdk]] — 6.5.2 — Data Plane Development Kit (DPDK)
+- [[network-algorithmics-6-5-3-single-root-i-o-virtualization-sr-iov]] — 6.5.3 — Single Root I/O Virtualization (SR-IOV)
+- [[network-algorithmics-6-6-radical-restructuring-of-operating-systems]] — 6.6 — Radical Restructuring of Operating Systems
+- [[network-algorithmics-6-7-reducing-interrupts-we-have-worked-our-way-down-the-hierarchy-of-control]] — 6.7 — Reducing interrupts We have worked our way down the hierarchy of control overheads from process scheduling to select
+- [[network-algorithmics-6-7-1-avoiding-receiver-livelock]] — 6.7.1 — Avoiding receiver livelock
+- [[network-algorithmics-6-8-conclusions-after-the-basic-restructuring-to-avoid-copying-control-overh]] — 6.8 — Conclusions After the basic restructuring to avoid copying, control overhead is probably the next most important
+- [[network-algorithmics-6-9-exercises-1-packet-filters-and-upcalls-in-the-description-on-upcalls-fig]] — 6.9 — Exercises 1. Packet Filters and Upcalls: In the description on upcalls (Fig. 6.2) we showed that the system
+- [[network-algorithmics-7-2-model-and-performance-measures]] — 7.2 — Model and performance measures
+- [[network-algorithmics-7-3-simplest-timer-schemes]] — 7.3 — Simplest timer schemes
+- [[network-algorithmics-7-4-timing-wheels-the-design-of-the-first-scheme-follows-a-common-problem-so]] — 7.4 — Timing wheels The design of the first scheme follows a common problem-solving paradigm:
+- [[network-algorithmics-7-5-hashed-wheels-the-design-of-the-first-extension-follows-a-second-common]] — 7.5 — Hashed wheels The design of the first extension follows a second common problem-solving paradigm:
+- [[network-algorithmics-7-6-hierarchical-wheels-the-second-extension-of-the-basic-scheme-exploits-th]] — 7.6 — Hierarchical wheels The second extension of the basic scheme exploits the concept of hierarchy. To represent the number
+- [[network-algorithmics-7-7-bsd-implementation-adam-costello-was-the-first-to-use-hashed-wheels-to-i]] — 7.7 — BSD implementation Adam Costello was the first to use hashed wheels to implement (Costello and Varghese, 1998) the BSD
+- [[network-algorithmics-7-8-google-carousel-implementation]] — 7.8 — Google Carousel implementation
+- [[network-algorithmics-7-9-obtaining-finer-granularity-timers]] — 7.9 — Obtaining finer granularity timers
+- [[network-algorithmics-7-10-conclusions-this-chapter-describes-two-techniques-for-efficient-timer-im]] — 7.10 — Conclusions This chapter describes two techniques for efficient timer implementation. The first technique, timing
+- [[network-algorithmics-7-11-exercises-1-better-hash-functions-currently-hashed-wheels-use-a-very-sim]] — 7.11 — Exercises 1. Better Hash Functions: Currently hashed wheels use a very simple and primitive hash function
+- [[network-algorithmics-8-1-opportunities-and-challenges-of-early-demultiplexing]] — 8.1 — Opportunities and challenges of early demultiplexing
+- [[network-algorithmics-8-2-goals-if-early-demultiplexing-is-a-good-idea-is-it-easy-to-implement-ear]] — 8.2 — Goals If early demultiplexing is a good idea, is it easy to implement? Early demultiplexing is particularly
+- [[network-algorithmics-8-3-cmu-stanford-packet-filter-pioneering-packet-filters]] — 8.3 — CMU/Stanford packet filter: pioneering packet filters
+- [[network-algorithmics-8-4-berkeley-packet-filter-enabling-high-performance-monitoring]] — 8.4 — Berkeley packet filter: enabling high-performance monitoring
+- [[network-algorithmics-8-5-pathfinder-factoring-out-common-checks]] — 8.5 — Pathfinder: factoring out common checks
+- [[network-algorithmics-8-6-dynamic-packet-filter-compilers-to-the-rescue]] — 8.6 — Dynamic packet filter: compilers to the rescue
+- [[network-algorithmics-8-7-conclusions-while-it-may-be-trite-to-say-that-necessity-is-the-mother-of]] — 8.7 — Conclusions While it may be trite to say that necessity is the mother of invention, it is also often true. New needs
+- [[network-algorithmics-8-8-exercises-1-other-uses-of-early-demultiplexing-besides-the-uses-of-early]] — 8.8 — Exercises 1. Other Uses of Early Demultiplexing: Besides the uses of early demultiplexing already described, consider the following potential uses.
+- [[network-algorithmics-9-1-buffer-management-all-protocols-have-to-manage-buffers-in-particular-pac]] — 9.1 — Buffer management All protocols have to manage buffers. In particular, packets travel up and down the protocol stack in
+- [[network-algorithmics-9-1-1-buffer-allocation-the-classical-bsd-unix-implementation-called-mbufs-all]] — 9.1.1 — Buffer allocation The classical BSD UNIX implementation, called mbufs, allowed a single packet to be stored as a linear
+- [[network-algorithmics-9-2-cyclic-redundancy-checks-and-checksums]] — 9.2 — Cyclic redundancy checks and checksums
+- [[network-algorithmics-9-2-1-cyclic-redundancy-checks]] — 9.2.1 — Cyclic redundancy checks
+- [[network-algorithmics-9-2-2-internet-checksums-since-crc-computation-is-done-on-every-link-on-the-in]] — 9.2.2 — Internet checksums Since CRC computation is done on every link on the Internet, it is done in hardware by link chips.
+- [[network-algorithmics-9-2-3-finessing-checksums-the-humble-checksum-s-reason-for-existence-compared]] — 9.2.3 — Finessing checksums The humble checksum’s reason for existence, compared to the more powerful CRC, is the relative ease
+- [[network-algorithmics-9-3-generic-protocol-processing]] — 9.3 — Generic protocol processing
+- [[network-algorithmics-9-3-1-udp-processing-recall-that-udp-is-tcp-without-error-recovery-congestion]] — 9.3.1 — UDP processing Recall that UDP is TCP without error recovery, congestion control, or connection management. As with
+- [[network-algorithmics-9-4-reassembly-both-header-prediction-for-tcp-and-even-the-udp-optimizations]] — 9.4 — Reassembly Both header prediction for TCP and even the UDP optimizations of Partridge and Pink (1993) assume
+- [[network-algorithmics-9-4-1-efficient-reassembly]] — 9.4.1 — Efficient reassembly
+- [[network-algorithmics-9-6-exercises-1-dynamic-buffer-thresholds-and-credit-based-flow-control-read]] — 9.6 — Exercises 1. Dynamic Buffer Thresholds and Credit-Based Flow Control: Read the credit-based protocol
+- [[network-algorithmics-10-1-challenge-1-ethernet-under-fire]] — 10.1 — Challenge 1: Ethernet under fire
+- [[network-algorithmics-10-2-challenge-2-wire-speed-forwarding]] — 10.2 — Challenge 2: wire speed forwarding
+- [[network-algorithmics-10-3-challenge-3-scaling-lookups-to-higher-speeds]] — 10.3 — Challenge 3: scaling lookups to higher speeds
+- [[network-algorithmics-10-3-2-using-hardware-parallelism]] — 10.3.2 — Using hardware parallelism
+- [[network-algorithmics-10-3-3-the-d-left-approach-now-we-introduce-d-left-the-state-of-art-solution-br]] — 10.3.3 — The d-left approach Now we introduce d-left, the state of art solution (Broder and Mitzenmacher, 2001) to the exact-match
+- [[network-algorithmics-10-4-summary-this-chapter-on-exact-match-lookups-is-written-as-a-story-the-st]] — 10.4 — Summary This chapter on exact-match lookups is written as a story, the story of bridging. Three morals can be
+- [[network-algorithmics-10-5-exercise-1-arp-caches-another-example-of-an-exact-match-lookup-is-furnis]] — 10.5 — Exercise 1. ARP Caches: Another example of an exact-match lookup is furnished by ARP (address resolution
+- [[network-algorithmics-11-1-introduction-to-prefix-lookups]] — 11.1 — Introduction to prefix lookups
+- [[network-algorithmics-11-1-1-prefix-notation-internet-prefixes-are-defined-using-bits-and-not-alphanu]] — 11.1.1 — Prefix notation Internet prefixes are defined using bits and not alphanumerical characters, of up to 32 bits in length.
+- [[network-algorithmics-11-1-2-why-variable-length-prefixes]] — 11.1.2 — Why variable-length prefixes?
+- [[network-algorithmics-11-1-3-lookup-model-recall-the-router-model-of-chapter-2-a-packet-arrives-on-an]] — 11.1.3 — Lookup model Recall the router model of Chapter 2. A packet arrives on an input link. Each packet carries a 32-bit
+- [[network-algorithmics-11-2-finessing-lookups-the-first-instinct-for-a-systems-person-is-not-to-solv]] — 11.2 — Finessing lookups The first instinct for a systems person is not to solve complex problems (like longest matching prefix)
+- [[network-algorithmics-11-2-1-threaded-indices-and-tag-switching]] — 11.2.1 — Threaded indices and tag switching
+- [[network-algorithmics-11-2-3-status-of-tag-switching-flow-switching-and-multiprotocol-label-switching]] — 11.2.3 — Status of tag switching, flow switching, and multiprotocol label switching
+- [[network-algorithmics-11-3-non-algorithmic-techniques-for-prefix-matching]] — 11.3 — Non-algorithmic techniques for prefix matching
+- [[network-algorithmics-11-3-2-ternary-content-addressable-memories]] — 11.3.2 — Ternary content-addressable memories
+- [[network-algorithmics-11-5-multibit-tries-most-large-memories-use-dram-dram-has-a-large-latency-say]] — 11.5 — Multibit tries Most large memories use DRAM. DRAM has a large latency (say 30 nanoseconds) when compared to
+- [[network-algorithmics-11-5-1-fixed-stride-tries-fig-11-7-shows-a-trie-for-the-same-database-as-fig-11]] — 11.5.1 — Fixed-stride tries Fig. 11.7 shows a trie for the same database as Fig. 11.6, using expanded tries with a fixed stride length
+- [[network-algorithmics-11-5-2-variable-stride-tries]] — 11.5.2 — Variable-stride tries
+- [[network-algorithmics-11-5-3-incremental-update-simple-insertion-and-deletion-algorithms-exist-for-mu]] — 11.5.3 — Incremental update Simple insertion and deletion algorithms exist for multibit tries. Consider the addition of a prefix P. The
+- [[network-algorithmics-11-6-level-compressed-lc-tries]] — 11.6 — Level-compressed (LC) tries
+- [[network-algorithmics-11-7-lulea-compressed-tries]] — 11.7 — Lulea-compressed tries
+- [[network-algorithmics-11-8-tree-bitmap-the-tree-bitmap-eatherton-et-al-2004-scheme-starts-with-the]] — 11.8 — Tree bitmap The tree bitmap (Eatherton et al., 2004) scheme starts with the goal of achieving the same storage
+- [[network-algorithmics-11-8-1-tree-bitmap-ideas-thus-the-first-and-main-idea-in-the-tree-bitmap-scheme]] — 11.8.1 — Tree bitmap ideas Thus the first and main idea in the tree bitmap scheme is that there are two bitmaps per trie node, one
+- [[network-algorithmics-11-8-2-tree-bitmap-search-algorithm]] — 11.8.2 — Tree bitmap search algorithm
+- [[network-algorithmics-11-8-3-poptrie-an-alternate-bitmap-algorithm]] — 11.8.3 — PopTrie: an alternate bitmap algorithm
+- [[network-algorithmics-11-9-binary-search-on-ranges]] — 11.9 — Binary search on ranges
+- [[network-algorithmics-11-10-binary-search-on-ranges-with-initial-lookup-table]] — 11.10 — Binary search on ranges with Initial Lookup Table
+- [[network-algorithmics-11-11-binary-search-on-prefix-lengths]] — 11.11 — Binary search on prefix lengths
+- [[network-algorithmics-11-12-linear-search-on-prefix-lengths-with-hardware-assist]] — 11.12 — Linear search on prefix lengths with hardware assist
+- [[network-algorithmics-11-12-1-using-bloom-filters-to-compress-prefix-bitmaps]] — 11.12.1 — Using Bloom Filters to compress prefix bitmaps
+- [[network-algorithmics-11-12-2-sail-uncompressed-bitmaps-up-to-a-pivot-level]] — 11.12.2 — SAIL: Uncompressed Bitmaps up to a pivot level
+- [[network-algorithmics-11-13-memory-allocation-in-compressed-schemes]] — 11.13 — Memory allocation in compressed schemes
+- [[network-algorithmics-11-13-1-frame-based-compaction]] — 11.13.1 — Frame-based compaction
+- [[network-algorithmics-11-14-fixed-function-lookup-chip-models]] — 11.14 — Fixed Function Lookup-chip models
+- [[network-algorithmics-11-15-programmable-lookup-chips-and-p4]] — 11.15 — Programmable Lookup Chips and P4
+- [[network-algorithmics-11-15-2-ip-lookups-in-the-p4-model]] — 11.15.2 — IP Lookups in the P4 Model
+- [[network-algorithmics-11-16-conclusions-it-is-important-to-gain-some-perspective-after-the-large-num]] — 11.16 — Conclusions It is important to gain some perspective after the large number of isolated lookup variants described in
+- [[network-algorithmics-11-17-exercises-1-caching-prefixes-suppose-we-have-the-prefixes-10-100-and-100]] — 11.17 — Exercises 1. Caching Prefixes: Suppose we have the prefixes 10*, 100*, and 1001*. Hugh Hopeful would like
+- [[network-algorithmics-12-1-why-packet-classification]] — 12.1 — Why packet classification?
+- [[network-algorithmics-12-2-packet-classification-problem]] — 12.2 — Packet-classification problem
+- [[network-algorithmics-12-3-requirements-and-metrics]] — 12.3 — Requirements and metrics
+- [[network-algorithmics-12-4-2-tuple-space-search-a-simple-improvement-of-linear-search-is-a-simple-gen]] — 12.4.2 — Tuple space search A simple improvement of linear search is a simple generalization of IP lookups using hash tables where
+- [[network-algorithmics-12-4-3-caching-some-implementations-even-cache-the-result-of-the-search-keyed-a]] — 12.4.3 — Caching Some implementations even cache the result of the search keyed against the whole header. There are
+- [[network-algorithmics-12-4-4-demultiplexing-algorithms]] — 12.4.4 — Demultiplexing algorithms
+- [[network-algorithmics-12-4-5-passing-labels-recall-from-chapter-11-that-one-way-to-finesse-lookups-is]] — 12.4.5 — Passing labels Recall from Chapter 11 that one way to finesse lookups is to pass a label from a previous-hop router
+- [[network-algorithmics-12-4-6-content-addressable-memories]] — 12.4.6 — Content-addressable memories
+- [[network-algorithmics-12-5-two-dimensional-schemes]] — 12.5 — Two-dimensional schemes
+- [[network-algorithmics-12-5-1-fast-searching-using-set-pruning-tries]] — 12.5.1 — Fast searching using set-pruning tries
+- [[network-algorithmics-12-5-2-reducing-memory-using-backtracking]] — 12.5.2 — Reducing memory using backtracking
+- [[network-algorithmics-12-5-3-the-best-of-both-worlds-grid-of-tries]] — 12.5.3 — The best of both worlds: grid of tries
+- [[network-algorithmics-12-6-approaches-to-general-rule-sets]] — 12.6 — Approaches to general rule sets
+- [[network-algorithmics-12-6-1-geometric-view-of-classification]] — 12.6.1 — Geometric view of classification
+- [[network-algorithmics-12-6-2-beyond-two-dimensions-the-bad-news]] — 12.6.2 — Beyond two dimensions: the bad news
+- [[network-algorithmics-12-6-3-beyond-two-dimensions-the-good-news]] — 12.6.3 — Beyond two dimensions: the good news
+- [[network-algorithmics-12-7-extending-two-dimensional-schemes]] — 12.7 — Extending two-dimensional schemes
+- [[network-algorithmics-12-8-using-divide-and-conquer]] — 12.8 — Using divide-and-conquer
+- [[network-algorithmics-12-9-bit-vector-linear-search]] — 12.9 — Bit vector linear search
+- [[network-algorithmics-12-10-cross-producting-this-section-describes-a-crude-scheme-called-cross-prod]] — 12.10 — Cross-producting This section describes a crude scheme called cross-producting (Srinivasan et al., 1998). In the next
+- [[network-algorithmics-12-11-equivalenced-cross-producting]] — 12.11 — Equivalenced cross-producting
+- [[network-algorithmics-12-12-decision-tree-approaches]] — 12.12 — Decision tree approaches
+- [[network-algorithmics-12-13-hybrid-algorithms-based-on-the-earlier-descriptions-of-the-various-algor]] — 12.13 — Hybrid algorithms Based on the earlier descriptions of the various algorithms it should be clear that different algorithms
+- [[network-algorithmics-12-14-conclusions-this-chapter-describes-several-algorithms-for-packet-classif]] — 12.14 — Conclusions This chapter describes several algorithms for packet classification at gigabit speeds. The grid of tries
+- [[network-algorithmics-12-15-exercises-1-range-to-prefix-mappings-cams-require-the-use-of-prefix-rang]] — 12.15 — Exercises 1. Range to Prefix Mappings: CAMs require the use of prefix ranges, but many rules use general
+- [[network-algorithmics-13-1-router-versus-telephone-switches]] — 13.1 — Router versus telephone switches
+- [[network-algorithmics-13-2-shared-memory-switches]] — 13.2 — Shared-memory switches
+- [[network-algorithmics-13-3-router-history-from-buses-to-crossbars]] — 13.3 — Router history: from buses to crossbars
+- [[network-algorithmics-13-4-the-take-a-ticket-crossbar-scheduler]] — 13.4 — The take-a-ticket crossbar scheduler
+- [[network-algorithmics-13-5-head-of-line-blocking]] — 13.5 — Head-of-line blocking
+- [[network-algorithmics-13-6-avoiding-hol-blocking-via-output-queuing]] — 13.6 — Avoiding HOL blocking via output queuing
+- [[network-algorithmics-13-7-avoiding-hol-blocking-via-virtual-output-queuing]] — 13.7 — Avoiding HOL blocking via virtual output queuing
+- [[network-algorithmics-13-8-input-queued-switching-as-a-bipartite-matching-problem]] — 13.8 — Input-queued switching as a bipartite matching problem
+- [[network-algorithmics-13-9-parallel-iterative-matching-pim]] — 13.9 — Parallel iterative matching (PIM)
+- [[network-algorithmics-13-10-avoiding-randomization-with-islip]] — 13.10 — Avoiding randomization with iSLIP
+- [[network-algorithmics-13-11-computing-near-optimal-matchings-via-learning]] — 13.11 — Computing near-optimal matchings via learning
+- [[network-algorithmics-13-12-sample-and-compare-a-stunningly-simple-adaptive-algorithm]] — 13.12 — Sample-and-compare: a stunningly simple adaptive algorithm
+- [[network-algorithmics-13-13-serena-an-improved-adaptive-algorithm]] — 13.13 — SERENA: an improved adaptive algorithm
+- [[network-algorithmics-13-13-1-derive-r-t-from-the-arrival-graph]] — 13.13.1 — Derive R(t) from the arrival graph
+- [[network-algorithmics-13-13-2-merge-r-t-with-s-t-1]] — 13.13.2 — Merge R(t) with S(t − 1)
+- [[network-algorithmics-13-14-the-queue-proportional-sampling-strategy]] — 13.14 — The queue-proportional sampling strategy
+- [[network-algorithmics-13-15-qps-implementation-we-now-describe-the-data-structure-and-algorithm-that]] — 13.15 — QPS implementation We now describe the data structure and algorithm that allows an input port to sample a VOQ in the
+- [[network-algorithmics-13-15-1-the-qps-algorithm-this-algorithm-consists-of-two-steps-in-the-first-step]] — 13.15.1 — The QPS algorithm This algorithm consists of two steps. In the first step we sample a packet, out of all packets currently
+- [[network-algorithmics-13-15-2-the-qps-data-structure]] — 13.15.2 — The QPS data structure
+- [[network-algorithmics-13-16-small-batch-qps-and-sliding-window-qps]] — 13.16 — Small-batch QPS and sliding-window QPS
+- [[network-algorithmics-13-16-1-batch-switching-algorithms]] — 13.16.1 — Batch switching algorithms
+- [[network-algorithmics-13-16-2-the-sb-qps-algorithm]] — 13.16.2 — The SB-QPS algorithm
+- [[network-algorithmics-13-16-3-the-sw-qps-algorithm]] — 13.16.3 — The SW-QPS algorithm
+- [[network-algorithmics-13-17-combined-input-and-output-queueing]] — 13.17 — Combined input and output queueing
+- [[network-algorithmics-13-18-scaling-to-larger-and-faster-switches]] — 13.18 — Scaling to larger and faster switches
+- [[network-algorithmics-13-18-1-measuring-switch-cost]] — 13.18.1 — Measuring switch cost
+- [[network-algorithmics-13-18-2-a-divide-and-conquer-approach-to-building-large-switches]] — 13.18.2 — A divide-and-conquer approach to building large switches
+- [[network-algorithmics-13-18-3-clos-networks-for-medium-sized-routers]] — 13.18.3 — Clos networks for medium-sized routers
+- [[network-algorithmics-13-18-4-benes-networks-for-larger-routers]] — 13.18.4 — Benes networks for larger routers
+- [[network-algorithmics-13-18-5-load-balanced-switching]] — 13.18.5 — Load-balanced switching
+- [[network-algorithmics-13-19-scaling-to-faster-link-speeds]] — 13.19 — Scaling to faster link speeds
+- [[network-algorithmics-13-19-1-using-bit-slicing-for-higher-speed-fabrics]] — 13.19.1 — Using bit slicing for higher-speed fabrics
+- [[network-algorithmics-13-19-2-using-short-links-for-higher-speed-fabrics]] — 13.19.2 — Using short links for higher-speed fabrics
+- [[network-algorithmics-13-19-3-memory-scaling-using-randomization]] — 13.19.3 — Memory scaling using randomization
+- [[network-algorithmics-13-20-conclusions-this-chapter-has-surveyed-techniques-for-building-switches-f]] — 13.20 — Conclusions This chapter has surveyed techniques for building switches, from small shared-memory switches to
+- [[network-algorithmics-13-21-exercises-1-take-a-ticket-state-machine-draw-a-state-machine-for-take-a]] — 13.21 — Exercises 1. Take-a-Ticket State Machine: Draw a state machine for take-a-ticket. Describe the state machine
+- [[network-algorithmics-14-1-motivation-for-quality-of-service]] — 14.1 — Motivation for quality of service
+- [[network-algorithmics-14-2-random-early-detection]] — 14.2 — Random early detection
+- [[network-algorithmics-14-3-approximate-fair-dropping]] — 14.3 — Approximate fair dropping
+- [[network-algorithmics-14-4-token-bucket-policing]] — 14.4 — Token bucket policing
+- [[network-algorithmics-14-5-multiple-outbound-queues-and-priority]] — 14.5 — Multiple outbound queues and priority
+- [[network-algorithmics-14-6-a-quick-detour-into-reservation-protocols]] — 14.6 — A quick detour into reservation protocols
+- [[network-algorithmics-14-7-providing-bandwidth-guarantees]] — 14.7 — Providing bandwidth guarantees
+- [[network-algorithmics-14-7-1-the-parochial-parcel-service]] — 14.7.1 — The parochial parcel service
+- [[network-algorithmics-14-7-3-implementation-and-extensions-of-deficit-round-robin]] — 14.7.3 — Implementation and extensions of deficit round-robin
+- [[network-algorithmics-14-8-schedulers-that-provide-delay-guarantees]] — 14.8 — Schedulers that provide delay guarantees
+- [[network-algorithmics-14-9-generalized-processor-sharing]] — 14.9 — Generalized processor sharing
+- [[network-algorithmics-14-9-1-a-simple-example-it-helps-to-explain-the-gps-scheduler-and-the-related-c]] — 14.9.1 — A simple example It helps to explain the GPS scheduler and the related concepts using the following simple example. We
+- [[network-algorithmics-14-9-2-recursive-definition-of-gps-virtual-start-and-finish-times]] — 14.9.2 — Recursive definition of GPS virtual start and finish times
+- [[network-algorithmics-14-9-3-another-packet-arrival-scenario]] — 14.9.3 — Another packet arrival scenario
+- [[network-algorithmics-14-9-4-tracking-the-gps-clock]] — 14.9.4 — Tracking the GPS clock
+- [[network-algorithmics-14-10-weighted-fair-queueing]] — 14.10 — Weighted fair queueing
+- [[network-algorithmics-14-11-worst-case-fair-weighed-fair-queueing]] — 14.11 — Worst-case fair weighed fair queueing
+- [[network-algorithmics-14-12-the-data-structure-and-algorithm-for-efficient-gps-clock-tracking]] — 14.12 — The data structure and algorithm for efficient GPS clock tracking
+- [[network-algorithmics-14-12-1-the-staircase-query-problem]] — 14.12.1 — The staircase query problem
+- [[network-algorithmics-14-12-2-augmented-data-structures]] — 14.12.2 — Augmented data structures
+- [[network-algorithmics-14-13-implementing-wfq-and-wf2-q]] — 14.13 — Implementing WFQ and WF2 Q
+- [[network-algorithmics-14-14-quick-fair-queueing-qfq]] — 14.14 — Quick fair queueing (QFQ)
+- [[network-algorithmics-14-14-1-fair-round-robin-frr-algorithm]] — 14.14.1 — Fair round robin (FRR) algorithm
+- [[network-algorithmics-14-14-2-how-qfq-improves-upon-frr]] — 14.14.2 — How QFQ improves upon FRR
+- [[network-algorithmics-14-15-towards-programmable-packet-scheduling]] — 14.15 — Towards programmable packet scheduling
+- [[network-algorithmics-14-15-1-push-in-first-out-pifo-framework]] — 14.15.1 — Push-In First-Out (PIFO) framework
+- [[network-algorithmics-14-15-2-universal-packet-scheduler]] — 14.15.2 — Universal packet scheduler
+- [[network-algorithmics-14-16-scalable-fair-queuing]] — 14.16 — Scalable fair queuing
+- [[network-algorithmics-14-16-1-random-aggregation-the-idea-behind-sfq-mckenney-1991-is-to-employ-princi]] — 14.16.1 — Random aggregation The idea behind SFQ (McKenney, 1991) is to employ Principle P3a by trading certainty in fairness for
+- [[network-algorithmics-14-16-2-edge-aggregation-the-three-ideas-behind-the-diffserv-proposal-blake-et-a]] — 14.16.2 — Edge aggregation The three ideas behind the DiffServ proposal (Blake et al., 1998) are: relaxing system requirements
+- [[network-algorithmics-14-16-3-edge-aggregation-with-policing]] — 14.16.3 — Edge aggregation with policing
+- [[network-algorithmics-15-1-internal-flow-control]] — 15.1 — Internal flow control
+- [[network-algorithmics-15-1-1-improving-performance]] — 15.1.1 — Improving performance
+- [[network-algorithmics-15-1-2-rescuing-reliability]] — 15.1.2 — Rescuing reliability
+- [[network-algorithmics-15-2-internal-link-striping]] — 15.2 — Internal Link Striping
+- [[network-algorithmics-15-2-1-improving-performance]] — 15.2.1 — Improving performance
+- [[network-algorithmics-15-2-2-rescuing-reliability]] — 15.2.2 — Rescuing reliability
+- [[network-algorithmics-15-3-distributed-memory-so-far-in-this-book-we-have-ignored-the-problem-of-bu]] — 15.3 — Distributed Memory So far in this book, we have ignored the problem of building packet buffers. The following section is
+- [[network-algorithmics-15-3-1-improving-performance]] — 15.3.1 — Improving performance
+- [[network-algorithmics-15-3-2-rescuing-reliability]] — 15.3.2 — Rescuing reliability
+- [[network-algorithmics-15-4-asynchronous-updates]] — 15.4 — Asynchronous updates
+- [[network-algorithmics-15-4-1-improving-performance]] — 15.4.1 — Improving performance
+- [[network-algorithmics-15-4-2-rescuing-reliability]] — 15.4.2 — Rescuing reliability
+- [[network-algorithmics-15-5-conclusions-the-routing-protocol-bgp-border-gateway-protocol-controls-th]] — 15.5 — Conclusions The routing protocol BGP (Border Gateway Protocol) controls the backbone of the Internet. In the last
+- [[network-algorithmics-15-6-exercises-1-fcvc-flow-control-protocol-the-fcvc-flow-control-protocol-of]] — 15.6 — Exercises 1. FCVC flow control protocol: The FCVC flow control protocol of Kung et al. (1994) provides
+- [[network-algorithmics-16-1-why-measurement-is-hard]] — 16.1 — Why measurement is hard
+- [[network-algorithmics-16-1-1-why-counting-is-hard]] — 16.1.1 — Why counting is hard
+- [[network-algorithmics-16-2-reducing-sram-width-using-dram-backing-store]] — 16.2 — Reducing SRAM width using DRAM backing store
+- [[network-algorithmics-16-3-a-randomized-counter-scheme]] — 16.3 — A randomized counter scheme
+- [[network-algorithmics-16-4-maintain-active-counters-using-brick]] — 16.4 — Maintain active counters using BRICK
+- [[network-algorithmics-16-4-1-motivation-and-design-objectives]] — 16.4.1 — Motivation and design objectives
+- [[network-algorithmics-16-5-extending-brick-for-maintaining-associated-states]] — 16.5 — Extending BRICK for maintaining associated states
+- [[network-algorithmics-16-6-reducing-counter-width-using-approximate-counting]] — 16.6 — Reducing counter width using approximate counting
+- [[network-algorithmics-16-7-reducing-counters-using-threshold-aggregation]] — 16.7 — Reducing counters using threshold aggregation
+- [[network-algorithmics-16-8-reducing-counters-using-flow-counting]] — 16.8 — Reducing counters using flow counting
+- [[network-algorithmics-16-9-reducing-processing-using-sampled-netflow]] — 16.9 — Reducing processing using sampled NetFlow
+- [[network-algorithmics-16-10-reducing-reporting-using-sampled-charging]] — 16.10 — Reducing reporting using sampled charging
+- [[network-algorithmics-16-11-correlating-measurements-using-trajectory-sampling]] — 16.11 — Correlating measurements using trajectory sampling
+- [[network-algorithmics-16-12-a-concerted-approach-to-accounting]] — 16.12 — A concerted approach to accounting
+- [[network-algorithmics-16-13-computing-traffic-matrices]] — 16.13 — Computing traffic matrices
+- [[network-algorithmics-16-13-1-approach-1-internet-tomography]] — 16.13.1 — Approach 1: Internet tomography
+- [[network-algorithmics-16-13-2-approach-2-per-prefix-counters]] — 16.13.2 — Approach 2: per-prefix counters
+- [[network-algorithmics-16-13-3-approach-3-class-counters]] — 16.13.3 — Approach 3: class counters
+- [[network-algorithmics-16-14-sting-as-an-example-of-passive-measurement]] — 16.14 — Sting as an example of passive measurement
+- [[network-algorithmics-16-15-generating-better-traffic-logs-via-data-streaming]] — 16.15 — Generating better traffic logs via data streaming
+- [[network-algorithmics-16-16-counting-the-number-of-distinct-flows]] — 16.16 — Counting the number of distinct flows
+- [[network-algorithmics-16-16-1-the-min-hash-algorithm]] — 16.16.1 — The min-hash algorithm
+- [[network-algorithmics-16-16-2-an-extension-of-min-hash-for-estimating-a-b]] — 16.16.2 — An extension of min-hash for estimating |A                     B|
+- [[network-algorithmics-16-16-3-application-to-data-mining]] — 16.16.3 — Application to data mining
+- [[network-algorithmics-16-16-4-bitmap-sketch-a-worthy-alternative-to-min-hash]] — 16.16.4 — Bitmap sketch: a worthy alternative to min-hash
+- [[network-algorithmics-16-17-detection-of-heavy-hitters]] — 16.17 — Detection of heavy hitters
+- [[network-algorithmics-16-18-estimation-of-flow-size-distribution]] — 16.18 — Estimation of flow-size distribution
+- [[network-algorithmics-16-18-1-motivation-flow-size-distribution-information-can-be-useful-in-a-number]] — 16.18.1 — Motivation Flow-size distribution information can be useful in a number of applications in network measurement
+- [[network-algorithmics-16-18-2-a-data-streaming-algorithm-solution]] — 16.18.2 — A data streaming algorithm solution
+- [[network-algorithmics-16-19-the-tug-of-war-algorithm-for-estimating-f2]] — 16.19 — The Tug-of-War algorithm for estimating F2
+- [[network-algorithmics-16-20-conclusion-this-chapter-was-written-to-convince-the-reader-that-measurem]] — 16.20 — Conclusion This chapter was written to convince the reader that measurement is an exciting field of endeavor.
+- [[network-algorithmics-16-21-exercises-1-using-dram-backed-up-counters-this-chapter-described-only-th]] — 16.21 — Exercises 1. Using DRAM-Backed up Counters: This chapter described only the implementation of packet
+- [[network-algorithmics-17-1-searching-for-multiple-strings-in-packet-payloads]] — 17.1 — Searching for multiple strings in packet payloads
+- [[network-algorithmics-17-1-1-integrated-string-matching-using-aho-corasick]] — 17.1.1 — Integrated string matching using Aho–Corasick
+- [[network-algorithmics-17-1-2-integrated-string-matching-using-boyer-moore]] — 17.1.2 — Integrated string matching using Boyer–Moore
+- [[network-algorithmics-17-2-approximate-string-matching]] — 17.2 — Approximate string matching
+- [[network-algorithmics-17-3-ip-traceback-via-probabilistic-marking]] — 17.3 — IP traceback via probabilistic marking
+- [[network-algorithmics-17-4-ip-traceback-via-logging]] — 17.4 — IP traceback via logging
+- [[network-algorithmics-17-4-1-bloom-filters-start-by-observing-that-querying-either-a-packet-log-or-a]] — 17.4.1 — Bloom filters Start by observing that querying either a packet log or a table of allowed users is a set membership
+- [[network-algorithmics-17-4-2-bloom-filter-implementation-of-packet-logging]] — 17.4.2 — Bloom filter implementation of packet logging
+- [[network-algorithmics-17-4-3-scale-to-higher-link-speeds]] — 17.4.3 — Scale to higher link speeds
+- [[network-algorithmics-17-6-earlybird-system-for-worm-detection]] — 17.6 — EarlyBird system for worm detection
+- [[network-algorithmics-17-7-carousel-scalable-logging-for-intrusion-prevention-systems]] — 17.7 — Carousel: scalable logging for intrusion prevention systems
+- [[network-algorithmics-17-8-conclusion-returning-to-marcus-ranum-s-quote-at-the-start-of-this-chapte]] — 17.8 — Conclusion Returning to Marcus Ranum’s quote at the start of this chapter, hacking is probably exciting for hackers
+- [[network-algorithmics-17-9-exercises-1-traceback-by-edge-sampling-extend-the-ip-traceback-edge-samp]] — 17.9 — Exercises 1. Traceback by edge sampling: Extend the IP traceback edge-sampling idea to reduce the space
+- [[network-algorithmics-18-1-what-this-book-has-been-about]] — 18.1 — What this book has been about
+- [[network-algorithmics-18-1-1-endnode-algorithmics]] — 18.1.1 — Endnode algorithmics
+- [[network-algorithmics-18-1-2-router-algorithmics-in-router-algorithmics-by-contrast-the-bottlenecks-a]] — 18.1.2 — Router algorithmics In router algorithmics, by contrast, the bottlenecks are caused not by structuring artifacts (as in some
+- [[network-algorithmics-18-1-3-toward-a-synthesis-in-his-book-the-character-of-physical-law-richard-fey]] — 18.1.3 — Toward a synthesis In his book The Character of Physical Law, Richard Feynman argues that we have a need to understand
+- [[network-algorithmics-18-2-what-network-algorithmics-is-about]] — 18.2 — What network algorithmics is about
+- [[network-algorithmics-18-2-1-interdisciplinary-thinking]] — 18.2.1 — Interdisciplinary thinking
+- [[network-algorithmics-18-2-2-systems-thinking-systems-thinking-is-embodied-by-principles-p1-through-p]] — 18.2.2 — Systems thinking Systems thinking is embodied by Principles P1 through P10. Principles P1 through P5 were described
+- [[network-algorithmics-18-2-3-algorithmic-thinking]] — 18.2.3 — Algorithmic thinking
+- [[network-algorithmics-18-3-network-algorithmics-and-real-products]] — 18.3 — Network algorithmics and real products
+- [[network-algorithmics-18-4-network-algorithmics-back-to-the-future]] — 18.4 — Network algorithmics: back to the future
+- [[network-algorithmics-18-4-1-new-abstractions-this-book-dealt-with-the-fast-implementation-of-the-sta]] — 18.4.1 — New abstractions This book dealt with the fast implementation of the standard networking abstractions: TCP sockets at
+- [[network-algorithmics-18-4-2-new-connecting-disciplines]] — 18.4.2 — New connecting disciplines
+- [[network-algorithmics-18-4-3-new-requirements-much-of-this-book-has-focused-on-processing-time-as-the]] — 18.4.3 — New requirements Much of this book has focused on processing time as the main metric to be optimized while minimizing
+- [[network-algorithmics-18-5-the-inner-life-of-a-networking-device]] — 18.5 — The inner life of a networking device
+- [[network-algorithmics-intro-p20-24]] — (unnumbered) — intro (PDF pages 20–24)

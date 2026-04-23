@@ -1,0 +1,651 @@
+             3.3 Fifteen implementation principles—categorization and description                                       63
+
+
+
+replace the operating system caching routines with more specialized routines. It is best to do such spe-
+cialization only for key routines, to avoid code bloat. A networking example is the fast UDP processing
+routines that we describe in Chapter 9.
+
+P7: Avoid unnecessary generality
+The tendency to design abstract and general subsystems can also lead to unnecessary or rarely used
+features. Thus, rather than building several specialized routines (e.g., P6) to replace the general-purpose
+routine, we might remove features to gain performance.4
+    Of course, as in the case of P3, removing features requires users of the routine to live with re-
+strictions. For example, in RISC processors, the elimination of complex instructions such as multiplies
+required multiplication to be emulated by firmware. A networking example is provided by Fbufs (Chap-
+ter 5), which provides a specialized virtual memory service that allows efficient copying between virtual
+address spaces.
+
+P8: Don’t be tied to reference implementations
+Specifications are written for clarity, not to suggest efficient implementations. Because abstract speci-
+fication languages are unpopular, many specifications use imperative languages such as C. Rather than
+precisely describe what function is to be computed, one gets code that prescribes how to compute the
+function. This has two side effects.
+    First, there is a strong tendency to overspecify. Second, many implementors copy the reference
+implementation in the specification, which is a problem when the reference implementation was chosen
+for conceptual clarity and not efficiency. As Clark (1985) points out, implementors are free to change
+the reference implementation as long as the two implementations have the same external effects. In
+fact, there may be other structured implementations that are efficient as well as modular.
+    For example, Charlie knows that when a recipe tells him to cut beans and then to cut carrots, he can
+interchange the two steps. In the systems world, Clark originally suggested the use of upcalls (Clark,
+1985) for operating systems. In an upcall, a lower layer can call an upper layer for data or advice, seem-
+ingly violating the rules of hierarchical decomposition introduced in the design of operating systems.
+Upcalls are commonly used today in network protocol implementations.
+
+P9: Pass hints in module interfaces
+A hint is information passed from a client to a service that, if correct, can avoid expensive computation
+by the service. The two key phrases are passed and if correct. By passing the hint in its request, a
+service can avoid the need for the associative lookup needed to access a cache. For example, a hint can
+be used to supply a direct index into the processing state at the receiver. Also, unlike caches, the hint is
+not guaranteed to be correct and hence must be checked against other certifiably correct information.
+Hints improve performance if the hint is correct most of the time.
+    This definition of a hint suggests a variant in which information is passed that is guaranteed to be
+correct and hence requires no checking. For want of an established term, we will call such information
+a tip. Tips are harder to use because of the need to ensure the correctness of the tip.
+
+
+4 Butler Lampson, a computer scientist and Turing Award winner, provides two quotes: When in doubt, get rid of it (anonymous)
+and Exterminate Features (Thacker).
+64       Chapter 3 Fifteen implementation principles
+
+
+
+    As a systems example, the Alto File system (Lampson, 1989) has every file block on disk carry a
+pointer to the next file block. This pointer is treated as only a hint and is checked against the file name
+and block number stored in the block itself. If the hint is incorrect, the information can be reconstructed
+from disk. Incorrect hints must not jeopardize system correctness but result only in performance degra-
+dation.
+
+P10: Pass hints in protocol headers
+For distributed systems, the logical extension to Principle P9 is to pass information such as hints in
+message headers. Since this book deals with distributed systems, we will make this a separate principle.
+For example, computer architects have applied this principle to circumvent inefficiencies in message-
+passing parallel systems such as the Connection Machine.
+    One of the ideas in active messages (Chapter 5) is to have a message carry the address of the
+interrupt handler for fast dispatching. Another example is tag switching (Chapter 11), where packets
+carry additional indices besides the destination address to help the destination address to be looked up
+quickly. Tags are used as hints because tag consistency is not guaranteed; packets can be routed to the
+wrong destination, where they must be checked.
+
+
+3.3.3 Principles for speeding up routines
+While the previous principles exploited system structure, we now consider principles for speeding up
+system routines considered in isolation.
+
+P11: Optimize the expected case
+While systems can exhibit a range of behaviors, the behaviors often fall into a smaller set called the
+“expected case” (Hennessey and Patterson, 1996). For example, well-designed systems should mostly
+operate in a fault- and exception-free regime. A second example is a program that exhibits spatial
+locality by mostly accessing a small set of memory locations. Thus it pays to make common behaviors
+efficient, even at the cost of making uncommon behaviors more expensive.
+    Heuristics such as optimizing the expected case are often unsatisfying for theoreticians, who (natu-
+rally) prefer mechanisms whose benefit can be precisely quantified in an average or worst-case sense.
+In defense of this heuristic, note that every computer in existence optimizes the expected case (see
+Chapter 2) at least a million times a second.
+    For example, with the use of paging, the worst-case number of memory references to resolve a
+PC instruction that accesses memory can be as bad as four (read instruction from memory, read first-
+level page table, read second-level page table, fetch operand from memory). However, the number of
+memory accesses can be reduced to 0 using caches. In general, caches allow designers to use modular
+structures and indirection, with gains in flexibility, and yet regain performance in the expected case.
+Thus it is worth highlighting caching.
+
+P11a: Use caches
+Besides caching, there are subtler uses of the expected-case principle. For example, when you wish to
+change buffers in the EMACS editor, the editor offers you a default buffer name, which is the last buffer
+you examined. This saves typing time in the expected case when you keep moving between two buffers.
+The use of header prediction (Chapter 9) in networks is another example of optimizing the expected
+           3.3 Fifteen implementation principles—categorization and description                       65
+
+
+
+case: The cost of processing a packet can be greatly reduced by assuming that the next packet received
+is closely related to the last packet processed (for example, by being the next packet in sequence) and
+requires no exception processing.
+    Note that determining the common case is best done by measurements and by schemes that auto-
+matically learn the common case. However, it is often based on the designer’s intuition. Note that the
+expected case may be incorrect in special situations or may change with time.
+
+P12: Add or exploit state to gain speed
+If an operation is expensive, consider maintaining additional but redundant state to speed up the op-
+eration. For example, Charlie keeps track of the tables that are busy so that he can optimize waiter
+assignments. This is not absolutely necessary, for he can always compute this information when needed
+by walking around the restaurant.
+    In database systems, a classic example is the use of secondary indices. Bank records may be stored
+and searched using a primary key, say, the customer’s Social Security number. However, if there are
+several queries that reference the customer name (e.g., “Find the balance of all Cleopatra’s accounts in
+the Thebes branch”), it may pay to maintain an additional index (e.g., a hash table or B-tree) on the
+customer name. Note that maintaining additional state implies the need to potentially modify this state
+whenever changes occur.
+    However, sometimes this principle can be used without adding state by exploiting the existing state.
+We call this out as Principle P12a.
+
+P12a: Compute incrementally
+When a new customer comes in or leaves, Charlie increments the board on which he notes waiter
+assignments. As a second example, strength reduction in compilers (see example in P4c) incrementally
+computes the new loop index from the old using additions instead of computing the absolute index using
+multiplication. An example of incremental computation in networking is the incremental computation
+of IP checksums (Chapter 9) when only a few fields in the packet change.
+
+P13: Optimize degrees of freedom
+It helps to be aware of the variables that are under one’s control and the evaluation criteria used to
+determine good performance. Then the game becomes one of optimizing these variables to maximize
+performance. For example, Charlie first used to assign waiters to tables as they became free, but he
+realized he could improve waiter efficiency by assigning each waiter to a set of contiguous tables.
+    Similarly, compilers use coloring algorithms to do register assignment while minimizing register
+spills. A networking example of optimizing degrees of freedom is multibit trie IP lookup algorithms
+(Chapter 11). In this example, a degree of freedom that can be overlooked is that the number of bits
+used to index into a trie node can vary, depending on the path through the trie, as opposed to being fixed
+at each level. The number of bits used can also be optimized via dynamic programming (Chapter 11)
+to demand the smallest amount of memory for a given speed requirement.
+
+P14: Use special techniques for finite universes such as integers
+When dealing with small universes, such as moderately sized integers, techniques like bucket sorting,
+array lookup, and bitmaps are often more efficient than general-purpose sorting and searching algo-
+rithms.
+66         Chapter 3 Fifteen implementation principles
+
+
+
+    To translate a virtual address into a physical address, a processor first tries a cache called the TLB.
+If this fails, the processor must look up the page table. A prefix of the address bits is used to index into
+the page table directly. The use of table lookup avoids the use of hash tables or binary search, but it
+requires large page table sizes. A networking example of this technique is timing wheels (Chapter 7),
+where an efficient algorithm for a fixed timer range is constructed using a circular array.
+
+P15: Use algorithmic techniques to create efficient data structures
+Even where there are major bottlenecks, such as virtual address translation, systems designers finesse
+the need for clever algorithms by passing hints, using caches, and performing table lookup. Thus a
+major system designer is reported to have told an eager theoretician: “I don’t use algorithms, son.”
+    This book does not take this somewhat antiintellectual position. Instead, it contends that, in context,
+efficient algorithms can greatly improve system performance. In fact, a fair portion of the book will be
+spent describing such examples. However, there is a solid kernel of truth to the “I don’t use algorithms”
+putdown. In many cases, Principles P1 through P14 need to be applied before any algorithmic issues
+become bottlenecks.
+    Algorithmic approaches include the use of standard data structures as well as generic algorithmic
+techniques, such as divide-and-conquer and randomization. The algorithm designer must, however, be
+prepared to see his clever algorithm become obsolete because of changes in system structure and tech-
+nology. As described in the introduction, the real breakthroughs may arise from applying algorithmic
+thinking as opposed to merely reusing existing algorithms.
+    Examples of the successful use of algorithms in computer systems are the Lempel–Ziv compression
+algorithm employed in the UNIX utility gzip, the Rabin–Miller primality test algorithm found in public
+key systems, and the common use of B-trees (due to Bayer–McCreight) in databases (Cormen et al.,
+1990). Networking examples studied in this text include the Lulea IP-lookup algorithm (Chapter 11)
+and the RFC scheme for packet classification (Chapter 12).
+
+
+
+3.4 Design versus implementation principles
+Now that we have listed the principles used in this book, three clarifications are needed. First, con-
+scious use of general principles does not eliminate creativity and effort but instead channels them more
+efficiently. Second, the list of principles is necessarily incomplete and can probably be categorized in a
+different way; however, it is a good place to start.
+    Third, it is important to clarify the difference between system design and implementation principles.
+Systems designers have articulated principles for system design. Design principles include, for exam-
+ple, the use of hierarchies and aggregation for scaling (e.g., IP prefixes), adding a level of indirection for
+increased flexibility (e.g., mapping from domain names to IP addresses allows DNS servers to balance
+the load between instances of a server), and virtualization of resources for increased user productivity
+(e.g., virtual memory).5
+    A nice compilation of design principles can be found in Lampson’s article (Lampson, 1989) and
+Keshav’s book (Keshav, 1997). Besides design principles, both Lampson and Keshav include a few
+
+
+5 The previous chapter briefly explains these terms (IP prefixes, DNS, and virtual memory).
+                                                                                          3.5 Caveats            67
+
+
+
+
+FIGURE 3.9
+Retrieval of a Web page with images typically requires one request to get the page that specifies the needed images
+and more requests to retrieve each specified image. Why not have the Web server download the images directly?
+
+implementation principles (e.g., “use hints” and “optimize the expected case”). This book, by contrast,
+assumes that much of the network design is already given, and so we focus on principles for efficient
+protocol implementation. This book also adds several principles for efficient implementation not found
+in Keshav (1991) or Lampson (1989).
+    On the other hand, Bentley’s book on “efficient program design” (Bentley, 1982) is more about
+optimizing small code segments than the large systems that are our focus; thus many of Bentley’s
+principles (e.g., fuse loops, unroll loops, reorder tests) are meant to speed up critical loops rather than
+speed up systems as a whole.
+
+
+
+3.5 Caveats
+                                  Performance problems cannot be solved only through the use of Zen meditation.
+                                                —Paraphrased from Jeff Mogul, a computer scientist at HP Labs
+
+The best of principles must be balanced with wisdom to understand the important metrics, with profiling
+to determine bottlenecks, and with experimental measurements to confirm that the changes are really
+improvements. We start with two case studies to illustrate the need for caution.
+
+                            Case study 1: Reducing page download times
+      Fig. 3.9 shows that in order for a Web client to retrieve a Web page containing images, it must
+  typically send a GET request for the page. If the page specifies inline images, then the client must
+  send separate requests to retrieve the images before it can display the page. A natural application
+  of principle P1 is to ask why separate requests are needed. Why can’t the Web server automatically
+  download the images when the page is requested instead of waiting for a separate request? This
+  should reduce page download latency by at least half a round trip delay.
+68     Chapter 3 Fifteen implementation principles
+
+
+
+    To test our hypothesis, we modified the server software to do so and measured the resulting
+ performance. To our surprise, we found only minimal latency improvement.
+    Using a network analyzer based on tcpdump, we found two reasons why this seeming im-
+ provement was a bad idea.
+ • Interaction with TCP: Web transfer is orchestrated by TCP as described in Chapter 2. To
+   avoid network congestion, TCP increases its rate slowly, starting with one packet per round-
+   trip, then to two packets per round trip delay, increasing its rate when it gets acks. Since TCP
+   had to wait for acks anyway to increase its rate, waiting for additional requests for images did
+   not add latency.
+ • Interaction with Client Caching: Many clients already cache common images, such as .gif
+   files. It is a waste of bandwidth to have the Web server unilaterally download images that
+   the client already has in its cache. Note that having the client request the images avoids this
+   problem because the client will only request images it does not already have.
+ A useful lesson from this case study is the difficulty of improving part of a system (e.g., image
+ downloading) because of interactions with other parts of the system (e.g., TCP congestion control).
+
+
+                  Case study 2: Speeding up signature-based intrusion detection
+      As a second example, many network sites field an intrusion detection system, such as Snort
+ (2001), that looks for suspicious strings in packet payloads that are characteristics of hacker at-
+ tacks. An example is the string “perl.exe,” which may signify an attempt to execute perl and then
+ to execute arbitrary commands on a Web server. For every potentially matching rule that contains
+ a string, Snort searches for each such string separately using the Boyer–Moore algorithm (Cormen
+ et al., 1990). The worst case happens to be a Web packet that matches 310 rules. Simple profiling
+ using gprof reveals (Fisk and Varghese, 2001) that 30% of the overhead in Snort arises from string
+ searching.
+      An obvious application of P1 seemed to be the following: Instead of separate searches for each
+ string, use an integrated search algorithm that searches for all possible strings in a single pass over
+ the packet. We modified Boyer–Moore to a set Boyer–Moore algorithm that could search for all
+ specified strings in one pass. Implemented in a library, the new algorithm performed better than
+ the Snort algorithm by a factor of 50 for the full Snort database. Unfortunately, when we integrated
+ it into Snort, we found almost no improvement on packet traces (Fisk and Varghese, 2001). We
+ found two reasons for this.
+ • Multiple string matching is not a bottleneck for the trace: For the given trace, very few
+   packets matched multiple rules, each of which contained separate strings. When we used a trace
+   containing only Web traffic (i.e., traffic with destination port 80), a substantial improvement
+   was found.
+ • Cache Effects: Integrated string searching requires a data structure, such as a trie, whose size
+   grows with the number of strings being searched. The simplest way to do integrated set search-
+   ing is to place the strings contained in all rules in a single trie. However, when the number
+                                                                                   3.5 Caveats          69
+
+
+
+      of strings went over 100, the trie did not fit in cache, and performance suffered. Thus the
+      system had to be reimplemented to use collections of smaller sets that took into account the
+      hardware (P4).
+  A useful lesson from this case study is that purported improvements may not really target the
+  bottleneck (which in the trace appears to be single-string matching) and can also interact with
+  other parts of the system (the data cache).
+
+
+
+3.5.1 Eight cautionary questions
+In the spirit of the two case studies, here are eight cautionary questions that warn against the injudicious
+use of the principles.
+
+Q1: Is it worth improving performance?
+If one were to sell the system as a product, is performance a major selling strength? People interested
+in performance improvement would like to think so, but other aspects of a system, such as ease of use,
+functionality, and robustness, may be more important. For example, a user of a network management
+product cares more about features than performance. Thus, given limited resources and implementation
+complexity, we may choose to defer optimizations until needed. Even if performance is important,
+which performance metric (e.g., latency throughput, memory) is important?
+    Other things being equal, simplicity is best. Simple systems are easier to understand, debug, and
+maintain. On the other hand, the definition of simplicity changes with technology and time. Some
+amount of complexity is worthwhile for large performance gains. For example, years ago image com-
+pression algorithms such as MPEG were considered too complex to implement in software or hardware.
+However, with increasing chip densities, many MPEG chips have come to market.
+
+Q2: Is this really a bottleneck?
+The 80–20 rule suggests that a large percentage of the performance improvements comes from op-
+timizing a small fraction of the system. A simple way to start is to identify key bottlenecks for the
+performance metrics we wish to optimize. One way to do so is to use profiling tools, as we did in Case
+Study 2.
+
+Q3: What impact does the change have on the rest of the system?
+A simple change may speed up a portion of the system but may have complex and unforeseen effects
+on the rest of the system. This is illustrated in Case Study 1. A change that improves performance but
+has too many interactions should be reconsidered.
+
+Q4: Does the initial analysis indicate significant improvement?
+Before doing a complete implementation, a quick analysis can indicate how much gain is possible.
+Standard complexity analysis is useful. However, when nanoseconds are at stake, constant factors are
+important. For software and hardware, because memory accesses are a bottleneck, a reasonable first-
+pass estimate is the number of memory accesses.
+    For example, suppose analysis indicates that address lookup in a router is a bottleneck (e.g., because
+there are fast switches to make data transfer not a bottleneck). Suppose the standard algorithm takes an
+70       Chapter 3 Fifteen implementation principles
+
+
+
+average of 15 memory accesses while a new algorithm indicates a worst case of 3 memory accesses.
+This suggests a factor of 5 improvement, which makes it interesting to proceed further.
+
+Q5: Is it worth adding custom hardware?
+With the continued improvement in the price–performance of general-purpose processors, it is tempting
+to implement algorithms in software and ride the price–performance curve. Thus if we are considering
+a piece of custom hardware that takes a year to design, and the resulting price–performance improve-
+ment is only a factor of 2, it may not be worth the effort. On the other hand, hardware design times
+are shrinking with the advent of effective synthesis tools. Volume manufacturing can also result in ex-
+tremely small costs (compared to general-purpose processors) for a custom-designed chip. Having an
+edge for even a small period such as a year in a competitive market is attractive. This has led companies
+to increasingly place networking functions in silicon.
+
+Q6: Can protocol changes be avoided?
+Through the years there have been several proposals denouncing particular protocols as being inef-
+ficient and proposing alternative protocols designed for performance. For example, in the 1980s, the
+transport protocol TCP was considered “slow” and a protocol called XTP (Chesson, 1989) was explic-
+itly designed to be implemented in hardware. This stimulated research into making TCP fast, which
+culminated in Van Jacobson’s fast implementation of TCP (Clark et al., 1989) in the standard BSD
+(Berkeley software distribution) release. More recently, proposals for protocol changes (e.g., tag and
+flow switching) to finesse the need for IP lookups have stimulated research into fast IP lookups.
+
+Q7: Do prototypes confirm the initial promise?
+Once we have successfully answered all the preceding questions, it is still a good idea to build a pro-
+totype or simulation and actually test to see if the improvement is real. This is because we are dealing
+with complex systems; the initial analysis rarely captures all effects encountered in practice. For ex-
+ample, understanding that the Web-image-dumping idea does not improve latency (see Case Study 1)
+might come only after a real implementation and tests with a network analyzer.
+    A major problem is finding a standard set of benchmarks to compare the standard and new imple-
+mentations. For example, in the general systems world, despite some disagreement, there are standard
+benchmarks for floating-point performance (e.g., Whetstone) or database performance (e.g., debit–
+credit). If one claims to reduce Web transfer latencies using differential encoding, what set of Web
+pages provides a reasonable benchmark to prove this contention? If one claims to have an IP lookup
+scheme with small storage, which benchmark databases can be used to support this assertion?
+
+Q8: Will performance gains be lost if the environment changes?
+Sadly, the job is not quite over even if a prototype implementation is built and a benchmark shows that
+performance improvements are close to initial projections. The difficulty is that the improvement may
+be specific to the particular platform used (which can change) and may take advantage of properties
+of a certain benchmark (which may not reflect all environments in which the system will be used).
+The improvements may still be worthwhile, but some form of sensitivity analysis is still useful for the
+future.
+    For example, Van Jacobson performed a major optimization of the BSD networking code that al-
+lowed ordinary workstations to saturate 100-Mbps FDDI (Fiber Distributed Data Interface) rings. The
+                                                                                 3.7 Exercises          71
+
+
+
+optimization, which we will study in detail in Chapter 9, assumes that in the normal case the next packet
+is from the same connection as the previous packet, P , and has sequence number one higher than P .
+Will this assumption hold for servers that have thousands of simultaneous connections to clients? Will
+it hold if packets get sent over parallel links in the network, resulting in packet reordering? Fortunately,
+the code has worked well in practice for a number of years. Despite this, such questions alert us to
+possible future dangers.
+
+
+
+3.6 Summary
+This chapter introduced a set of principles for efficient system implementation. A summary can be
+found in Figs. 3.1–3.3. The principles were illustrated with examples drawn from compilers, archi-
+tecture, databases, algorithms, and networks to show broad applicability to computer systems. Chef
+Charlie’s examples, while somewhat tongue in cheek, show that these principles also extend to general
+systems, from restaurants to state governments. While the broad focus is on performance, cost is an
+equally important metric. One can cast problems in the form of finding the fastest solution for a given
+cost. Optimization of other metrics, such as bandwidth, storage, and computation, can be subsumed
+under the cost metric.
+    A preview of well-known networking applications of the 15 principles can be found in Figs. 3.1–3.3.
+These applications will be explained in detail in later chapters. The first five principles encourage
+systems thinking. The next five principles encourage a fresh look at system modularity. The last five
+principles point to useful ways to speed up individual subsystems.
+    Just as chess strategies are boring until one plays a game of chess, implementation principles are
+lifeless without concrete examples. The reader is encouraged to try the following exercises, which
+provide more examples drawn from computer systems. The principles will be applied to networks in
+the remaining chapters. In particular, the next chapter seeks to engage the reader by providing a set of
+15 self-contained networking problems to play with.
+
+
+
+3.7 Exercises
+1. Batching, Disk Locality, and Logs: Most serious databases use log files for performance. Because
+   writes to disk are expensive, it is cheaper to update only a memory image of a record. However,
+   because a crash can occur at any time, the update must also be recorded on disk. This can be done
+   by directly updating the record location on disk, but random writes to disk are expensive (see P4a).
+   Instead, information on the update is written to a sequential log file. The log entry contains the
+   record location, the old value (undo information), and the new value (redo information).
+   • Suppose a disk page of 4000 bytes can be written using one disk I/O and that a log record is
+     50 bytes. If we apply batching (2c), what is a reasonable strategy for updating the log? What
+     fraction of a disk I/O should be charged to a log update?
+   • Before a transaction that does the update can commit (i.e., tell the user it is done), it must be
+     sure the log is written. Why? Explain why this leads to another form of batching, group commit,
+     where multiple transactions are committed together.
+72       Chapter 3 Fifteen implementation principles
+
+
+
+   • If the database represented by the log gets too far ahead of the database represented on disk,
+     crash recovery can take too long. Describe a strategy to bound crash recovery times.
+2. Relaxing Consistency Requirements in a Name Service: The Grapevine system (Birell et al.,
+   1982) offers a combination of a name service (to translate user names to inboxes) and a mail service.
+   To improve availability, Grapevine name servers are replicated. Thus any update to a registration
+   record (e.g., Joe → MailSlot3) must be performed on all servers implementing replicas of that
+   record. Standard database techniques for distributed databases require that each update be atomic;
+   that is, the effect should be as if updates were done simultaneously on all replicas. Because atomic
+   updates require that all servers be available, and registration information is not as important as,
+   say, bank accounts, Grapevine provides only the following loose semantics (P3): All replicas will
+   eventually agree if updates stop. Each update is timestamped and passed from one replica to the
+   other in arbitrary order. The highest timestamped update wins.
+   • Give an example of how a user could detect inconsistency in Joe’s registration during the con-
+     vergence process.
+   • If Joe’s record is deleted, it should eventually be purged from the database to save storage. Sup-
+     pose a server purges Joe’s record immediately after receiving a Delete update. Why might Add
+     updates possibly cause a problem? Suggest a solution.
+   • The rule that the latest timestamp wins does not work well when two administrators try to create
+     an entry with the same name. Because a later creation could be trapped in a crashed server,
+     the administrator of the earlier creation can never know for sure that his creation has won. The
+     Grapevine designers did not introduce mechanisms to solve this problem but relied on “some
+     human-level centralization of name creation.” Explain their assumption clearly.
+3. Replacing General-Purpose Routines with Special-Purpose Routines and Efficient Storage
+   Allocators: Consider the design of a general storage allocator that is given control of a large contigu-
+   ous piece of memory and may be asked by applications for smaller, variable-size chunks. A general
+   allocator is quite complex: As time goes by, the available memory fragments and time must be spent
+   finding a piece of the requested size and coalescing adjacent released pieces into larger free blocks.
+   • Briefly sketch the design of a general-purpose allocator. Consult a textbook such as Horowitz
+     and Sahni (1978) for examples of allocators.
+   • Suppose a profile has shown that a large fraction of the applications ask for 64 bytes of storage.
+     Describe a more efficient allocator that works for the special case (P6) of allocating just 64-byte
+     quantities.
+   • How would you optimize the expected case (P11) and yet handle requests for storage other than
+     64 bytes?
+4. Passing Information in Interfaces: Consider a file system that is reading or writing files from
+   disk. Each random disk Read/Write involves positioning the disk over the correct track (seeking).
+   If we have a sequence of, say, three Reads to Tracks 1, 15, and 7, it may pay to reorder the second
+   and third Reads to reduce waste in terms of seek times. Clearly, as in P1, the larger the context of
+   the optimization (e.g., the number of Reads or Writes considered for reordering), the greater the
+   potential benefits of such seek optimization.
+                                                                                3.7 Exercises          73
+
+
+
+   A normal file system only has an interface to open, read, and write a single file. However, suppose
+   an application is reading multiple files and can pass that information (P9) in the file system call.
+   • What information about the pattern of file accesses would be useful for the file system to perform
+     seek optimization? What should the interface look like?
+   • Give examples of applications that process multiple files and could benefit from this optimization.
+     For more details, see the paper by Patterson et al. (1995). They call this form of tip a disclosure.
+5. Optimizing the Expected Case, Using Algorithmic Ideas, and Scavenging Files: The Alto com-
+   puter used a scavenging system (Lampson, 1989) that scans the disk after a crash to reconstruct file
+   system indexes that map from file names and blocks to disk sectors. This can be done because each
+   disk sector that contains a file block also contains the corresponding file identifier. What complicates
+   matters is that the main memory is not large enough to hold information for every disk sector. Thus
+   a single scan that builds a list in memory for each file will not work. Assume that the information
+   for a single file will fit into memory. Thus a way that will work is to make a single scan of the disk
+   for each file, but that would be obvious waste (P1) and too slow.
+   Instead, observe that in the expected case, most files are allocated contiguously. Thus suppose File
+   X has pages 1–1000 located on disk sectors 301–1300. Thus the information about 1000 sectors can
+   be compactly represented by three integers and a file name. Call this a run node.
+   • Assume the expected case holds and that all run nodes can fit in memory. Assume also that the
+     file index for each file is an array (stored on disk) that maps from file block number to disk sector
+     number. Show how to rebuild all the file indexes.
+   • Now suppose the expected case does not hold and that the run nodes do not all fit into memory.
+     Describe a technique, based on the algorithmic idea of divide-and-conquer (P15), that is guaran-
+     teed to work (without reverting to the naive idea of building the index for one file at a time unless
+     strictly necessary).
+This page intentionally left blank
+                                                                                                               CHAPTER
+
+
+Principles in action
+                                                                                                                   4
+                              System architecture and design, like any art, can only be learned by doing. . . . The space of
+                                                                      possibilities unfolds only as the medium is worked.
+                                                                                           —Carver Mead and Lynn Conway
+
+
+                                             Having rounded up my horses, I now set myself to put them through their paces.
+                                                                                                            —Arnold Toynbee
+
+
+
+The previous chapter outlined 15 principles for efficient network protocol implementation. Part 2 of the
+book begins a detailed look at specific network bottlenecks such as data copying and control transfer.
+While the principles are used in these later chapters, the focus of these later chapters is on the specific
+bottleneck being examined. Given that network algorithmics is as much a way of thinking as it is a
+set of techniques, it seems useful to round out Part 1 by seeing the principles in action on small, self-
+contained, but nontrivial network problems.
+    Thus this chapter provides examples of applying the principles in solving specific networking prob-
+lems. The examples are drawn from real problems, and some of the solutions are used in real products.
+Unlike subsequent chapters, this chapter is not a collection of new material followed by a set of exer-
+cises. Instead, this chapter can be thought of as an extended set of exercises.
+    In Sections 4.1 to 4.15 15 problems are motivated and described. Each problem is followed by a
+hint that suggests specific principles, which is then followed by a solution sketch. There are also a few
+exercises after each solution. In classes and seminars on the topic of this chapter, the audience enjoyed
+inventing solutions by themselves (after a few hints were provided), rather than directly seeing the final
+solutions.
+
+
+    Quick reference guide
+    In an ideal world, each problem should have something interesting for every reader. For those readers pressed for time,
+    however, here is some guidance. Hardware designers looking to sample a few problems may wish to try their hand at
+    designing an Ethernet monitor (Section 4.4) or doing a binary search on long identifiers (Section 4.14). Systems people
+    looking for examples of how systems thinking can finesse algorithmic expertise may wish to tackle a problem on applica-
+    tion device channels (Section 4.1) or a problem on compressing the connection table (Section 4.11). Algorithm designers
+    may be interested in the problem of identifying a resource hog (Section 4.10) and a problem on the use of protocol design
+    changes to simplify an implementation problem in link state routing (Section 4.8).
+
+
+
+
+Network Algorithmics. https://doi.org/10.1016/B978-0-12-809927-8.00009-9
+Copyright © 2022 Elsevier Inc. All rights reserved.
+                                                                                                                            75
+76        Chapter 4 Principles in action
+
+
+
+
+4.1 Buffer validation of application device channels
+Usually, application programs can only send network data through the operating system kernel, and only
+the kernel is allowed to talk to the network adaptor. This restriction prevents different applications from
+(maliciously or accidentally) writing or reading each other’s data. However, communication through
+the kernel adds overhead in the form of system calls (see Chapter 2). In application device channels
+(ADCs), the idea is to allow an application to send data to and from the network by directly writing
+to the memory of the network adaptor. Refer to Chapter 5 for more details. One mechanism to ensure
+protection, in lieu of kernel mediation, is to have the kernel set up the adaptor with a set of valid memory
+pages for each application. The network adaptor must then ensure that the application’s data can only
+be sent and received from memory in the valid set.
+    In Fig. 4.1, for example, application P is allowed to send and receive data from a set of valid pages
+X, Y, . . . , L, A. Suppose application P queues a request to the adaptor to receive the next packet for P
+into a buffer in page A. Since this request is sent directly to the adaptor, the kernel cannot check that
+this is a valid buffer for P . Instead, the adaptor must validate this request by ensuring that A is in the
+set of valid pages. If the adaptor does not perform this check, application P could supply an invalid
+page belonging to some other application, and the adaptor would write P ’s data into the wrong page.
+The need for a check leads to the following problem.
+
+Problem
+When application P does a Receive, the adaptor must validate whether the page belongs to the valid
+page set for P . If the set of pages is organized as a linear list (Druschel et al., 1994), then validation can
+cost O(n), where n is the number of pages in the set. For instance, in Fig. 4.1, since A is at the end of
+the list of valid pages, the adaptor must traverse the entire list before it finds A. If n is large, this can be
+expensive and can slow down the rate at which the adaptor can send and receive packets. How can the
+
+
+
+
+FIGURE 4.1
+In application device channels, the network adaptor is given a set of valid pages (X, Y, L, A, etc.) for a given ap-
+plication P . When application P makes a request to receive data into page A, the adaptor must check if A is in the
+valid list before allowing the receive.
+                                     4.1 Buffer validation of application device channels                         77
+
+
+
+validation process be sped up? Try thinking through the solution before reading the hint and solutions
+that follow.
+
+Hint: A good approach to reduce the complexity of validation is to use a better data structure than
+a list (P15). Which data structure would you choose? However, one can improve worst-case behavior
+even further and get smaller constant factors by using system thinking and by passing hints in
+interfaces (P9).
+    An algorithmic thinker will immediately consider implementing the set of valid pages as a hash
+table instead of a list. This provides an O(1) average search time. Hashing has two disadvan-
+tages: (1) good hash functions that have small collision probabilities are expensive computationally;
+(2) hashing does not provide a good worst-case bound. Binary search does provide logarithmic worst-
+case search times, but this is expensive (it also requires keeping the set sorted) if the set of pages
+is large and packet transmission rates are higher. Instead, we replace the hash table lookup by an
+indexed array lookup, as follows (try using P9 before you read on).
+
+
+Solution
+The adaptor stores the set of valid pages for each application in an array, as shown in Fig. 4.2. This array
+is updated only when the kernel updates the set of valid pages for the application. When the application
+does a Receive into page A, it also passes to the adaptor a handle (P9). The handle is the index of the
+array position where A is stored. The adaptor can use this to quickly confirm whether the page in the
+Receive request matches the page stored in the handle. The cost of validation is a bounds check (to see
+if the handle is a valid index), one array lookup, and one compare.
+
+Exercises
+
+• Is the handle a hint or a tip? Let’s invoke principle P1: If this is a handle, why pass the page number
+  (e.g., A) in the interface? Why does removing the page number speed up the confirmation task
+  slightly?
+
+
+
+
+FIGURE 4.2
+Finessing the need for a hash table lookup by passing a handle across the interface between the application and
+adaptor.
+78        Chapter 4 Principles in action
+
+
+
+• To find the array corresponding to application P normally requires a hash table search using P as
+  the key. This weakens the argument for getting rid of the hash table search to check if the page is
+  valid—unless, of course, the hash search of P can be finessed as well. How can this be done?
+
+
+
+4.2 Scheduler for asynchronous transfer mode flow control
+In asynchronous transfer mode (ATM), an ATM adaptor may have hundreds of simultaneous virtual
+circuits (VCs) that can send data (called cells). Each VC is often flow controlled in some way to limit
+the rate at which it can send. For example, in rate-based flow control, a VC may receive credits to send
+cells at fixed time intervals. On the other hand, in credit-based flow control (Kung et al., 1994; Ozveren
+et al., 1994), credits may be sent by the next node in the path when buffers free up.
+    Thus in Fig. 4.3 the adaptor has a table that holds the VC state. There are four VCs that have been
+set up (1, 3, 5, 7). Of these, only VCs 1, 5, and 7 have some cells to send. Finally, only VCs 1 and
+7 have credits to send cells. Thus the next cell to be sent by the adaptor should be from either one of
+the eligible VCs: 1 or 7. The selection from the eligible VCs should be done fairly, for example, in
+round-robin fashion. If the adaptor chooses to send a cell from VC 7, the adaptor would decrement the
+credits of VC 7 to 1. Since there are no more cells to be sent, VC 7 now becomes ineligible. Choosing
+the next eligible VC leads to the following problem.
+
+Problem
+A naive scheduler may cycle through the VC array looking for a VC that is eligible. If many of the VCs
+are ineligible, this can be quite inefficient, for the scheduler may have to step through several VCs that
+are ineligible to send one cell from an eligible VC. How can this inefficiency be avoided?
+Hint: Consider invoking P12 to add some extra state to speed up the scheduler main loop. What
+state can you add to avoid stepping through ineligible VCs? How would you maintain this state
+efficiently?
+
+
+
+
+FIGURE 4.3
+An ATM VC is eligible to send data if it is active (has some outstanding cells to send in the queue shown below the
+VC) and has credits (shown by gray dots above the VC). The problem is to select the next eligible VC in some fair
+manner without stepping through VCs that are ineligible.
+

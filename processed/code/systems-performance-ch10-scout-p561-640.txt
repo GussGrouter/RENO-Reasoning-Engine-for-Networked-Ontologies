@@ -1,0 +1,6662 @@
+522
+
+Chapter 10 Network
+
+Network Device Drivers
+The network device driver usually has an additional buffer—a ring buffer—for sending and
+receiving packets between kernel memory and the NIC. This was pictured in Figure 10.8 as the
+driver queue.
+A performance feature that has become more common with high-speed networking is the use of
+interrupt coalescing mode. Instead of interrupting the kernel for every arrived packet, an interrupt
+is sent only when either a timer (polling) or a certain number of packets is reached. This reduces
+the rate at which the kernel communicates with the NIC, allowing larger transfers to be buffered, resulting in greater throughput, though at some cost in latency.
+The Linux kernel uses a new API (NAPI) framework that uses an interrupt mitigation technique:
+for low packet rates, interrupts are used (processing is scheduled via a softirq); for high packet rates,
+interrupts are disabled, and polling is used to allow coalescing [Corbet 03][Corbet 06b]. This provides low latency or high throughput, depending on the workload. Other features of NAPI include:
+■
+
+■
+
+■
+
+Packet throttling, which allows early packet drop in the network adapter to prevent the
+system from being overwhelmed by packet storms.
+Interface scheduling, where a quota is used to limit the buffers processed in a polling
+cycle, to ensure fairness between busy network interfaces.
+Support for the SO_BUSY_POLL socket option, where user-level applications can reduce
+network receive latency by requesting to busy wait (spin on CPU until an event occurs) on
+a socket [Dumazet 17a].
+
+Coalescing can be especially important for improving virtual machine networking, and is used
+by the ena network driver used by AWS EC2.
+
+NIC Send and Receive
+For sent packets, the NIC is notified and typically reads the packet (frame) from kernel memory
+using direct memory access (DMA) for efficiency. NICs provide transmit descriptors for managing
+DMA packets; if the NIC does not have free descriptors, the network stack will pause transmission to allow the NIC to catch up.7
+For received packets, NICs can use DMA to place the packet into kernel ring-buffer memory and
+then notify the kernel using an interrupt (which may be ignored to allow coalescing). The interrupt triggers a softirq to deliver the packet to the network stack for further processing.
+
+CPU Scaling
+High packet rates can be achieved by engaging multiple CPUs to process packets and the TCP/
+IP stack. Linux supports various methods for multi-CPU packet processing (see Documentation/
+networking/scaling.txt):
+■
+
+RSS: Receive Side Scaling: For modern NICs that support multiple queues and can hash
+packets to different queues, which are in turn processed by different CPUs, interrupting
+
+7
+Byte Queue Limits (BQL), summarized under the heading Other Optimizations, usually prevent TX descriptor
+exhaustion.
+
+10.4
+
+Architecture
+
+them directly. This hash may be based on the IP address and TCP port numbers, so that
+packets from the same connection end up being processed by the same CPU.8
+■
+
+■
+
+■
+
+■
+
+RPS: Receive Packet Steering: A software implementation of RSS, for NICs that do
+not support multiple queues. This involves a short interrupt service routine to map the
+inbound packet to a CPU for processing. A similar hash can be used to map packets to
+CPUs, based on fields from the packet headers.
+RFS: Receive Flow Steering: This is similar to RPS, but with affinity for where the socket
+was last processed on-CPU, to improve CPU cache hit rates and memory locality.
+Accelerated Receive Flow Steering: This achieves RFS in hardware, for NICs that support
+this functionality. It involves updating the NIC with flow information so that it can determine which CPU to interrupt.
+XPS: Transmit Packet Steering: For NICs with multiple transmit queues, this supports
+transmission by multiple CPUs to the queues.
+
+Without a CPU load-balancing strategy for network packets, a NIC may interrupt only one CPU,
+which can reach 100% utilization and become a bottleneck. This may show up as high softirq
+CPU time on a single CPU (e.g., using Linux mpstat(1): see Chapter 6, CPUs, Section 6.6.3,
+mpstat). This may especially happen for load balancers or proxy servers (e.g., nginx), as their
+intended workload is a high rate of inbound packets.
+Mapping interrupts to CPUs based on factors such as cache coherency, as is done by RFS, can
+noticeably improve network performance. This can also be accomplished by the irqbalance
+process, which assigns interrupt request (IRQ) lines to CPUs.
+
+Kernel Bypass
+Figure 10.8 shows the path most commonly taken through the TCP/IP stack. Applications can
+bypass the kernel network stack using technologies such as the Data Plane Development Kit
+(DPDK) in order to achieve higher packet rates and performance. This involves an application
+implementing its own network protocols in user-space, and making writes to the network driver
+via a DPDK library and a kernel user space I/O (UIO) or virtual function I/O (VFIO) driver. The
+expense of copying packet data can be avoided by directly accessing memory on the NIC.
+The eXpress Data Path (XDP) technology provides another path for network packets: a programmable fast path that uses extended BPF and that integrates into the existing kernel stack rather
+than bypassing it [Høiland-Jørgensen 18]. (DPDK now supports XDP for receiving packets,
+moving some functionality back to the kernel [DPDK 20].)
+With kernel network stack bypass, instrumentation using traditional tools and metrics is not
+available because the counters and tracing events they use are also bypassed. This makes
+performance analysis more difficult.
+Apart from full stack bypass, there are capabilities for avoiding the expense of copying data: the
+MSG_ZEROCOPY send(2) flag, and zero-copy receive via mmap(2) [Linux 20c][Corbet 18b].
+
+8
+
+The Netflix FreeBSD CDN uses RSS to assist TCP large receive offload (LRO), allowing packets for the same
+connection to be aggregated, even when separated by other packets [Gallatin 17].
+
+523
+
+524
+
+Chapter 10 Network
+
+Other Optimizations
+There are other algorithms in use throughout the Linux network stack to improve performance.
+Figure 10.11 shows these for the TCP send path (many of these are called from the tcp_write_
+xmit() kernel function).
+
+Figure 10.11 TCP send path
+Some of these components and algorithms were described earlier (socket send buffers, TSO,9
+congestion controls, Nagle, and qdiscs); others include:
+■
+
+■
+
+■
+
+■
+
+Pacing: This controls when to send packets, spreading out transmissions (pacing) to avoid
+bursts that may hurt performance (this may help avoid TCP micro-bursts that can lead to
+queueing delay, or even cause network switches to drop packets. It may also help with the
+incast problem, when many end points transmit to one at the same time [Fritchie 12]).
+TCP Small Queues (TSQ): This controls (reduces) how much is queued by the network
+stack to avoid problems including bufferbloat [Bufferbloat 20].
+Byte Queue Limits (BQL): These automatically size the driver queues large enough to avoid
+starvation, but also small enough to reduce the maximum latency of queued packets, and
+to avoid exhausting NIC TX descriptors [Hrubý 12]. It works by pausing the addition of
+packets to the driver queue when necessary, and was added in Linux 3.3 [Siemon 13].
+Earliest Departure Time (EDT): This uses a timing wheel instead of a queue to order
+packets sent to the NIC. Timestamps are set on every packet based on policy and rate
+configuration. This was added in Linux 4.20, and has BQL- and TSQ-like capabilities
+[Jacobson 18].
+
+These algorithms often work in combination to improve performance. A TCP sent packet can be
+processed by any of the congestion controls, TSO, TSQ, pacing, and queueing disciplines, before
+it ever arrives at the NIC [Cheng 16].
+
+10.5
+
+Methodology
+
+This section describes methodologies and exercises for network analysis and tuning. Table 10.2
+summarizes the topics.
+
+9
+
+Note that TSO appears twice in the diagram: first, after Pacing to build a super packet, and then in the NIC for final
+segmentation.
+
+10.5
+
+Methodology
+
+Table 10.2
+
+Network performance methodologies
+
+Section
+
+Methodology
+
+Types
+
+10.5.1
+
+Tools method
+
+Observational analysis
+
+10.5.2
+
+USE method
+
+Observational analysis
+
+10.5.3
+
+Workload characterization
+
+Observational analysis, capacity planning
+
+10.5.4
+
+Latency analysis
+
+Observational analysis
+
+10.5.5
+
+Performance monitoring
+
+Observational analysis, capacity planning
+
+10.5.6
+
+Packet sniffing
+
+Observational analysis
+
+10.5.7
+
+TCP analysis
+
+Observational analysis
+
+10.5.8
+
+Static performance tuning
+
+Observational analysis, capacity planning
+
+10.5.9
+
+Resource controls
+
+Tuning
+
+10.5.10
+
+Micro-benchmarking
+
+Experimental analysis
+
+See Chapter 2, Methodologies, for more strategies and the introduction to many of these.
+These may be followed individually or used in combination. My suggestion is to use the following strategies to start with, in this order: performance monitoring, the USE method, static
+performance tuning, and workload characterization.
+Section 10.6, Observability Tools, shows operating system tools for applying these methods.
+
+10.5.1 Tools Method
+The tools method is a process of iterating over available tools, examining key metrics they
+provide. It may overlook issues for which the tools provide poor or no visibility, and it can be
+time-consuming to perform.
+For networking, the tools method can involve checking:
+■
+
+■
+
+■
+
+■
+
+■
+
+nstat/netstat -s: Look for a high rate of retransmits and out-of-order packets. What
+constitutes a “high” retransmit rate depends on the clients: an Internet-facing system with
+unreliable remote clients should have a higher retransmit rate than an internal system
+with clients in the same data center.
+ip -s link/netstat -i: Check interface error counters, including “errors,” “dropped,”
+“overruns.”
+ss -tiepm: Check for the limiter flag for important sockets to see what their bottleneck is,
+as well as other statistics showing socket health.
+nicstat/ip -s link: Check the rate of bytes transmitted and received. High throughput
+may be limited by a negotiated data link speed, or an external network throttle. It could
+also cause contention and delays between network users on the system.
+tcplife: Log TCP sessions with process details, duration (lifespan), and throughput
+statistics.
+
+525
+
+526
+
+Chapter 10 Network
+
+■
+
+■
+
+■
+
+tcptop: Watch top TCP sessions live.
+tcpdump: While this can be expensive to use in terms of the CPU and storage costs, using
+tcpdump(8) for short periods may help you identify unusual network traffic or protocol
+headers.
+perf(1)/BCC/bpftrace: Inspect selected packets between the application and the wire,
+including examining kernel state.
+
+If an issue is found, examine all fields from the available tools to learn more context. See
+Section 10.6, Observability Tools, for more about each tool. Other methodologies can identify
+more types of issues.
+
+10.5.2
+
+USE Method
+
+The USE method is for quickly identifying bottlenecks and errors across all components. For
+each network interface, and in each direction—transmit (TX) and receive (RX)—check for:
+■
+
+■
+
+■
+
+Utilization: The time the interface was busy sending or receiving frames
+Saturation: The degree of extra queueing, buffering, or blocking due to a fully utilized
+interface
+Errors: For receive: bad checksum, frame too short (less than the data link header) or
+too long, collisions (unlikely with switched networks); for transmit: late collisions
+(bad wiring)
+
+Errors may be checked first, since they are typically quick to check and the easiest to interpret.
+Utilization is not commonly provided by operating system or monitoring tools directly (nicstat(1)
+is an exception). It can be calculated as the current throughput divided by the current negotiated speed, for each direction (RX, TX). The current throughput should be measured as bytes per
+second on the network, including all protocol headers.
+For environments that implement network bandwidth limits (resource controls), as occurs in
+some cloud computing environments, network utilization may need to be measured in terms of
+the imposed limit, in addition to the physical limit.
+Saturation of the network interface is difficult to measure. Some network buffering is normal, as
+applications can send data much more quickly than an interface can transmit it. It may be possible to measure as the time application threads spend blocked on network sends, which should
+increase as saturation increases. Also check if there are other kernel statistics more closely related
+to interface saturation, for example, Linux “overruns.” Note that Linux uses BQL to regulate the
+NIC queue size, which helps avoid NIC saturation.
+Retransmits at the TCP level are usually readily available as statistics and can be an indicator of
+network saturation. However, they are measured across the network between the server and its
+clients and could be caused by problems at any hop.
+The USE method can also be applied to network controllers, and the transports between them
+and the processors. Since observability tools for these components are sparse, it may be easier
+to infer metrics based on network interface statistics and topology. For example, if network
+
+10.5
+
+Methodology
+
+controller A houses ports A0 and A1, the network controller throughput can be calculated as the
+sum of the interface throughputs A0 + A1. With a known maximum throughput, utilization of
+the network controller can then be calculated.
+
+10.5.3
+
+Workload Characterization
+
+Characterizing the load applied is an important exercise when capacity planning, benchmarking, and simulating workloads. It can also lead to some of the largest performance gains by
+identifying unnecessary work that can be eliminated.
+The following are the most basic characteristics to measure:
+■
+
+Network interface throughput: RX and TX, bytes per second
+
+■
+
+Network interface IOPS: RX and TX, frames per second
+
+■
+
+TCP connection rate: Active and passive, connections per second
+
+The terms active and passive were described in the Three-Way Handshake section of Section
+10.4.1, Protocols.
+These characteristics can vary over time, as usage patterns change throughout the day.
+Monitoring over time is described in Section 10.5.5, Performance Monitoring.
+Here is an example workload description, to show how these attributes can be expressed
+together:
+The network throughput varies based on users and performs more writes (TX) than reads
+(RX). The peak write rate is 200 Mbytes/s and 210,000 packets/s, and the peak read rate
+is 10 Mbytes/s with 70,000 packets/s. The inbound (passive) TCP connection rate
+reaches 3,000 connections/s.
+Apart from describing these characteristics system-wide, they can also be expressed per interface. This allows interface bottlenecks to be determined, if the throughput can be observed to
+have reached line rate. If network bandwidth limits (resource controls) are present, they may
+throttle network throughput before line rate is reached.
+
+Advanced Workload Characterization/Checklist
+Additional details may be included to characterize the workload. These have been listed here
+as questions for consideration, which may also serve as a checklist when studying CPU issues
+thoroughly:
+■
+
+■
+
+What is the average packet size? RX, TX?
+What is the protocol breakdown for each layer? For transport protocols: TCP, UDP (which
+can include QUIC).
+
+■
+
+What TCP/UDP ports are active? Bytes per second, connections per second?
+
+■
+
+What are the broadcast and multicast packet rates?
+
+■
+
+Which processes are actively using the network?
+
+527
+
+528
+
+Chapter 10 Network
+
+The sections that follow answer some of these questions. See Chapter 2, Methodologies, for a
+higher-level summary of this methodology and the characteristics to measure (who, why,
+what, how).
+
+10.5.4
+
+Latency Analysis
+
+Various times (latencies) can be studied to help understand and express network performance.
+Some were introduced in Section 10.3.5, Latency, and a longer list is provided as Table 10.3.
+Measure as many of these as you can to narrow down the real source of latency.
+
+Table 10.3
+
+Network latencies
+
+Latency
+
+Description
+
+Name resolution latency
+
+The time for a host to be resolved to an IP address, usually by DNS
+resolution—a common source of performance issues.
+
+Ping latency
+
+The time from an ICMP echo request to a response. This measures
+the network and kernel stack handling of the packet on each host.
+
+TCP connection
+initialization latency
+
+The time from when a SYN is sent to when the SYN,ACK is received.
+Since no applications are involved, this measures the network and
+kernel stack latency on each host, similar to ping latency, with some
+additional kernel processing for the TCP session. TCP Fast Open
+(TFO) may be used to reduce this latency.
+
+TCP first-byte latency
+
+Also known as the time-to-first-byte latency (TTFB), this measures
+the time from when a connection is established to when the first
+data byte is received by the client. This includes CPU scheduling
+and application think time for the host, making it a more a measure
+of application performance and current load than TCP connection
+latency.
+
+TCP retransmits
+
+If present, can add thousands of milliseconds of latency to network
+I/O.
+
+TCP TIME_WAIT latency
+
+The duration that locally closed TCP sessions are left waiting for late
+packets.
+
+Connection/session
+lifespan
+
+The duration of a network connection from initialization to close.
+Some protocols like HTTP can use a keep-alive strategy, leaving
+connections open and idle for future requests, to avoid the overheads
+and latency of repeated connection establishment.
+
+System call send/
+receive latency
+
+Time for the socket read/write calls (any syscalls that read/write to
+sockets, including read(2), write(2), recv(2), send(2), and variants).
+
+System call connect
+latency
+
+For connection establishment; note that some applications perform
+this as a non-blocking syscall.
+
+Network round-trip time
+
+The time for a network request to make a round-trip between
+endpoints. The kernel may use such measurements with congestion
+control algorithms.
+
+10.5
+
+Methodology
+
+Latency
+
+Description
+
+Interrupt latency
+
+Time from a network controller interrupt for a received packet to when
+it is serviced by the kernel.
+
+Inter-stack latency
+
+Time for a packet to move through the kernel TCP/IP stack.
+
+Latency may be presented as:
+■
+
+■
+
+■
+
+Per-interval averages: Best performed per client/server pair, to isolate differences in the
+intermediate network
+Full distributions: As histograms or heat maps
+Per-operation latency: Listing details for each event, including source and destination IP
+addresses
+
+A common source of issues is the presence of latency outliers caused by TCP retransmits. These
+can be identified using full distributions or per-operation latency tracing, including by filtering
+for a minimum latency threshold.
+Latencies may be measured using tracing tools and, for some latencies, socket options. On Linux,
+the socket options include SO_TIMESTAMP for incoming packet time (and SO_TIMESTAMPNS
+for nanosecond resolution) and SO_TIMESTAMPING for per-event timestamps [Linux 20j].
+SO_TIMESTAMPING can identify transmission delays, network round-trip time, and inter-stack
+latencies; this can be especially helpful when analyzing complex packet latency involving tunneling [Hassas Yeganeh 19].
+Note that some sources of extra latency are transient and only occur during system load. For
+more realistic measurements of network latency, it is important to measure not only an idle
+system, but also a system under load.
+
+10.5.5
+
+Performance Monitoring
+
+Performance monitoring can identify active issues and patterns of behavior over time, including
+daily patterns of end users, and scheduled activities including network backups.
+Key metrics for network monitoring are
+■
+
+Throughput: Network interface bytes per second for both receive and transmit, ideally for
+each interface
+
+■
+
+Connections: TCP connections per second, as another indication of network load
+
+■
+
+Errors: Including dropped packet counters
+
+■
+
+TCP retransmits: Also useful to record for correlation with network issues
+
+■
+
+TCP out-of-order packets: Can also cause performance problems
+
+For environments that implement network bandwidth limits (resource controls), as in some
+cloud computing environments, statistics related to the imposed limits may also be collected.
+
+529
+
+530
+
+Chapter 10 Network
+
+10.5.6
+
+Packet Sniffing
+
+Packet sniffing (aka packet capture) involves capturing the packets from the network so that
+their protocol headers and data can be inspected on a packet-by-packet basis. For observational
+analysis this may be the last resort, as it can be expensive to perform in terms of CPU and storage
+overhead. Network kernel code paths are typically cycle-optimized, since they need to handle
+up to millions of packets per second and are sensitive to any extra overhead. To reduce this overhead, ring buffers may be used by the kernel to pass packet data to the user-level trace tool via a
+shared memory map—for example,10 using BPF with perf(1)’s output ring buffer, and also using
+AF_XDP [Linux 20k]. A different way to solve overhead is to use an out-of-band packet sniffer: a
+separate server connected to a “tap” or “mirror” port of a switch. Public cloud providers such as
+Amazon and Google provide this as a service [Amazon 19][Google 20b].
+Packet sniffing typically involves capturing packets to a file, and then analyzing that file in different ways. One way is to produce a log, which can contain the following for each packet:
+■
+
+Timestamp
+
+■
+
+Entire packet, including
+q All protocol headers (e.g., Ethernet, IP, TCP)
+q Partial or full payload data
+
+■
+
+Metadata: number of packets, number of drops
+
+■
+
+Interface name
+
+As an example of packet capture, the following shows the default output of the Linux tcpdump(8)
+tool:
+# tcpdump -ni eth4
+tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+listening on eth4, link-type EN10MB (Ethernet), capture size 65535 bytes
+01:20:46.769073 IP 10.2.203.2.22 > 10.2.0.2.33771: Flags [P.], seq
+4235343542:4235343734, ack 4053030377, win 132, options [nop,nop,TS val 328647671 ecr
+2313764364], length 192
+01:20:46.769470 IP 10.2.0.2.33771 > 10.2.203.2.22: Flags [.], ack 192, win 501,
+options [nop,nop,TS val 2313764392 ecr 328647671], length 0
+01:20:46.787673 IP 10.2.203.2.22 > 10.2.0.2.33771: Flags [P.], seq 192:560, ack 1,
+win 132, options [nop,nop,TS val 328647672 ecr 2313764392], length 368
+01:20:46.788050 IP 10.2.0.2.33771 > 10.2.203.2.22: Flags [.], ack 560, win 501,
+options [nop,nop,TS val 2313764394 ecr 328647672], length 0
+01:20:46.808491 IP 10.2.203.2.22 > 10.2.0.2.33771: Flags [P.], seq 560:896, ack 1,
+win 132, options [nop,nop,TS val 328647674 ecr 2313764394], length 336
+[...]
+
+10
+
+Another option is to use PF_RING instead of the per-packet PF_PACKET, although PF_RING has not been included
+in the Linux kernel [Deri 04].
+
+10.5
+
+Methodology
+
+This output has a line summarizing each packet, including details of the IP addresses, TCP ports,
+and other TCP header details. This can be used to debug a variety of issues including message
+latency and missing packets.
+Because packet capture can be a CPU-expensive activity, most implementations include the
+ability to drop events instead of capturing them when overloaded. The count of dropped packets
+may be included in the log.
+Apart from the use of ring buffers to reduce overhead, packet capture implementations commonly
+allow a filtering expression to be supplied by the user and perform this filtering in the kernel. This
+reduces overhead by not transferring unwanted packets to user level. The filter expression is typically optimized using Berkeley Packet Filter (BPF), which compiles the expression to BPF bytecode
+that can be JIT-compiled to machine code by the kernel. In recent years, BPF has been extended
+in Linux to become a general-purpose execution environment, which powers many observability
+tools: see Chapter 3, Operating Systems, Section 3.4.4, Extended BPF, and Chapter 15, BPF.
+
+10.5.7
+
+TCP Analysis
+
+Apart from what was covered in Section 10.5.4, Latency Analysis, other specific TCP behavior
+can be investigated, including:
+■
+
+Usage of TCP (socket) send/receive buffers
+
+■
+
+Usage of TCP backlog queues
+
+■
+
+Kernel drops due to the backlog queue being full
+
+■
+
+Congestion window size, including zero-size advertisements
+
+■
+
+SYNs received during a TCP TIME_WAIT interval
+
+The last behavior can become a scalability problem when a server is connecting frequently to
+another on the same destination port, using the same source and destination IP addresses. The
+only distinguishing factor for each connection is the client source port—the ephemeral port—
+which for TCP is a 16-bit value and may be further constrained by operating system parameters
+(minimum and maximum). Combined with the TCP TIME_WAIT interval, which may be
+60 seconds, a high rate of connections (more than 65,536 during 60 seconds) can encounter a
+clash for new connections. In this scenario, a SYN is sent while that ephemeral port is still associated with a previous TCP session that is in TIME_WAIT, and the new SYN may be rejected if it
+is misidentified as part of the old connection (a collision). To avoid this issue, the Linux kernel
+attempts to reuse or recycle connections quickly (which usually works well). The use of multiple
+IP addresses by the server is another possible solution, as is the SO_LINGER socket option with a
+low linger time.
+
+10.5.8
+
+Static Performance Tuning
+
+Static performance tuning focuses on issues of the configured environment. For network performance, examine the following aspects of the static configuration:
+■
+
+How many network interfaces are available for use? Are currently in use?
+
+■
+
+What is the maximum speed of the network interfaces?
+
+531
+
+532
+
+Chapter 10 Network
+
+■
+
+What is the currently negotiated speed of the network interfaces?
+
+■
+
+Are network interfaces negotiated as half or full duplex?
+
+■
+
+What MTU is configured for the network interfaces?
+
+■
+
+Are network interfaces trunked?
+
+■
+
+What tunable parameters exist for the device driver? IP layer? TCP layer?
+
+■
+
+Have any tunable parameters been changed from the defaults?
+
+■
+
+How is routing configured? What is the default gateway?
+
+■
+
+What is the maximum throughput of network components in the data path (all
+components, including switch and router backplanes)?
+
+■
+
+What is the maximum MTU for the datapath and does fragmentation occur?
+
+■
+
+Are any wireless connections in the data path? Are they suffering interference?
+
+■
+
+Is forwarding enabled? Is the system acting as a router?
+
+■
+
+How is DNS configured? How far away is the server?
+
+■
+
+■
+
+■
+
+■
+
+Are there known performance issues (bugs) with the version of the network interface
+firmware, or any other network hardware?
+Are there known performance issues (bugs) with the network device driver? Kernel
+TCP/IP stack?
+What firewalls are present?
+Are there software-imposed network throughput limits present (resource controls)? What
+are they?
+
+The answers to these questions may reveal configuration choices that have been overlooked.
+The last question is especially relevant for cloud computing environments, where there may be
+imposed limits on network throughput.
+
+10.5.9
+
+Resource Controls
+
+The operating system may provide controls to limit network resources for types of connections,
+processes, or groups of processes. These can include the following types of controls:
+■
+
+■
+
+■
+
+Network bandwidth limits: A permitted bandwidth (maximum throughput) for different protocols or applications, applied by the kernel.
+IP quality of service (QoS): The prioritization of network traffic, performed by network
+components (e.g., routers). This can be implemented in different ways: the IP header
+includes type-of-service (ToS) bits, including a priority; those bits have since been redefined
+for newer QoS schemes, including Differentiated Services (see Section 10.4.1, Protocols,
+under the heading IP). There may be other priorities implemented by other protocol layers, for the same purpose.
+Packet latency: Additional packet latency (e.g., using Linux tc-netem(8)), which can be
+used to simulate other networks when testing performance.
+
+10.6 Observability Tools
+
+Your network may have a mix of traffic that can be classified as low or high priority. Low priority
+may include the transfer of backups and performance-monitoring traffic. High priority may be
+the traffic between the production server and clients. Either resource control scheme can be
+used to throttle the low-priority traffic, producing more favorable performance for the highpriority traffic.
+How these work is implementation-specific: see Section 10.8, Tuning.
+
+10.5.10 Micro-Benchmarking
+There are many benchmark tools for networking. They are especially useful when investigating
+throughput issues for a distributed application environment, to confirm that the network can at
+least achieve the expected network throughput. If it cannot, network performance can be investigated via a network micro-benchmark tool, which is typically much less complex and faster
+to debug than the application. After the network has been tuned to the desired speed, attention
+can return to the application.
+Typical factors that can be tested include:
+■
+
+Direction: Send or receive
+
+■
+
+Protocol: TCP or UDP, and port
+
+■
+
+Number of threads
+
+■
+
+Buffer size
+
+■
+
+Interface MTU size
+
+Faster network interfaces, such as 100 Gbits/s, may require multiple client threads to be driven to
+maximum bandwidth.
+An example network micro-benchmark tool, iperf(1), is introduced in Section 10.7.4, iperf, and
+others are listed in Section 10.7, Experimentation.
+
+10.6
+
+Observability Tools
+
+This section introduces network performance observability tools for Linux-based operating
+systems. See the previous section for strategies to follow when using them.
+The tools in this section are listed in Table 10.4.
+
+Table 10.4
+
+Network observability tools
+
+Section
+
+Tool
+
+Description
+
+10.6.1
+
+ss
+
+Socket statistics
+
+10.6.2
+
+ip
+
+Network interface and route statistics
+
+10.6.3
+
+ifconfig
+
+Network interface statistics
+
+10.6.4
+
+nstat
+
+Network stack statistics
+
+533
+
+534
+
+Chapter 10 Network
+
+Section
+
+Tool
+
+Description
+
+10.6.5
+
+netstat
+
+Various network stack and interface statistics
+
+10.6.6
+
+sar
+
+Historical statistics
+
+10.6.7
+
+nicstat
+
+Network interface throughput and utilization
+
+10.6.8
+
+ethtool
+
+Network interface driver statistics
+
+10.6.9
+
+tcplife
+
+Trace TCP session lifespans with connection details
+
+10.6.10
+
+tcptop
+
+Show TCP throughput by host and process
+
+10.6.11
+
+tcpretrans
+
+Trace TCP retransmits with address and TCP state
+
+10.6.12
+
+bpftrace
+
+TCP/IP stack tracing: connections, packets, drops, latency
+
+10.6.13
+
+tcpdump
+
+Network packet sniffer
+
+10.6.14
+
+Wireshark
+
+Graphical network packet inspection
+
+This is a selection of tools and capabilities to support Section 10.5, Methodology, beginning
+with traditional tools and statistics, then tracing tools, and finally packet capture tools. Some of
+the traditional tools are likely available on other Unix-like operating systems where they originated, including: ifconfig(8), netstat(8), and sar(1). The tracing tools are BPF-based, and use BCC
+and bpftrace frontends (Chapter 15); they are: socketio(8), tcplife(8), tcptop(8), and tcpretrans(8).
+The first statistical tools covered are ss(8), ip(8), and nstat(8), as these are from the iproute2 package that is maintained by the network kernel engineers. Tools from this package are most likely
+to support the latest Linux kernel features. Similar tools from the net-tools package, namely
+ifconfig(8) and netstat(8), are also covered as they are in widespread use, although Linux kernel
+network engineers consider these deprecated.
+
+10.6.1
+
+ss
+
+ss(8) is a socket statistics tool that summarizes open sockets. The default output provides highlevel information about sockets, for example:
+# ss
+Netid State
+
+Recv-Q
+
+Send-Q
+
+Local Address:Port
+
+Peer Address:Port
+
+[...]
+tcp
+
+ESTAB
+
+0
+
+0
+
+100.85.142.69:65264
+
+100.82.166.11:6001
+
+tcp
+
+ESTAB
+
+0
+
+0
+
+100.85.142.69:6028
+
+100.82.16.200:6101
+
+[...]
+
+This output is a snapshot of the current state. The first column shows the protocol used by
+the sockets: these are TCP. Since this output lists all established connections with IP address
+information, it can be used to characterize the current workload, and answer questions including how many client connections are open, how many concurrent connections there are to a
+dependency service, etc.
+
+10.6 Observability Tools
+
+Similar per-socket information is available using the older netstat(8) tool. ss(8), however, can
+show much more information when using options. For example, showing TCP sockets only (-t),
+with TCP internal info (-i), extended socket info (-e), process info (-p), and memory usage (-m):
+# ss -tiepm
+State
+
+Recv-Q
+
+Send-Q
+
+Local Address:Port
+
+Peer Address:Port
+
+ESTAB
+
+0
+
+0
+
+100.85.142.69:65264
+
+100.82.166.11:6001
+
+users:(("java",pid=4195,fd=10865)) uid:33 ino:2009918 sk:78 <->
+skmem:(r0,rb12582912,t0,tb12582912,f266240,w0,o0,bl0,d0) ts sack bbr ws
+cale:9,9 rto:204 rtt:0.159/0.009 ato:40 mss:1448 pmtu:1500 rcvmss:1448 advmss:14
+48 cwnd:152 bytes_acked:347681 bytes_received:1798733 segs_out:582 segs_in:1397
+data_segs_out:294 data_segs_in:1318 bbr:(bw:328.6Mbps,mrtt:0.149,pacing_gain:2.8
+8672,cwnd_gain:2.88672) send 11074.0Mbps lastsnd:1696 lastrcv:1660 lastack:1660
+pacing_rate 2422.4Mbps delivery_rate 328.6Mbps app_limited busy:16ms rcv_rtt:39.
+822 rcv_space:84867 rcv_ssthresh:3609062 minrtt:0.139
+[...]
+
+Highlighted in bold are the endpoint addresses and the following details:
+■
+
+"java",pid=4195: Process name “java”, PID 4195.
+
+■
+
+fd=10865: File descriptor 10865 (for PID 4195).
+
+■
+
+rto:204: TCP retransmission timeout: 204 milliseconds.
+
+■
+
+rtt:0.159/0.009: Average round-trip time is 0.159 milliseconds, with 0.009 milliseconds
+mean deviation.
+
+■
+
+mss:1448: Maximum segment size: 1448 bytes.
+
+■
+
+cwnd:152: Congestion window size: 152 × MSS.
+
+■
+
+bytes_acked:347681: 340 Kbytes successfully transmitted.
+
+■
+
+bytes_received:1798733: 1.72 Mbytes received.
+
+■
+
+bbr:...: BBR congestion control statistics.
+
+■
+
+pacing_rate 2422.4Mbps: Pacing rate of 2422.4 Mbps.
+
+■
+
+■
+
+app_limited: Shows that the congestion window is not fully utilized, suggesting that the
+connection is application-bound.
+minrtt:0.139: Minimum round-trip time in millisecond. Compare to the average and
+mean deviation (listed earlier) to get an idea of network variation and congestion.
+
+This particular connection is flagged as application-limited (app_limited), with a low RTT to the
+remote endpoint, and low total bytes transferred. The possible “limited” flags ss(1) can print are:
+■
+
+■
+
+app_limited: Application limited.
+rwnd_limited:Xms: Limited by the receive window. Includes the time limited in
+milliseconds.
+
+535
+
+536
+
+Chapter 10 Network
+
+■
+
+sndbuf_limited:Xms: Limited by the send buffer. Includes the time limited in
+milliseconds.
+
+One detail missing from the output is the age of the connection, which is needed to calculate
+the average throughput. A workaround I’ve found is to use the change timestamp on the file
+descriptor file in /proc: for this connection, I would run stat(1) on /proc/4195/fd/10865.
+
+netlink
+ss(8) reads these extended details from the netlink(7) interface, which operates via sockets of
+family AF_NETLINK to fetch information from the kernel. You can see this in action using
+strace(1) (see Chapter 5, Applications, Section 5.5.4, strace, for warnings on strace(1) overhead):
+# strace -e sendmsg,recvmsg ss -t
+sendmsg(3, {msg_name={sa_family=AF_NETLINK, nl_pid=0, nl_groups=00000000},
+msg_namelen=12, msg_iov=[{iov_base={{len=72, type=SOCK_DIAG_BY_FAMILY,
+flags=NLM_F_REQUEST|NLM_F_DUMP, seq=123456, pid=0}, {sdiag_family=AF_INET,
+sdiag_protocol=IPPROTO_TCP, idiag_ext=1<<(INET_DIAG_MEMINFO-1)|...
+recvmsg(3, {msg_name={sa_family=AF_NETLINK, nl_pid=0, nl_groups=00000000},...
+[...]
+
+netstat(8) sources information using /proc/net files instead:
+# strace -e openat netstat -an
+[...]
+openat(AT_FDCWD, "/proc/net/tcp", O_RDONLY) = 3
+openat(AT_FDCWD, "/proc/net/tcp6", O_RDONLY) = 3
+[...]
+
+Because the /proc/net files are text, I’ve found them handy as a source for ad hoc reporting,
+requiring nothing more than awk(1) for processing. Serious monitoring tools should use the
+netlink(7) interface instead, which passes information in binary format and avoids the overhead
+of text parsing.
+
+10.6.2
+
+ip
+
+ip(8) is a tool for managing routing, network devices, interfaces, and tunnels. For observability,
+it can be used to print statistics on: link, address, route, etc. For example, printing extra statistics
+(-s) on interfaces (link):
+# ip -s link
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT
+group default qlen 1000
+link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+RX: bytes
+
+packets
+
+errors
+
+dropped overrun mcast
+
+26550075
+
+273178
+
+0
+
+0
+
+TX: bytes
+
+packets
+
+errors
+
+dropped carrier collsns
+
+26550075
+
+273178
+
+0
+
+0
+
+0
+0
+
+0
+0
+
+10.6 Observability Tools
+
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT
+group default qlen 1000
+link/ether 12:c0:0a:b0:21:b8 brd ff:ff:ff:ff:ff:ff
+RX: bytes
+
+packets
+
+errors
+
+dropped overrun mcast
+
+512473039143 568704184 0
+TX: bytes
+
+packets
+
+errors
+
+0
+
+0
+
+0
+
+dropped carrier collsns
+
+573510263433 668110321 0
+
+0
+
+0
+
+0
+
+Examining the configuration of all interfaces can be useful during static performance tuning,
+to check for misconfigurations. Error metrics are also included in the output: for receive (RX):
+receive errors, drops, and overruns; for transmit (TX): transmit errors, drops, carrier errors, and
+collisions. Such errors can be a source of performance issues and, depending on the error, may
+be caused by faulty network hardware. These are global counters showing all errors since the
+interface was activated (in network speak, it was brought “UP”).
+Specifying the -s option twice (-s -s) provides even more statistics for error types.
+Although ip(8) provides RX and TX byte counters, it does not include an option to print the
+current throughput over an interval. For that, use sar(1) (Section 10.6.6, sar).
+
+Route Table
+ip(1) does have observability for other networking components. For example, the route object
+shows the routing table:
+# ip route
+default via 100.85.128.1 dev eth0
+default via 100.85.128.1 dev eth0 proto dhcp src 100.85.142.69 metric 100
+100.85.128.0/18 dev eth0 proto kernel scope link src 100.85.142.69
+100.85.128.1 dev eth0 proto dhcp scope link src 100.85.142.69 metric 100
+
+Misconfigured routes can also be a source of performance problems (for example, when specific
+route entries were added by an administrator but are no longer needed, and now perform worse
+than the default route).
+
+Monitoring
+Use the monitoring subcommand ip monitor to watch for netlink messages.
+
+10.6.3
+
+ifconfig
+
+The ifconfig(8) command is the traditional tool for interface administration, and can also list
+the configuration of all interfaces. The Linux version includes statistics with the output11:
+
+It also shows a tunable parameter, txqueuelen, but not all drivers use this value (it calls a netdevice notifier with
+NETDEV_CHANGE_TX_QUEUE_LEN, which is not implemented by some drivers), and byte queue limits auto-tune the
+device queues.
+
+11
+
+537
+
+538
+
+Chapter 10 Network
+
+$ ifconfig
+eth0
+
+Link encap:Ethernet
+
+HWaddr 00:21:9b:97:a9:bf
+
+inet addr:10.2.0.2
+
+Bcast:10.2.0.255
+
+Mask:255.255.255.0
+
+inet6 addr: fe80::221:9bff:fe97:a9bf/64 Scope:Link
+UP BROADCAST RUNNING MULTICAST
+
+MTU:1500
+
+Metric:1
+
+RX packets:933874764 errors:0 dropped:0 overruns:0 frame:0
+TX packets:1090431029 errors:0 dropped:0 overruns:0 carrier:0
+collisions:0 txqueuelen:1000
+RX bytes:584622361619 (584.6 GB)
+
+TX bytes:537745836640 (537.7 GB)
+
+Interrupt:36 Memory:d6000000-d6012800
+eth3
+
+Link encap:Ethernet
+
+HWaddr 00:21:9b:97:a9:c5
+
+[...]
+
+The counters are the same as those described for the ip(8) command.
+On Linux, ifconfig(8) is considered obsolete, replaced by ip(8).
+
+10.6.4
+
+nstat
+
+nstat(8) prints the various network metrics maintained by the kernel, with their SNMP names.
+For example, using -s to avoid resetting the counters:
+# nstat -s
+#kernel
+IpInReceives
+
+462657733
+
+0.0
+
+IpInDelivers
+
+462657733
+
+0.0
+
+IpOutRequests
+
+497050986
+
+0.0
+
+IpOutDiscards
+
+42
+
+0.0
+
+IpFragOKs
+
+2298
+
+0.0
+
+IpFragCreates
+
+13788
+
+0.0
+
+IcmpInMsgs
+
+91
+
+0.0
+
+TcpActiveOpens
+
+362997
+
+0.0
+
+TcpPassiveOpens
+
+9663983
+
+0.0
+
+TcpAttemptFails
+
+12718
+
+0.0
+
+TcpEstabResets
+
+14591
+
+0.0
+
+TcpInSegs
+
+462181482
+
+0.0
+
+TcpOutSegs
+
+938958577
+
+0.0
+
+TcpRetransSegs
+
+129212
+
+0.0
+
+TcpOutRsts
+
+52362
+
+0.0
+
+UdpInDatagrams
+
+476072
+
+0.0
+
+UdpNoPorts
+
+88
+
+0.0
+
+[...]
+
+10.6 Observability Tools
+
+UdpOutDatagrams
+
+476197
+
+0.0
+
+UdpIgnoredMulti
+
+2
+
+0.0
+
+Ip6OutRequests
+
+29
+
+0.0
+
+[...]
+
+Key metrics include:
+■
+
+IpInReceives: Inbound IP packets.
+
+■
+
+IpOutRequests: Outbound IP packets.
+
+■
+
+TcpActiveOpens: TCP active connections (the connect(2) socket syscall).
+
+■
+
+TcpPassiveOpens: TCP passive connections (the accept(2) socket syscall).
+
+■
+
+TcpInSegs: TCP inbound segments.
+
+■
+
+TcpOutSegs: TCP outbound segments.
+
+■
+
+TcpRetransSegs: TCP retransmitted segments. Compare with TcpOutSegs for the ratio of
+retransmits.
+
+If the -s option is not used, the default behavior of nstat(8) is to reset the kernel counters. This
+can be useful, as you can then run nstat(8) a second time and see counts that spanned that interval, rather than totals since boot. If you had a network problem that could be reproduced with
+a command, then nstat(8) can be run before and after the command to show which counters
+changed.
+If you forgot to use -s and have reset the counters by mistake, you can use -rs to set them back
+to their summary since boot values.
+nstat(8) also has a daemon mode (-d) to collect interval statistics, which when used are shown in
+the last column.
+
+10.6.5 netstat
+The netstat(8) command reports various types of network statistics, based on the options used. It
+is like a multi-tool with several different functions. These include the following:
+■
+
+(default): Lists connected sockets
+
+■
+
+-a: Lists information for all sockets
+
+■
+
+-s: Network stack statistics
+
+■
+
+-i: Network interface statistics
+
+■
+
+-r: Lists the route table
+
+Other options can modify the output, including -n to not resolve IP addresses to host names,
+and -v for verbose details where available.
+
+539
+
+540
+
+Chapter 10 Network
+
+Here is an example of netstat(8) interface statistics:
+$ netstat -i
+Kernel Interface table
+Iface
+
+MTU
+
+eth0
+
+1500 933760207
+
+RX-OK RX-ERR RX-DRP RX-OVR
+0
+
+0 0
+
+1090211545
+
+TX-OK TX-ERR TX-DRP TX-OVR Flg
+0
+
+0
+
+0 BMRU
+
+eth3
+
+1500 718900017
+
+0
+
+0 0
+
+587534567
+
+0
+
+0
+
+0 BMRU
+
+lo
+
+16436 21126497
+
+0
+
+0 0
+
+21126497
+
+0
+
+0
+
+0 LRU
+
+ppp5
+
+1496
+
+4225
+
+0
+
+0 0
+
+3736
+
+0
+
+0
+
+0 MOPRU
+
+ppp6
+
+1496
+
+1183
+
+0
+
+0 0
+
+1143
+
+0
+
+0
+
+0 MOPRU
+
+tun0
+
+1500
+
+695581
+
+0
+
+0 0
+
+692378
+
+0
+
+0
+
+0 MOPRU
+
+tun1
+
+1462
+
+0
+
+0
+
+0 0
+
+4
+
+0
+
+0
+
+0 PRU
+
+The columns include the network interface (Iface), MTU, and a series of metrics for receive (RX-)
+and transmit (TX-):
+■
+
+-OK: Packets transferred successfully
+
+■
+
+-ERR: Packet errors
+
+■
+
+-DRP: Packet drops
+
+■
+
+-OVR: Packet overruns
+
+The packet drops and overruns are indications of network interface saturation and can be examined along with errors as part of the USE method.
+The -c continuous mode can be used with -i, which prints these cumulative counters every
+second. This provides the data for calculating the rate of packets.
+Here is an example of netstat(8) network stack statistics (truncated):
+$ netstat -s
+Ip:
+Forwarding: 2
+454143446 total packets received
+0 forwarded
+0 incoming packets discarded
+454143446 incoming packets delivered
+487760885 requests sent out
+42 outgoing packets dropped
+2260 fragments received ok
+13560 fragments created
+Icmp:
+91 ICMP messages received
+[...]
+Tcp:
+359286 active connection openings
+9463980 passive connection openings
+
+10.6 Observability Tools
+
+12527 failed connection attempts
+14323 connection resets received
+13545 connections established
+453673963 segments received
+922299281 segments sent out
+127247 segments retransmitted
+0 bad segments received
+51660 resets sent
+Udp:
+469302 packets received
+88 packets to unknown port received
+0 packet receive errors
+469427 packets sent
+0 receive buffer errors
+0 send buffer errors
+IgnoredMulti: 2
+TcpExt:
+21 resets received for embryonic SYN_RECV sockets
+12252 packets pruned from receive queue because of socket buffer overrun
+201219 TCP sockets finished time wait in fast timer
+11727438 delayed acks sent
+1445 delayed acks further delayed because of locked socket
+Quick ack mode was activated 17624 times
+169257582 packet headers predicted
+76058392 acknowledgments not containing data payload received
+111925821 predicted acknowledgments
+TCPSackRecovery: 1703
+Detected reordering 876 times using SACK
+Detected reordering 19 times using time stamp
+2 congestion windows fully recovered without slow start
+19 congestion windows partially recovered using Hoe heuristic
+TCPDSACKUndo: 164
+88 congestion windows recovered without slow start after partial ack
+TCPLostRetransmit: 901
+TCPSackFailures: 31
+28248 fast retransmits
+709 retransmits in slow start
+TCPTimeouts: 12684
+TCPLossProbes: 73383
+TCPLossProbeRecovery: 132
+TCPSackRecoveryFail: 24
+805315 packets collapsed in receive queue due to low socket buffer
+[...]
+
+541
+
+542
+
+Chapter 10 Network
+
+TCPAutoCorking: 13520259
+TCPFromZeroWindowAdv: 257
+TCPToZeroWindowAdv: 257
+TCPWantZeroWindowAdv: 18941
+TCPSynRetrans: 24816
+[...]
+
+The output lists various network statistics, mostly from TCP, grouped by their protocol.
+Fortunately, many of these have long descriptive names, so their meaning may be obvious. A
+number of these statistics have been highlighted in bold, to show the kind of performancerelated information available. Many of these require an advanced understanding of TCP behavior, including the newer features and algorithms that have been introduced in recent years.
+Some example statistics to look for:
+■
+
+■
+
+■
+
+■
+
+■
+
+A high rate of forwarded versus total packets received: check that the server is supposed to
+be forwarding (routing) packets.
+Passive connection openings: this can be monitored to show load in terms of client
+connections.
+A high rate of segments retransmitted versus segments sent out: can show an unreliable
+network. This may be expected (Internet clients).
+TCPSynRetrans: shows retransmitted SYNs, which can be caused by the remote endpoint
+dropping SYNs from the listen backlog due to load.
+Packets pruned from the receive queue because of socket buffer overrun: This is a sign of
+network saturation and may be fixable by increasing socket buffers, provided there are
+sufficient system resources for the application to keep up.
+
+Some of the statistic names include typos (e.g., packetes rejected). These can be problematic
+to simply fix, if other monitoring tools have been built upon the same output. Such tools should
+be better served by processing nstat(8) output, which uses standard SNMP names, or even better,
+to read the /proc sources for these statistics directly, which are /proc/net/snmp and /proc/net/
+netstat. For example:
+$ grep ^Tcp /proc/net/snmp
+Tcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens AttemptFails
+EstabResets CurrEstab InSegs OutSegs RetransSegs InErrs OutRsts InCsumErrors
+Tcp: 1 200 120000 -1 102378 126946 11940 19495 24 627115849 325815063 346455 5 24183
+0
+
+These /proc/net/snmp statistics also include the SNMP management information bases (MIBs).
+MIB documentation describes what each statistic is supposed to be (if the kernel has correctly
+implemented it). Extended statistics are in /proc/net/netstat.
+An interval, in seconds, can be used with netstat(8) so that it continually prints the cumulative
+counters every interval. This output could then be post-processed to calculate the rate of each
+counter.
+
+10.6 Observability Tools
+
+10.6.6
+
+sar
+
+The system activity reporter, sar(1), can be used to observe current activity and can be configured to archive and report historical statistics. It is introduced in Chapter 4, Observability Tools,
+and mentioned in other chapters as appropriate.
+The Linux version provides network statistics via the following options:
+■
+
+-n DEV: Network interface statistics
+
+■
+
+-n EDEV: Network interface errors
+
+■
+
+-n IP: IP datagram statistics
+
+■
+
+-n EIP: IP error statistics
+
+■
+
+-n TCP: TCP statistics
+
+■
+
+-n ETCP: TCP error statistics
+
+■
+
+-n SOCK: Socket usage
+
+Statistics provided include those shown in Table 10.5.
+
+Table 10.5
+
+Linux sar network statistics
+
+Option
+
+Statistic
+
+Description
+
+Units
+
+-n DEV
+
+rxpkt/s
+
+Received packets
+
+Packets/s
+
+-n DEV
+
+txpkt/s
+
+Transmitted packets
+
+Packets/s
+
+-n DEV
+
+rxkB/s
+
+Received kilobytes
+
+Kilobytes/s
+
+-n DEV
+
+txkB/s
+
+Transmitted kilobytes
+
+Kilobytes/s
+
+-n DEV
+
+rxcmp/s
+
+Received compressed packets
+
+Packets/s
+
+-n DEV
+
+txcmp/s
+
+Transmitted compressed packets
+
+Packets/s
+
+-n DEV
+
+rxmcst/s
+
+Received multicast packets
+
+Packets/s
+
+-n DEV
+
+%ifutil
+
+Interface utilization: for full duplex, the greater
+of rx or tx
+
+Percent
+
+-n EDEV
+
+rxerr/s
+
+Received packet errors
+
+Packets/s
+
+-n EDEV
+
+txerr/s
+
+Transmitted packet errors
+
+Packets/s
+
+-n EDEV
+
+coll/s
+
+Collisions
+
+Packets/s
+
+-n EDEV
+
+rxdrop/s
+
+Received packets dropped (buffer full)
+
+Packets/s
+
+-n EDEV
+
+txdrop/s
+
+Transmitted packets dropped (buffer full)
+
+Packets/s
+
+-n EDEV
+
+txcarr/s
+
+Transmission carrier errors
+
+Errors/s
+
+-n EDEV
+
+rxfram/s
+
+Received alignment errors
+
+Errors/s
+
+-n EDEV
+
+rxfifo/s
+
+Received packets FIFO overrun errors
+
+Packets/s
+
+-n EDEV
+
+txfifo/s
+
+Transmitted packets FIFO overrun errors
+
+Packets/s
+
+543
+
+544
+
+Chapter 10 Network
+
+Option
+
+Statistic
+
+Description
+
+Units
+
+-n IP
+
+irec/s
+
+Input datagrams (received)
+
+Datagrams/s
+
+-n IP
+
+fwddgm/s
+
+Forwarded datagrams
+
+Datagrams/s
+
+-n IP
+
+idel/s
+
+Input IP datagrams (including ICMP)
+
+Datagrams/s
+
+-n IP
+
+orq/s
+
+Output datagram requests (transmit)
+
+Datagrams/s
+
+-n IP
+
+asmrq/s
+
+IP fragments received
+
+Fragments/s
+
+-n IP
+
+asmok/s
+
+IP datagrams reassembled
+
+Datagrams/s
+
+-n IP
+
+fragok/s
+
+IP datagrams fragmented
+
+Datagrams/s
+
+-n IP
+
+fragcrt/s
+
+IP datagram fragments created
+
+Fragments/s
+
+-n EIP
+
+ihdrerr/s
+
+IP header errors
+
+Datagrams/s
+
+-n EIP
+
+iadrerr/s
+
+Invalid IP destination address errors
+
+Datagrams/s
+
+-n EIP
+
+iukwnpr/s
+
+Unknown protocol errors
+
+Datagrams/s
+
+-n EIP
+
+idisc/s
+
+Input discards (e.g., buffer full)
+
+Datagrams/s
+
+-n EIP
+
+odisc/s
+
+Output discards (e.g., buffer full)
+
+Datagram/s
+
+-n EIP
+
+onort/s
+
+Output datagram no route error
+
+Datagrams/s
+
+-n EIP
+
+asmf/s
+
+IP reassembly failures
+
+Failures/s
+
+-n EIP
+
+fragf/s
+
+IP don’t fragment discards
+
+Datagrams/s
+
+-n TCP
+
+active/s
+
+New active TCP connections (connect(2))
+
+Connections/s
+
+-n TCP
+
+passive/s
+
+New passive TCP connections (accept(2))
+
+Connections/s
+
+-n TCP
+
+iseg/s
+
+Input segments (received)
+
+Segments/s
+
+-n TCP
+
+oseg/s
+
+Output segments (received)
+
+Segments/s
+
+-n ETCP
+
+atmptf/s
+
+Active TCP connection fails
+
+Connections/s
+
+-n ETCP
+
+estres/s
+
+Established resets
+
+Resets/s
+
+-n ETCP
+
+retrans/s
+
+TCP segments retransmitted
+
+Segments/s
+
+-n ETCP
+
+isegerr/s
+
+Segment errors
+
+Segments/s
+
+-n ETCP
+
+orsts/s
+
+Sent resets
+
+Segments/s
+
+-n SOCK
+
+totsck
+
+Total sockets in use
+
+Sockets
+
+-n SOCK
+
+tcpsck/s
+
+Total TCP sockets in use
+
+Sockets
+
+-n SOCK
+
+udpsck/s
+
+Total UDP sockets in use
+
+Sockets
+
+-n SOCK
+
+rawsck/s
+
+Total RAW sockets in use
+
+Sockets
+
+-n SOCK
+
+ip-frag
+
+IP fragments currently queued
+
+Fragments
+
+-n SOCK
+
+tcp-tw
+
+TCP sockets in TIME_WAIT
+
+Sockets
+
+10.6 Observability Tools
+
+Not listed are the ICMP, NFS, and SOFT (software network processing) groups, and IPv6 variants: IP6, EIP6, SOCK6, and UDP6. See the man page for the full list of statistics, which also
+notes some equivalent SNMP names (e.g., ipInReceives for irec/s). Many of the sar(1) statistic
+names are easy to remember in practice, as they include the direction and units measured: rx for
+“received,” i for “input,” seg for “segments,” and so on.
+This example prints TCP statistics every second:
+$ sar -n TCP 1
+Linux 5.3.0-1010-aws (ip-10-1-239-218)
+07:32:45
+
+active/s passive/s
+
+02/27/20
+
+iseg/s
+
+oseg/s
+
+186.00
+
+28837.00
+
+13.00
+
+203.00
+
+33584.00
+
+11.00
+
+1999.00
+
+24441.00
+
+0.00
+
+7.00
+
+92.00
+
+8908.00
+
+0.00
+
+10.00
+
+114.00
+
+13795.00
+
+07:32:46
+
+0.00
+
+12.00
+
+07:32:47
+
+0.00
+
+07:32:48
+
+0.00
+
+07:32:49
+07:32:50
+
+_x86_64_
+
+(2 CPU)
+
+[...]
+
+The output shows a passive connection rate (inbound) of around 10 per second.
+When examining network devices (DEV) the network interface statistics column (IFACE) lists all
+interfaces; however, often only one is of interest. The following example uses a little awk(1) to
+filter the output:
+$ sar -n DEV 1 | awk 'NR == 3 || $2 == "ens5"'
+07:35:41 IFACE
+
+rxpck/s
+
+txpck/s
+
+rxkB/s
+
+txkB/s rxcmp/s txcmp/s rxmcst/s %ifutil
+
+07:35:42
+
+ens5
+
+134.00
+
+11483.00
+
+10.22
+
+6328.72
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+07:35:43
+
+ens5
+
+170.00
+
+20354.00
+
+13.62
+
+6925.27
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+07:35:44
+
+ens5
+
+185.00
+
+28228.00
+
+14.33
+
+8586.79
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+07:35:45
+
+ens5
+
+180.00
+
+23093.00
+
+14.59
+
+7452.49
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+07:35:46
+
+ens5
+
+1525.00
+
+19594.00
+
+137.48
+
+7044.81
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+07:35:47
+
+ens5
+
+146.00
+
+10282.00
+
+12.05
+
+6876.80
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+[...]
+
+This shows network throughput for transmit and receive, and other statistics.
+The atop(1) tool is also able to archive statistics.
+
+10.6.7
+
+nicstat
+12
+
+nicstat(1) prints network interface statistics, including throughput and utilization. It follows
+the style of the traditional resource statistic tools, iostat(1) and mpstat(1).
+
+12
+
+I developed the original version for Solaris; Tim Cook developed the Linux version [Cook 09].
+
+545
+
+546
+
+Chapter 10 Network
+
+Here is output for version 1.92 on Linux:
+# nicstat -z 1
+Time
+
+Int
+
+rKB/s
+
+wKB/s
+
+rPk/s
+
+wPk/s
+
+rAvs
+
+wAvs %Util
+
+Sat
+
+01:20:58
+
+eth0
+
+0.07
+
+0.00
+
+0.95
+
+0.02
+
+79.43
+
+64.81
+
+0.00
+
+0.00
+
+01:20:58
+
+eth4
+
+0.28
+
+0.01
+
+0.20
+
+0.10
+
+1451.3
+
+80.11
+
+0.00
+
+0.00
+
+01:20:58
+
+vlan123
+
+0.00
+
+0.00
+
+0.00
+
+0.02
+
+42.00
+
+64.81
+
+0.00
+
+0.00
+
+01:20:58
+
+br0
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+42.00
+
+42.07
+
+0.00
+
+0.00
+
+Time
+
+Int
+
+rKB/s
+
+wKB/s
+
+rPk/s
+
+wPk/s
+
+rAvs
+
+wAvs %Util
+
+Sat
+
+eth4 42376.0
+
+974.5 28589.4 14002.1
+
+1517.8
+
+71.27
+
+0.00
+
+01:20:59
+
+35.5
+
+Time
+
+Int
+
+rKB/s
+
+wKB/s
+
+rPk/s
+
+wPk/s
+
+rAvs
+
+wAvs %Util
+
+Sat
+
+01:21:00
+
+eth0
+
+0.05
+
+0.00
+
+1.00
+
+0.00
+
+56.00
+
+0.00
+
+0.00
+
+0.00
+
+01:21:00
+
+eth4 41834.7
+
+977.9 28221.5 14058.3
+
+1517.9
+
+71.23
+
+Int
+
+wKB/s
+
+Time
+01:21:01
+
+rKB/s
+
+eth4 42017.9
+
+rPk/s
+
+wPk/s
+
+rAvs
+
+979.0 28345.0 14073.0
+
+1517.9
+
+35.1
+
+0.00
+
+wAvs %Util
+
+Sat
+
+71.24
+
+0.00
+
+35.2
+
+The first output is the summary-since-boot, followed by interval summaries. The interval summaries show that the eth4 interface is running at 35% utilization (this is reporting the highest
+current utilization from either the RX or TX direction) and is reading at 42 Mbytes/s.
+The fields include the interface name (Int), the maximum utilization (%Util), a value reflecting
+interface saturation statistics (Sat), and a series of statistics prefixed with r for “read” (receive)
+and w for “write” (transmit):
+■
+
+KB/s: Kbytes per second
+
+■
+
+Pk/s: packets per second
+
+■
+
+Avs/s: Average packet size, bytes
+
+Options supported in this version include -z to skip lines of zeros (idle interfaces) and -t for TCP
+statistics.
+nicstat(1) is particularly useful for the USE method, as it provides utilization and saturation
+values.
+
+10.6.8
+
+ethtool
+
+ethtool(8) can be used to check the static configuration of the network interfaces with -i and -k
+options, and also print driver statistics with -S. For example:
+# ethtool -S eth0
+NIC statistics:
+tx_timeout: 0
+suspend: 0
+resume: 0
+wd_expired: 0
+interface_up: 1
+interface_down: 0
+
+10.6 Observability Tools
+
+admin_q_pause: 0
+queue_0_tx_cnt: 100219217
+queue_0_tx_bytes: 84830086234
+queue_0_tx_queue_stop: 0
+queue_0_tx_queue_wakeup: 0
+queue_0_tx_dma_mapping_err: 0
+queue_0_tx_linearize: 0
+queue_0_tx_linearize_failed: 0
+queue_0_tx_napi_comp: 112514572
+queue_0_tx_tx_poll: 112514649
+queue_0_tx_doorbells: 52759561
+[...]
+
+This fetches statistics from the kernel ethtool framework, which many network device drivers
+support. Device drivers can define their own ethtool statistics.
+The -i option shows driver details, and -k shows interface tunables. For example:
+# ethtool -i eth0
+driver: ena
+version: 2.0.3K
+[...]
+# ethtool -k eth0
+Features for eth0:
+rx-checksumming: on
+[...]
+tcp-segmentation-offload: off
+tx-tcp-segmentation: off [fixed]
+tx-tcp-ecn-segmentation: off [fixed]
+tx-tcp-mangleid-segmentation: off [fixed]
+tx-tcp6-segmentation: off [fixed]
+udp-fragmentation-offload: off
+generic-segmentation-offload: on
+generic-receive-offload: on
+large-receive-offload: off [fixed]
+rx-vlan-offload: off [fixed]
+tx-vlan-offload: off [fixed]
+ntuple-filters: off [fixed]
+receive-hashing: on
+highdma: on
+[...]
+
+This example is a cloud instance with the ena driver, with tcp-segmentation-offload off. The -K
+option can be used to change these tunables.
+
+547
+
+548
+
+Chapter 10 Network
+
+10.6.9
+
+tcplife
+13
+
+tcplife(8) is a BCC and bpftrace tool to trace the lifespan of TCP sessions, showing their duration, address details, throughput, and, when possible, the responsible process ID and name.
+The following shows tcplife(8) from BCC, on a 48-CPU production instance:
+# tcplife
+PID
+
+COMM
+
+LADDR
+
+LPORT RADDR
+
+RPORT TX_KB RX_KB MS
+
+4169
+
+java
+
+100.1.111.231
+
+32648 100.2.0.48
+
+6001
+
+0
+
+0 3.99
+
+4169
+
+java
+
+100.1.111.231
+
+32650 100.2.0.48
+
+6001
+
+0
+
+0 4.10
+
+4169
+
+java
+
+100.1.111.231
+
+32644 100.2.0.48
+
+6001
+
+0
+
+0 8.41
+
+4169
+
+java
+
+100.1.111.231
+
+40158 100.2.116.192
+
+6001
+
+7
+
+33 3590.91
+
+4169
+
+java
+
+100.1.111.231
+
+56940 100.5.177.31
+
+6101
+
+0
+
+0 2.48
+
+4169
+
+java
+
+100.1.111.231
+
+6001
+
+100.2.176.45
+
+49482
+
+0
+
+0 17.94
+
+4169
+
+java
+
+100.1.111.231
+
+18926 100.5.102.250
+
+6101
+
+0
+
+0 0.90
+
+4169
+
+java
+
+100.1.111.231
+
+44530 100.2.31.140
+
+6001
+
+0
+
+0 2.64
+
+4169
+
+java
+
+100.1.111.231
+
+44406 100.2.8.109
+
+6001
+
+11
+
+28 3982.11
+
+34781 sshd
+
+100.1.111.231
+
+22
+
+100.2.17.121
+
+41566
+
+5
+
+7 2317.30
+
+4169
+
+java
+
+100.1.111.231
+
+49726 100.2.9.217
+
+6001
+
+11
+
+28 3938.47
+
+4169
+
+java
+
+100.1.111.231
+
+58858 100.2.173.248
+
+6001
+
+9
+
+30 2820.51
+
+[...]
+
+This output shows a series of connections that were either short-lived (less than 20 milliseconds)
+or long-lived (over three seconds), as shown in the duration column (MS for milliseconds). This is
+an application server pool that listens on port 6001. Most of the sessions in this screenshot show
+connections to port 6001 on remote application servers, with only one connection to the local
+port 6001. An ssh session was also seen, owned by sshd and local port 22—an inbound session.
+The BCC version of tcplife(8) supports options including:
+■
+
+-t: Include time column (HH:MM:SS)
+
+■
+
+-w: Wider columns (to better fit IPv6 addresses)
+
+■
+
+-p PID: Trace this process only
+
+■
+
+-L PORT[,PORT[,...]]: Trace only sessions with these local ports
+
+■
+
+-D PORT[,PORT[,...]]: Trace only sessions with these remote ports
+
+This tool works by tracing TCP socket state-change events, and prints the summary details when
+the state changes to TCP_CLOSE. These state-change events are much less frequent than packets,
+making this approach much less costly in overhead than per-packet sniffers. This has made
+tcplife(8) acceptable to run continuously as a TCP flow logger on Netflix production servers.14
+Creating udplife(8) for tracing UDP sessions is a Chapter 10 exercise in the BPF Performance Tools
+book [Gregg 19]; I have posted an initial solution [Gregg 19d].
+13
+
+Origin: I created tcplife(8) on 18-Oct-2016 based on an idea by Julia Evans, and the bpftrace version on 17-Apr-2019.
+
+14
+
+It is coupled with snapshots of all open sessions.
+
+10.6 Observability Tools
+
+10.6.10
+
+tcptop
+
+15
+
+tcptop(8) is a BCC tool that shows top processes using TCP. For example, from a 36-CPU
+production Hadoop instance:
+# tcptop
+09:01:13 loadavg: 33.32 36.11 38.63 26/4021 123015
+PID
+
+LADDR
+
+RADDR
+
+RX_KB
+
+118119 java
+
+COMM
+
+100.1.58.46:36246
+
+100.2.52.79:50010
+
+16840
+
+TX_KB
+0
+
+122833 java
+
+100.1.58.46:52426
+
+100.2.6.98:50010
+
+0
+
+3112
+
+122833 java
+
+100.1.58.46:50010
+
+100.2.50.176:55396
+
+3112
+
+0
+
+120711 java
+
+100.1.58.46:50010
+
+100.2.7.75:23358
+
+2922
+
+0
+
+121635 java
+
+100.1.58.46:50010
+
+100.2.5.101:56426
+
+2922
+
+0
+
+121219 java
+
+100.1.58.46:50010
+
+100.2.62.83:40570
+
+2858
+
+0
+
+121219 java
+
+100.1.58.46:42324
+
+100.2.4.58:50010
+
+0
+
+2858
+
+122927 java
+
+100.1.58.46:50010
+
+100.2.2.191:29338
+
+2351
+
+0
+
+[...]
+
+This output shows one connection at the top receiving over 16 Mbytes during this interval. By
+default, the screen is updated every second.
+This works by tracing the TCP send and receive code path, and summarizing data in a BPF map
+efficiency. Even so, these events can be frequent, and on high network throughput systems the
+overhead may become measurable.
+Options include:
+■
+
+-C: Don’t clear the screen.
+
+■
+
+-p PID: Measure this process only.
+
+tcptop(8) also accepts an optional interval and count.
+
+10.6.11
+
+tcpretrans
+16
+
+tcpretrans(8) is a BCC and bpftrace tool to trace TCP retransmits, showing IP address and port
+details and the TCP state. The following shows tcpretrans(8) from BCC, on a production instance:
+# tcpretrans
+Tracing retransmits ... Hit Ctrl-C to end
+TIME
+
+IP LADDR:LPORT
+
+T> RADDR:RPORT
+
+STATE
+
+00:20:11 72475
+
+PID
+
+4
+
+100.1.58.46:35908
+
+R> 100.2.0.167:50010
+
+ESTABLISHED
+
+00:20:11 72475
+
+4
+
+100.1.58.46:35908
+
+R> 100.2.0.167:50010
+
+ESTABLISHED
+
+15
+Origin: I created the BCC version on 02-Sep-2016, based on an earlier tcptop tool I had created in 2005, which
+itself was inspired by the original top(1) by William LeFebvre.
+16
+Origin: I created similar tools in 2011, an Ftrace tcpretrans(8) in 2014, and this BCC version on 14-Feb-2016.
+Dale Hamel created the bpftrace version on 23-Nov-2018.
+
+549
+
+550
+
+Chapter 10 Network
+
+00:20:11 72475
+
+4
+
+100.1.58.46:35908
+
+R> 100.2.0.167:50010
+
+ESTABLISHED
+
+00:20:12 60695
+
+4
+
+100.1.58.46:52346
+
+R> 100.2.6.189:50010
+
+ESTABLISHED
+
+00:20:12 60695
+
+4
+
+100.1.58.46:52346
+
+R> 100.2.6.189:50010
+
+ESTABLISHED
+
+00:20:12 60695
+
+4
+
+100.1.58.46:52346
+
+R> 100.2.6.189:50010
+
+ESTABLISHED
+
+00:20:12 60695
+
+4
+
+100.1.58.46:52346
+
+R> 100.2.6.189:50010
+
+ESTABLISHED
+
+00:20:13 60695
+
+6
+
+::ffff:100.1.58.46:13562 R> ::ffff:100.2.51.209:47356 FIN_WAIT1
+
+00:20:13 60695
+
+6
+
+::ffff:100.1.58.46:13562 R> ::ffff:100.2.51.209:47356 FIN_WAIT1
+
+[...]
+
+This output shows a low rate of retransmits, a few per second (TIME column), which were mostly
+for sessions in the ESTABLISHED state. A high rate in the ESTABLISHED state can point to an
+external network problem. A high rate in the SYN_SENT state can point to an overloaded server
+application that is not consuming its SYN backlog fast enough.
+This works by tracing TCP retransmit events in the kernel. Since these should occur infrequently,
+the overhead should be negligible. Compare this to how retransmits are historically analyzed
+using a packet sniffer to capture all packets, and then post-processing to find retransmits—both
+steps can cost significant CPU overhead. Packet-capture can only see details that are on the wire,
+whereas tcpretrans(8) prints the TCP state directly from the kernel, and can be enhanced to
+print more kernel state if needed.
+Options for the BCC version include:
+■
+
+-l: Include tail loss probe attempts (adds a kprobe for tcp_send_loss_probe())
+
+■
+
+-c: Count retransmits per flow
+
+The -c option changes the behavior of tcpretrans(8), causing it to print a summary of counts
+rather than per-event details.
+
+10.6.12
+
+bpftrace
+
+bpftrace is a BPF-based tracer that provides a high-level programming language, allowing the
+creation of powerful one-liners and short scripts. It is well suited for custom networking analysis
+based on clues from other tools. It can examine network events from within the kernel and
+applications, including socket connections, socket I/O, TCP events, packet transmission, backlog
+drops, TCP retransmits, and other details. These abilities support workload characterization and
+latency analysis.
+bpftrace is explained in Chapter 15. This section shows some examples for network analysis:
+one-liners, socket tracing, and TCP tracing.
+
+One-Liners
+The following one-liners are useful and demonstrate different bpftrace capabilities.
+Count socket accept(2)s by PID and process name:
+bpftrace -e 't:syscalls:sys_enter_accept* { @[pid, comm] = count(); }'
+
+10.6 Observability Tools
+
+Count socket connect(2)s by PID and process name:
+bpftrace -e 't:syscalls:sys_enter_connect { @[pid, comm] = count(); }'
+
+Count socket connect(2)s by user stack trace:
+bpftrace -e 't:syscalls:sys_enter_connect { @[ustack, comm] = count(); }'
+
+Count socket send/receives by direction, on-CPU PID, and process name17:
+bpftrace -e 'k:sock_sendmsg,k:sock_recvmsg { @[func, pid, comm] = count(); }'
+
+Count socket send/receive bytes by on-CPU PID and process name:
+bpftrace -e 'kr:sock_sendmsg,kr:sock_recvmsg /(int32)retval > 0/ { @[pid, comm] =
+sum((int32)retval); }'
+
+Count TCP connects by on-CPU PID and process name:
+bpftrace -e 'k:tcp_v*_connect { @[pid, comm] = count(); }'
+
+Count TCP accepts by on-CPU PID and process name:
+bpftrace -e 'k:inet_csk_accept { @[pid, comm] = count(); }'
+
+Count TCP send/receives by on-CPU PID and process name:
+bpftrace -e 'k:tcp_sendmsg,k:tcp_recvmsg { @[func, pid, comm] = count(); }'
+
+TCP send bytes as a histogram:
+bpftrace -e 'k:tcp_sendmsg { @send_bytes = hist(arg2); }'
+
+TCP receive bytes as a histogram:
+bpftrace -e 'kr:tcp_recvmsg /retval >= 0/ { @recv_bytes = hist(retval); }'
+
+Count TCP retransmits by type and remote host (assumes IPv4):
+bpftrace -e 't:tcp:tcp_retransmit_* { @[probe, ntop(2, args->saddr)] = count(); }'
+
+Count all TCP functions (adds high overhead to TCP):
+bpftrace -e 'k:tcp_* { @[func] = count(); }'
+
+Count UDP send/receives by on-CPU PID and process name:
+bpftrace -e 'k:udp*_sendmsg,k:udp*_recvmsg { @[func, pid, comm] = count(); }'
+
+17
+The earlier socket syscalls are in process context, where PID and comm are reliable. These kprobes are deeper in
+the kernel, and the process endpoint for these connections my not be currently on-CPU, meaning the pid and comm
+shown by bpftrace could be unrelated. They usually work, but that may not always be the case.
+
+551
+
+552
+
+Chapter 10 Network
+
+UDP send bytes as a histogram:
+bpftrace -e 'k:udp_sendmsg { @send_bytes = hist(arg2); }'
+
+UDP receive bytes as a histogram:
+bpftrace -e 'kr:udp_recvmsg /retval >= 0/ { @recv_bytes = hist(retval); }'
+
+Count transmit kernel stack traces:
+bpftrace -e 't:net:net_dev_xmit { @[kstack] = count(); }'
+
+Show receive CPU histogram for each device:
+bpftrace -e 't:net:netif_receive_skb { @[str(args->name)] = lhist(cpu, 0, 128, 1); }'
+
+Count ieee80211 layer functions (adds high overhead to packets):
+bpftrace -e 'k:ieee80211_* { @[func] = count(); }'
+
+Count all ixgbevf device driver functions (adds high overhead to ixgbevf):
+bpftrace -e 'k:ixgbevf_* { @[func] = count(); }'
+
+Count all iwl device driver tracepoints (adds high overhead to iwl):
+bpftrace -e 't:iwlwifi:*,t:iwlwifi_io:* { @[probe] = count(); }'
+
+Socket Tracing
+Tracing network events at the socket layer has the advantage that the responsible process is still
+on-CPU, making it straightforward to identify the application and code-path responsible. For
+example, counting the applications calling the accept(2) syscall:
+# bpftrace -e 't:syscalls:sys_enter_accept { @[pid, comm] = count(); }'
+Attaching 1 probe...
+^C
+@[573, sshd]: 2
+@[1948, mysqld]: 41
+
+The output shows that during tracing mysqld called accept(2) 41 times, and sshd called accept(2)
+2 times.
+The stack trace can be included to show the code path that led to accept(2). For example, counting by the user-level stack trace and process name:
+# bpftrace -e 't:syscalls:sys_enter_accept { @[ustack, comm] = count(); }'
+Attaching 1 probe...
+^C
+
+10.6 Observability Tools
+
+@[
+accept+79
+Mysqld_socket_listener::listen_for_connection_event()+283
+mysqld_main(int, char**)+15577
+__libc_start_main+243
+0x49564100fe8c4b3d
+, mysqld]: 22
+
+This output shows that mysqld was accepting connections via a code path that included
+Mysqld_socket_listener::listen_for_connection_event(). By changing “accept” to “connect”,
+this one-liner will identify the code paths leading to connect(2). I have used such one-liners to
+explain mysterious network connections, showing the code paths calling them.
+
+sock Tracepoints
+Apart from socket syscalls, there are socket tracepoints. From a 5.3 kernel:
+# bpftrace -l 't:sock:*'
+tracepoint:sock:sock_rcvqueue_full
+tracepoint:sock:sock_exceed_buf_limit
+tracepoint:sock:inet_sock_set_state
+
+The sock:inet_sock_set_state tracepoint is used by the earlier tcplife(8) tool. Here is an example
+one-liner that uses it to count source and destination IPv4 addresses for new connections:
+# bpftrace -e 't:sock:inet_sock_set_state
+/args->newstate == 1 && args->family == 2/ {
+@[ntop(args->saddr), ntop(args->daddr)] = count() }'
+Attaching 1 probe...
+^C
+@[127.0.0.1, 127.0.0.1]: 2
+@[10.1.239.218, 10.29.225.81]: 18
+
+This one-liner is getting long, and it would be easier to save to a bpftrace program file (.bt) for
+editing and execution. As a file, it can also include the appropriate kernel headers so that the
+filter line can be rewritten to use constant names rather than hard-coded numbers (which are
+unreliable), like this:
+/args->newstate == TCP_ESTABLISHED && args->family == AF_INET/ {
+
+The next example is of a program file: socketio.bt.
+
+socketio.bt
+As a more complex example, the socketio(8) tool shows socket I/O with the process details, direction, protocol, and port. Example output:
+
+553
+
+554
+
+Chapter 10 Network
+
+# ./socketio.bt
+Attaching 2 probes...
+^C
+[...]
+@io[sshd, 21925, read, UNIX, 0]: 40
+@io[sshd, 21925, read, TCP, 37408]: 41
+@io[systemd, 1, write, UNIX, 0]: 51
+@io[systemd, 1, read, UNIX, 0]: 57
+@io[systemd-udevd, 241, write, NETLINK, 0]: 65
+@io[systemd-udevd, 241, read, NETLINK, 0]: 75
+@io[dbus-daemon, 525, write, UNIX, 0]: 98
+@io[systemd-logind, 526, read, UNIX, 0]: 105
+@io[systemd-udevd, 241, read, UNIX, 0]: 127
+@io[snapd, 31927, read, NETLINK, 0]: 150
+@io[dbus-daemon, 525, read, UNIX, 0]: 160
+@io[mysqld, 1948, write, TCP, 55010]: 8147
+@io[mysqld, 1948, read, TCP, 55010]: 24466
+
+This shows that the most socket I/O was by mysqld, with reads and writes to TCP port 55010,
+the ephemeral port a client is using.
+The source to socketio(8) is:
+#!/usr/local/bin/bpftrace
+#include <net/sock.h>
+kprobe:sock_recvmsg
+{
+$sock = (struct socket *)arg0;
+$dport = $sock->sk->__sk_common.skc_dport;
+$dport = ($dport >> 8) | (($dport << 8) & 0xff00);
+@io[comm, pid, "read", $sock->sk->__sk_common.skc_prot->name, $dport] =
+count();
+}
+kprobe:sock_sendmsg
+{
+$sock = (struct socket *)arg0;
+$dport = $sock->sk->__sk_common.skc_dport;
+$dport = ($dport >> 8) | (($dport << 8) & 0xff00);
+@io[comm, pid, "write", $sock->sk->__sk_common.skc_prot->name, $dport] =
+count();
+}
+
+10.6 Observability Tools
+
+This is an example of fetching details from a kernel struct, in this case struct socket, which
+provides the protocol name and destination port. The destination port is big endian, and is converted to little endian (for this x86 processor) by the tool before inclusion in the @io map.18 This
+script could be modified to show the bytes transferred instead of the I/O counts.
+
+TCP Tracing
+Tracing at the TCP level provides insight for TCP protocol events and internals, as well as events
+not associated with a socket (e.g., a TCP port scan).
+
+TCP Tracepoints
+Instrumenting TCP internals often requires using kprobes, but there are some TCP tracepoints
+available. From a 5.3 kernel:
+# bpftrace -l 't:tcp:*'
+tracepoint:tcp:tcp_retransmit_skb
+tracepoint:tcp:tcp_send_reset
+tracepoint:tcp:tcp_receive_reset
+tracepoint:tcp:tcp_destroy_sock
+tracepoint:tcp:tcp_rcv_space_adjust
+tracepoint:tcp:tcp_retransmit_synack
+tracepoint:tcp:tcp_probe
+
+The tcp:tcp_retransmit_skb tracepoint is used by the earlier tcpretrans(8) tool. Tracepoints are
+preferable for their stability, but when they cannot solve your problem you can use kprobes on
+the kernel TCP functions. Counting them:
+# bpftrace -e 'k:tcp_* { @[func] = count(); }'
+Attaching 336 probes...
+^C
+@[tcp_try_keep_open]: 1
+@[tcp_ooo_try_coalesce]: 1
+@[tcp_reset]: 1
+[...]
+@[tcp_push]: 3191
+@[tcp_established_options]: 3584
+@[tcp_wfree]: 4408
+@[tcp_small_queue_check.isra.0]: 4617
+@[tcp_rate_check_app_limited]: 7022
+@[tcp_poll]: 8898
+@[tcp_release_cb]: 18330
+
+18
+For this to work on big-endian processors, the tool should test for processor endianness and use a conversion
+only if necessary; for example, by use of #ifdef LITTLE_ENDIAN.
+
+555
+
+556
+
+Chapter 10 Network
+
+@[tcp_send_mss]: 28168
+@[tcp_sendmsg]: 31450
+@[tcp_sendmsg_locked]: 31949
+@[tcp_write_xmit]: 33276
+@[tcp_tx_timestamp]: 33485
+
+This showed that the most frequently called function was tcp_tx_timestamp(), called 33,485
+times while tracing. Counting functions can identify targets for tracing in more detail. Note
+that counting all TCP calls may add noticeable overhead due to the number and frequency of
+functions traced. For this particular task I would use Ftrace function profiling instead via
+my funccount(8) perf-tools tool, as its overhead and initialization time are much lower. See
+Chapter 14, Ftrace.
+
+tcpsynbl.bt
+The tcpsynbl(8)19 tool is an example of instrumenting TCP using kprobes. It shows the length
+of the listen(2) backlog queues broken down by queue length so that you can tell how close the
+queues are to overflowing (which causes drops of TCP SYN packets). Example output:
+# tcpsynbl.bt
+Attaching 4 probes...
+Tracing SYN backlog size. Ctrl-C to end.
+04:44:31 dropping a SYN.
+04:44:31 dropping a SYN.
+04:44:31 dropping a SYN.
+04:44:31 dropping a SYN.
+04:44:31 dropping a SYN.
+[...]
+^C
+@backlog[backlog limit]: histogram of backlog size
+@backlog[128]:
+[0]
+
+473 |@
+
+|
+
+[1]
+
+502 |@
+
+|
+
+[2, 4)
+
+1001 |@@@
+
+|
+
+[4, 8)
+
+1996 |@@@@@@
+
+|
+
+[8, 16)
+
+3943 |@@@@@@@@@@@
+
+|
+
+[16, 32)
+
+7718 |@@@@@@@@@@@@@@@@@@@@@@@
+
+|
+
+[32, 64)
+
+14460 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+|
+
+[64, 128)
+
+17246 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|
+
+[128, 256)
+
+1844 |@@@@@
+
+19
+
+Origin: I created tcpsynbl.bt on 19-Apr-2019 for [Gregg 19].
+
+|
+
+10.6 Observability Tools
+
+While running, tcpsynbl.bt prints timestamps and SYN drops if they occur when tracing. When
+terminated (by typing Ctrl-C), a histogram of backlog size is printed for each backlog limit in
+use. This output shows several SYN drops occurring at 4:44:31, and the histogram summary
+shows a limit of 128 and a distribution where that limit was reached 1844 times (the 128 to 256
+bucket). This distribution shows the backlog length when SYNs arrive.
+By monitoring the backlog length, you can check whether it is growing over time, giving you an
+early warning that SYN drops are imminent. This is something you can do as part of capacity
+planning.
+The source to tcpsynbl(8) is:
+#!/usr/local/bin/bpftrace
+#include <net/sock.h>
+BEGIN
+{
+printf("Tracing SYN backlog size. Ctrl-C to end.\n");
+}
+kprobe:tcp_v4_syn_recv_sock,
+kprobe:tcp_v6_syn_recv_sock
+{
+$sock = (struct sock *)arg0;
+@backlog[$sock->sk_max_ack_backlog & 0xffffffff] =
+hist($sock->sk_ack_backlog);
+if ($sock->sk_ack_backlog > $sock->sk_max_ack_backlog) {
+time("%H:%M:%S dropping a SYN.\n");
+}
+}
+END
+{
+printf("\n@backlog[backlog limit]: histogram of backlog size\n");
+}
+
+The shape of the earlier printed distribution has much to do with the log2 scale used by hist(),
+where later buckets span larger ranges. You can change hist() to lhist() using:
+lhist($sock->sk_ack_backlog, 0, 1000, 10);
+
+This will print a linear histogram with even ranges for each bucket: in this case, for the range 0
+to 1000 with a bucket size of 10. For more bpftrace programming, see Chapter 15, BPF.
+
+557
+
+558
+
+Chapter 10 Network
+
+Event Sources
+bpftrace can instrument much more; Table 10.6 shows event sources for instrumenting different
+network events.
+
+Table 10.6
+
+Network events and sources
+
+Network Event
+
+Event Source
+
+Application protocols
+
+uprobes
+
+Sockets
+
+syscalls tracepoints
+
+TCP
+
+tcp tracepoints, kprobes
+
+UDP
+
+kprobes
+
+IP and ICMP
+
+kprobes
+
+Packets
+
+skb tracepoints, kprobes
+
+QDiscs and driver queues
+
+qdisc and net tracepoints, kprobes
+
+XDP
+
+xdp tracepoints
+
+Network device drivers
+
+kprobes, some have tracepoints
+
+Use tracepoints wherever possible, as they are a stable interface.
+
+10.6.13 tcpdump
+Network packets can be captured and inspected on Linux using the tcpdump(8) utility. This can
+either print packet summaries on STDOUT or write packet data to a file for later analysis. The latter is usually more practical: packet rates can be too high to follow their summaries in real time.
+Dumping packets from the eth4 interface to a file in /tmp:
+# tcpdump -i eth4 -w /tmp/out.tcpdump
+tcpdump: listening on eth4, link-type EN10MB (Ethernet), capture size 65535 bytes
+^C273893 packets captured
+275752 packets received by filter
+1859 packets dropped by kernel
+
+The output notes how many packets were dropped by the kernel instead of being passed to
+tcpdump(8), as occurs when the rate of packets is too high. Note that you can use -i any to c
+apture packets from all interfaces.
+Inspecting packets from a dump file:
+# tcpdump -nr /tmp/out.tcpdump
+reading from file /tmp/out.tcpdump, link-type EN10MB (Ethernet)
+02:24:46.160754 IP 10.2.124.2.32863 > 10.2.203.2.5001: Flags [.], seq
+3612664461:3612667357, ack 180214943, win 64436, options [nop,nop,TS val 692339741
+ecr 346311608], length 2896
+
+10.6 Observability Tools
+
+02:24:46.160765 IP 10.2.203.2.5001 > 10.2.124.2.32863: Flags [.], ack 2896, win
+18184, options [nop,nop,TS val 346311610 ecr 692339740], length 0
+02:24:46.160778 IP 10.2.124.2.32863 > 10.2.203.2.5001: Flags [.], seq 2896:4344, ack
+1, win 64436, options [nop,nop,TS val 692339741 ecr 346311608], length 1448
+02:24:46.160807 IP 10.2.124.2.32863 > 10.2.203.2.5001: Flags [.], seq 4344:5792, ack
+1, win 64436, options [nop,nop,TS val 692339741 ecr 346311608], length 1448
+02:24:46.160817 IP 10.2.203.2.5001 > 10.2.124.2.32863: Flags [.], ack 5792, win
+18184, options [nop,nop,TS val 346311610 ecr 692339741], length 0
+[...]
+
+Each line of output shows the time of the packet (with microsecond resolution), its source and
+destination IP addresses, and TCP header values. By studying these, the operation of TCP can be
+understood in detail, including how well advanced features are working for your workload.
+The -n option was used to not resolve IP addresses as host names. Other options include printing
+verbose details where available (-v), link-layer headers (-e), and hex-address dumps (-x or -X). For
+example:
+# tcpdump -enr /tmp/out.tcpdump -vvv -X
+reading from file /tmp/out.tcpdump, link-type EN10MB (Ethernet)
+02:24:46.160754 80:71:1f:ad:50:48 > 84:2b:2b:61:b6:ed, ethertype IPv4 (0x0800),
+length 2962: (tos 0x0, ttl 63, id 46508, offset 0, flags [DF], proto TCP (6), length
+2948)
+10.2.124.2.32863 > 10.2.203.2.5001: Flags [.], cksum 0x667f (incorrect ->
+0xc4da), seq 3612664461:3612667357, ack 180214943, win 64436, options [nop,nop,TS val
+692339741 ecr 346311608], length 289
+6
+0x0000:
+
+4500 0b84 b5ac 4000 3f06 1fbf 0a02 7c02
+
+E.....@.?.....|.
+
+0x0010:
+
+0a02 cb02 805f 1389 d754 e28d 0abd dc9f
+
+....._...T......
+
+0x0020:
+
+8010 fbb4 667f 0000 0101 080a 2944 441d
+
+....f.......)DD.
+
+0x0030:
+
+14a4 4bb8 3233 3435 3637 3839 3031 3233
+
+..K.234567890123
+
+0x0040:
+
+3435 3637 3839 3031 3233 3435 3637 3839
+
+4567890123456789
+
+[...]
+
+During performance analysis, it can be useful to change the timestamp column to show delta
+times between packets (-ttt), or elapsed time since the first packet (-ttttt).
+An expression can also be provided to describe how to filter packets (see pcap-filter(7)) to focus
+on the packets of interest. This is performed in-kernel for efficiency (except on Linux 2.0 and
+older) using BPF.
+Packet capture is expensive to perform in terms of both CPU cost and storage. If possible, use
+tcpdump(8) only for short periods to limit the performance cost, and look for ways to use efficient BPF-based tools such as bpftrace instead.
+tshark(1) is a similar command-line packet capture tool that provides better filtering and output
+options. It is the CLI version of Wireshark.
+
+559
+
+560
+
+Chapter 10 Network
+
+10.6.14 Wireshark
+While tcpdump(8) works fine for casual investigations, for deeper analysis it can be timeconsuming to use at the command line. The Wireshark tool (formerly Ethereal) provides a
+graphical interface for packet capture and inspection and can also import packet dump files
+from tcpdump(8) [Wireshark 20]. Useful features include identifying network connections and
+their related packets, so that they can be studied separately, and also translation of hundreds of
+protocol headers.
+
+Figure 10.12 Wireshark screenshot
+Figure 10.12 shows an example screenshot of Wireshark. The window is split horizontally into
+three parts. At the top is a table showing packets as rows and details as columns. The middle section shows protocol details: in this example the TCP protocol was expanded and the destination
+port selected. The bottom section shows the raw packet as hexadecimal on the left and text on
+the right: the location of the TCP destination port is highlighted.
+
+10.6.15 Other Tools
+Network analysis tools included in other chapters of this book, and in BPF Performance Tools
+[Gregg 19], are listed in Table 10.7.
+
+10.6 Observability Tools
+
+Table 10.7
+
+Other network analysis tools
+
+Section
+
+Tool
+
+Description
+
+5.5.3
+
+offcputime
+
+Off-CPU profiling can show network I/O
+
+[Gregg 19]
+
+sockstat
+
+High-level socket statistics
+
+[Gregg 19]
+
+sofamily
+
+Count address families for new sockets, by process
+
+[Gregg 19]
+
+soprotocol
+
+Count transport protocols for new sockets, by process
+
+[Gregg 19]
+
+soconnect
+
+Trace socket IP-protocol connections with details
+
+[Gregg 19]
+
+soaccept
+
+Trace socket IP-protocol accepts with details
+
+[Gregg 19]
+
+socketio
+
+Summarize socket details with I/O counts
+
+[Gregg 19]
+
+socksize
+
+Show socket I/O sizes as per-process histograms
+
+[Gregg 19]
+
+sormem
+
+Show socket receive buffer usage and overflows
+
+[Gregg 19]
+
+soconnlat
+
+Summarize IP socket connection latency with stacks
+
+[Gregg 19]
+
+so1stbyte
+
+Summarize IP socket first byte latency
+
+[Gregg 19]
+
+tcpconnect
+
+Trace TCP active connections (connect())
+
+[Gregg 19]
+
+tcpaccept
+
+Trace TCP passive connections (accept())
+
+[Gregg 19]
+
+tcpwin
+
+Trace TCP send congestion window parameters
+
+[Gregg 19]
+
+tcpnagle
+
+Trace TCP Nagle usage and transmit delays
+
+[Gregg 19]
+
+udpconnect
+
+Trace new UDP connections from localhost
+
+[Gregg 19]
+
+gethostlatency
+
+Trace DNS lookup latency via library calls
+
+[Gregg 19]
+
+ipecn
+
+Trace IP inbound explicit congestion notification
+
+[Gregg 19]
+
+superping
+
+Measure ICMP echo times from the network stack
+
+[Gregg 19]
+
+qdisc-fq (...)
+
+Show FQ qdisc queue latency
+
+[Gregg 19]
+
+netsize
+
+Show net device I/O sizes
+
+[Gregg 19]
+
+nettxlat
+
+Show net device transmission latency
+
+[Gregg 19]
+
+skbdrop
+
+Trace sk_buff drops with kernel stack traces
+
+[Gregg 19]
+
+skblife
+
+Lifespan of sk_buff as inter-stack latency
+
+[Gregg 19]
+
+ieee80211scan
+
+Trace IEEE 802.11 WiFi scanning
+
+Other Linux network observability tools and sources include:
+■
+
+strace(1): Trace socket-related syscalls and examine the options used (note that strace(1)
+has high overhead)
+
+■
+
+lsof(8): List open files by process ID, including socket details
+
+■
+
+nfsstat(8): NFS server and client statistics
+
+■
+
+ifpps(8): Top-like network and system statistics
+
+561
+
+562
+
+Chapter 10 Network
+
+■
+
+iftop(8): Summarize network interface throughput by host (sniffer)
+
+■
+
+perf(1): Count and record network tracepoints and kernel functions.
+
+■
+
+/proc/net: Contains many network statistics files
+
+■
+
+BPF iterator: Allows BPF programs to export custom statistics in /sys/fs/bpf
+
+There are also many network monitoring solutions, either based on SNMP or running their own
+custom agents.
+
+10.7
+
+Experimentation
+
+Network performance is commonly tested using tools that perform an experiment rather than
+just observing the state of the system. Such experimental tools include ping(8), traceroute(8),
+and network micro-benchmarks such as iperf(8). These can be used to determine network health
+between hosts, which can be used to help determine whether end-to-end network throughput is
+a problem when debugging application performance issues.
+
+10.7.1
+
+ping
+
+The ping(8) command tests network connectivity by sending ICMP echo request packets. For
+example:
+# ping www.netflix.com
+PING www.netflix.com(2620:108:700f::3423:46a1 (2620:108:700f::3423:46a1)) 56 data
+bytes
+64 bytes from 2620:108:700f::3423:46a1 (2620:108:700f::3423:46a1): icmp_seq=1 ttl=43
+time=32.3 ms
+64 bytes from 2620:108:700f::3423:46a1 (2620:108:700f::3423:46a1): icmp_seq=2 ttl=43
+time=34.3 ms
+64 bytes from 2620:108:700f::3423:46a1 (2620:108:700f::3423:46a1): icmp_seq=3 ttl=43
+time=34.0 ms
+^C
+--- www.netflix.com ping statistics --3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 32.341/33.579/34.389/0.889 ms
+
+The output includes the round-trip time (time) for each packet and has a summary showing
+various statistics.
+Older versions of ping(8) measured the round-trip time from user space, slightly inflating times
+due to kernel execution and scheduler latency. Newer kernels and ping(8) versions use kernel
+timestamp support (SIOCGSTAMP or SO_TIMESTAMP) to improve the accuracy of the reported
+ping times.
+
+10.7
+
+Experimentation
+
+The ICMP packets used may be treated by routers at a lower priority than application protocols,
+and latency may show higher variance than usual.20
+
+10.7.2
+
+traceroute
+
+The traceroute(8) command sends a series of test packets to experimentally determine the current route to a host. This is performed by increasing the IP protocol time to live (TTL) by one for
+each packet, causing the sequence of gateways to the host to reveal themselves by sending ICMP
+time exceeded response messages (provided a firewall doesn’t block them).
+For example, testing the current route from a California host to my website:
+# traceroute www.brendangregg.com
+traceroute to www.brendangregg.com (184.168.188.1), 30 hops max, 60 byte packets
+1
+
+_gateway (10.0.0.1)
+
+2
+
+196.120.89.153 (196.120.89.153)
+
+3.453 ms
+
+3.379 ms
+
+4.769 ms
+
+19.239 ms
+
+19.217 ms
+
+13.507 ms
+
+3 be-10006-rur01.sanjose.ca.sfba.comcast.net (162.151.1.145)
+19.050 ms
+4
+ms
+
+19.141 ms
+
+be-231-rar01.santaclara.ca.sfba.comcast.net (162.151.78.249)
+18.941 ms
+
+19.102 ms
+
+19.018 ms
+
+18.987
+
+5 be-299-ar01.santaclara.ca.sfba.comcast.net (68.86.143.93)
+21.053 ms
+
+21.184 ms
+
+18.849 ms
+
+6
+
+11.950 ms
+
+16.471 ms
+
+7 4.69.216.162 (4.69.216.162)
+28.043 ms
+
+lag-14.ear3.SanJose1.Level3.net (4.68.72.105)
+
+24.905 ms 4.69.216.158 (4.69.216.158)
+
+21.705 ms
+
+8
+
+4.53.228.238 (4.53.228.238)
+
+35.802 ms
+
+37.202 ms
+
+37.137 ms
+
+9
+ms
+
+ae0.ibrsa0107-01.lax1.bb.godaddy.com (148.72.34.5)
+
+24.640 ms
+
+10
+
+148.72.32.16 (148.72.32.16)
+
+35.537 ms
+
+33.598 ms
+
+11
+ms
+
+be38.trmc0215-01.ars.mgmt.phx3.gdg (184.168.0.69)
+
+33.646 ms
+
+12
+
+* * *
+
+13
+
+* * *
+
+33.747 ms
+
+18.717 ms
+
+24.610 ms
+
+24.579
+
+33.590 ms
+
+35.220
+
+[...]
+
+Each hop shows a series of three RTTs, which can be used as a coarse source of network latency
+statistics. As with ping(8), the packets used are low-priority and may show higher latency than
+for other application protocols. Some tests show “*”: an ICMP time exceeded message was not
+returned. All three tests showing “*” can be due to a hop not returning ICMP at all, or ICMP
+being blocked by a firewall. A workaround can be to switch to TCP instead of ICMP, using
+the -T option (also provided as the command tcptraceroute(1); a more advanced version is
+astraceroute(8), which can customize flags).
+
+20
+
+Although some networks may instead treat ICMP with a higher priority, to perform better on ping-based
+benchmarks.
+
+563
+
+564
+
+Chapter 10 Network
+
+The path taken can also be studied as part of static performance tuning. Networks are designed
+to be dynamic and responsive to outages, and performance may have degraded as the path has
+changed. Note that the path can also change during a traceroute(8) run: hop 7 in the previous
+output first returned from 4.69.216.162, and then 4.69.216.158. If the address changes, it is
+printed; otherwise only the RTT time is printed for the subsequent tests.
+For advanced details on interpreting traceroute(8), see [Steenbergen 09].
+traceroute(8) was first written by Van Jacobson. He later created an amazing tool called pathchar.
+
+10.7.3 pathchar
+pathchar is similar to traceroute(8) but includes the bandwidth between hops. This is determined
+by sending a series of network packets in various sizes many times and performing statistical
+analysis. Here is example output:
+# pathchar 192.168.1.10
+pathchar to 192.168.1.1 (192.168.1.1)
+doing 32 probes at each of 64 to 1500 by 32
+0 localhost
+|
+
+30 Mb/s,
+
+79 us (562 us)
+
+1 neptune.test.com (192.168.2.1)
+|
+
+44 Mb/s,
+
+195 us (1.23 ms)
+
+2 mars.test.com (192.168.1.1)
+2 hops, rtt 547 us (1.23 ms), bottleneck
+
+30 Mb/s, pipe 7555 bytes
+
+Unfortunately, pathchar somehow missed becoming popular (perhaps because the source
+code was not released, as far as I know), and it is difficult to run the original version (the most
+recent Linux binary on the pathchar site is for Linux 2.0.30 published in 1997 [Jacobson 97]). A
+new version by Bruce A. Mah, called pchar(8), is more readily available. pathchar was also very
+time-consuming to run, taking tens of minutes depending on the number of hops, although
+methods have been proposed to reduce this time [Downey 99].
+
+10.7.4
+
+iperf
+
+iperf(1) is an open-source tool for testing maximum TCP and UDP throughput. It supports a
+variety of options, including parallel mode where multiple client threads are used, which can be
+necessary to drive a network to its limit. iperf(1) must be executed on both the server and
+the client.
+For example, executing iperf(1) on the server:
+$ iperf -s -l 128k
+-----------------------------------------------------------Server listening on TCP port 5001
+TCP window size: 85.3 KByte (default)
+------------------------------------------------------------
+
+10.7
+
+Experimentation
+
+This increased the socket buffer size to 128 Kbytes (-l 128k), from the default of 8 Kbytes.
+The following was executed on the client:
+# iperf -c 10.2.203.2 -l 128k -P 2 -i 1 -t 60
+-----------------------------------------------------------Client connecting to 10.2.203.2, TCP port 5001
+TCP window size: 48.0 KByte (default)
+-----------------------------------------------------------[
+
+4] local 10.2.124.2 port 41407 connected with 10.2.203.2 port 5001
+
+[
+
+3] local 10.2.124.2 port 35830 connected with 10.2.203.2 port 5001
+
+[ ID] Interval
+
+Transfer
+
+Bandwidth
+
+[
+
+4]
+
+0.0- 1.0 sec
+
+6.00 MBytes
+
+50.3 Mbits/sec
+
+[
+
+3]
+
+0.0- 1.0 sec
+
+22.5 MBytes
+
+189 Mbits/sec
+
+[SUM]
+
+0.0- 1.0 sec
+
+28.5 MBytes
+
+239 Mbits/sec
+
+[
+
+3]
+
+1.0- 2.0 sec
+
+16.1 MBytes
+
+135 Mbits/sec
+
+[
+
+4]
+
+1.0- 2.0 sec
+
+12.6 MBytes
+
+106 Mbits/sec
+
+[SUM]
+
+1.0- 2.0 sec
+
+28.8 MBytes
+
+241 Mbits/sec
+
+[...]
+[
+
+4]
+
+0.0-60.0 sec
+
+748 MBytes
+
+105 Mbits/sec
+
+[
+
+3]
+
+0.0-60.0 sec
+
+996 MBytes
+
+139 Mbits/sec
+
+[SUM]
+
+0.0-60.0 sec
+
+1.70 GBytes
+
+244 Mbits/sec
+
+This used the following options:
+■
+
+-c host: Connect to the host name or IP address
+
+■
+
+-l 128k: Use a 128 Kbyte socket buffer
+
+■
+
+-P 2: Run in parallel mode with two client threads
+
+■
+
+-i 1: Print interval summaries every second
+
+■
+
+-t 60: Total duration of the test: 60 seconds
+
+The final line shows the average throughput during the test, summed across all parallel threads:
+244 Mbits/s.
+The per-interval summaries can be inspected to see the variance over time. The --reportstyle
+C option can be used to output CSV, so that it can then be imported by other tools, such as
+graphing software.
+
+10.7.5
+
+netperf
+
+netperf(1) is an advanced micro-benchmark tool that can test request/response performance [HP
+18]. I use netperf(1) to measure TCP round-trip latency; here is some example output:
+server$ netserver -D -p 7001
+Starting netserver with host 'IN(6)ADDR_ANY' port '7001' and family AF_UNSPEC
+[...]
+
+565
+
+566
+
+Chapter 10 Network
+
+client$ netperf -v 100 -H 100.66.63.99 -t TCP_RR -p 7001
+MIGRATED TCP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to
+100.66.63.99 () port 0 AF_INET : demo : first burst 0
+Alignment
+
+Offset
+
+RoundTrip
+
+Trans
+
+Throughput
+
+Local
+
+Remote
+
+Local
+
+Remote
+
+Latency
+
+Rate
+
+10^6bits/s
+
+Send
+
+Recv
+
+Send
+
+Recv
+
+usec/Tran
+
+per sec
+
+Outbound
+
+8
+
+0
+
+0
+
+0
+
+98699.102
+
+10.132 0.000
+
+Inbound
+0.000
+
+This shows a TCP round-trip latency of 98.7 ms.
+
+10.7.6
+
+tc
+
+The traffic control utility, tc(8), allows various queueing disciplines (qdiscs) to be selected to
+improve or manage performance. For experimentation, there are also qdiscs that can throttle or
+perturb performance, which can be useful for testing and simulation. This section demonstrates
+the network emulator (netem) qdisc.
+To start with, the following command lists the current qdisc configuration for the interface eth0:
+# tc qdisc show dev eth0
+qdisc noqueue 0: root refcnt 2
+
+Now the netem qdisc will be added. Each qdisc supports different tunable parameters. For this
+example, I will use the packet loss parameters for netem, and set packet loss to 1%:
+# tc qdisc add dev eth0 root netem loss 1%
+# tc qdisc show dev eth0
+qdisc netem 8001: root refcnt 2 limit 1000 loss 1%
+
+Subsequent network I/O on eth0 will now suffer a 1% packet loss.
+The -s option to tc(8) shows statistics:
+# tc -s qdisc show dev eth0
+qdisc netem 8001: root refcnt 2 limit 1000 loss 1%
+Sent 75926119 bytes 89538 pkt (dropped 917, overlimits 0 requeues 0)
+backlog 0b 0p requeues 0
+
+This output shows counts for the number of dropped packets.
+To remove the qdisc:
+# tc qdisc del dev eth0 root
+# tc qdisc show dev eth0
+qdisc noqueue 0: root refcnt 2
+
+See the man page for each qdisc for the full list of options (for netem, the man page is tc-netem(8)).
+
+10.8
+
+Tuning
+
+10.7.7 Other Tools
+Other experimental tools worth mentioning:
+■
+
+■
+
+■
+
+■
+
+pktgen: A packet generator included in the Linux kernel [Linux 20l].
+Flent: The FLExible Network Tester launches multiple micro-benchmarks and graphs the
+results [Høiland-Jørgensen 20].
+mtr(8): A traceroute-like tool that includes ping statistics.
+tcpreplay(1): A tool that replays previously captured network traffic (from tcpdump(8)),
+including simulating packet timing. While more useful for general debugging than
+performance testing, there might be performance issues that only occur with a certain
+sequence of packets or bit patterns, and this tool may be able to reproduce them.
+
+10.8
+
+Tuning
+
+Network tunable parameters are usually already tuned to provide high performance. The network
+stack is also usually designed to respond dynamically to different workloads, providing optimum
+performance.
+Before trying tunable parameters, it can be worthwhile to first understand network usage. This
+may also identify unnecessary work that can be eliminated, leading to much greater performance wins. Try the workload characterization and static performance tuning methodologies
+using the tools in the previous section.
+Available tunables vary between versions of an operating system. See their documentation.
+The sections that follow provide an idea of what may be available and how they are tuned; they
+should be treated as a starting point to revise based on your workload and environment.
+
+10.8.1
+
+System-Wide
+
+On Linux, system-wide tunable parameters can be viewed and set using the sysctl(8) command
+and written to /etc/sysctl.conf. They can also be read and written from the /proc file system,
+under /proc/sys/net.
+For example, to see what is currently available for TCP, the parameters can be searched for the
+text “tcp” from sysctl(8):
+# sysctl -a | grep tcp
+net.ipv4.tcp_abort_on_overflow = 0
+net.ipv4.tcp_adv_win_scale = 1
+net.ipv4.tcp_allowed_congestion_control = reno cubic
+net.ipv4.tcp_app_win = 31
+net.ipv4.tcp_autocorking = 1
+net.ipv4.tcp_available_congestion_control = reno cubic
+net.ipv4.tcp_available_ulp =
+
+567
+
+568
+
+Chapter 10 Network
+
+net.ipv4.tcp_base_mss = 1024
+net.ipv4.tcp_challenge_ack_limit = 1000
+net.ipv4.tcp_comp_sack_delay_ns = 1000000
+net.ipv4.tcp_comp_sack_nr = 44
+net.ipv4.tcp_congestion_control = cubic
+net.ipv4.tcp_dsack = 1
+[...]
+
+On this kernel (5.3) there are 70 containing “tcp” and many more under “net.” including parameters for IP, Ethernet, routing, and network interfaces.
+Some of these settings can be tuned on a per-socket basis. For example, net.ipv4.tcp_congestion_
+control is the system-wide default congestion control algorithm, which can be set per socket
+using the TCP_CONGESTION socket option (see Section 10.8.2, Socket Options).
+
+Production Example
+The following shows how Netflix tunes their cloud instances [Gregg 19c]; it is applied in a start
+script during boot:
+net.core.default_qdisc = fq
+net.core.netdev_max_backlog = 5000
+net.core.rmem_max = 16777216
+net.core.somaxconn = 1024
+net.core.wmem_max = 16777216
+net.ipv4.ip_local_port_range = 10240 65535
+net.ipv4.tcp_abort_on_overflow = 1
+net.ipv4.tcp_congestion_control = bbr
+net.ipv4.tcp_max_syn_backlog = 8192
+net.ipv4.tcp_rmem = 4096 12582912 16777216
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_syn_retries = 2
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_wmem = 4096 12582912 16777216
+
+This sets only 14 tunables out of those possible, and is provided as a point-in-time example, not
+a recipe. Netflix is considering updating two of these during 2020 (setting net.core.netdev_max_
+backlog to 1000, and net.core.somaxconn to 4096)21 pending non-regression testing.
+The following sections discuss individual tunables.
+
+21
+
+Thanks to Daniel Borkmann for the suggestions, made during the review of this book. These new values are
+already in use by Google [Dumazet 17b][Dumazet 19].
+
+10.8
+
+Tuning
+
+Socket and TCP Buffers
+The maximum socket buffer size for all protocol types, for both reads (rmem_max) and writes
+(wmem_max), can be set using:
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+
+The value is in bytes. This may need to be set to 16 Mbytes or higher to support full-speed 10
+GbE connections.
+Enabling auto-tuning of the TCP receive buffer:
+net.ipv4.tcp_moderate_rcvbuf = 1
+
+Setting the auto-tuning parameters for the TCP read and write buffers:
+net.ipv4.tcp_rmem = 4096 87380 16777216
+net.ipv4.tcp_wmem = 4096 65536 16777216
+
+Each has three values: the minimum, default, and maximum number of bytes to use. The size
+used is auto-tuned from the default. To improve TCP throughput, try increasing the maximum
+value. Increasing minimum and default will consume more memory per connection, which may
+not be necessary.
+
+TCP Backlog
+First backlog queue, for half-open connections:
+net.ipv4.tcp_max_syn_backlog = 4096
+
+Second backlog queue, the listen backlog, for passing connections to accept(2):
+net.core.somaxconn = 1024
+
+Both of these may need to be increased from their defaults, for example, to 4,096 and 1,024, or
+higher, to better handle bursts of load.
+
+Device Backlog
+Increasing the length of the network device backlog queue, per CPU:
+net.core.netdev_max_backlog = 10000
+
+This may need to be increased, such as to 10,000, for 10 GbE NICs.
+
+569
+
+570
+
+Chapter 10 Network
+
+TCP Congestion Control
+Linux supports pluggable congestion-control algorithms. Listing those currently available:
+# sysctl net.ipv4.tcp_available_congestion_control
+net.ipv4.tcp_available_congestion_control = reno cubic
+
+Some may be available but not currently loaded. For example, adding htcp:
+# modprobe tcp_htcp
+# sysctl net.ipv4.tcp_available_congestion_control
+net.ipv4.tcp_available_congestion_control = reno cubic htcp
+
+The current algorithm may be selected using:
+net.ipv4.tcp_congestion_control = cubic
+
+TCP Options
+Other TCP parameters that may be set include:
+net.ipv4.tcp_sack = 1
+net.ipv4.tcp_fack = 1
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_tw_recycle = 0
+
+SACK and the FACK extensions may improve throughput performance over high-latency networks, at the cost of some CPU load.
+The tcp_tw_reuse tunable allows a TIME_WAIT session to be reused when it appears safe to do so.
+This can allow higher rates of connections between two hosts, such as between a web server and a
+database, without hitting the 16-bit ephemeral port limit with sessions in TIME_WAIT.
+tcp_tw_recycle is another way to reuse TIME_WAIT sessions, although not as safe as
+tcp_tw_reuse.
+
+ECN
+Explicit Congestion Notification can be controlled using:
+net.ipv4.tcp_ecn = 1
+
+Values are 0 to disable ECN, 1 to allow for incoming connections and request ECN on outgoing
+connections, and 2 to allow for incoming and not request ECN on outgoing. The default is 2.
+There is also net.ipv4.tcp_ecn_fallback, set to 1 (true) by default, which will disable ECN for a
+connection if the kernel detects that it has misbehaved.
+
+10.8
+
+Tuning
+
+Byte Queue Limits
+This can be tuned via /sys. Showing the contents of the control files for these limits (the path,
+truncated in this output, will be different for your system and interface):
+# grep . /sys/devices/pci.../net/ens5/queues/tx-0/byte_queue_limits/limit*
+/sys/devices/pci.../net/ens5/queues/tx-0/byte_queue_limits/limit:16654
+/sys/devices/pci.../net/ens5/queues/tx-0/byte_queue_limits/limit_max:1879048192
+/sys/devices/pci.../net/ens5/queues/tx-0/byte_queue_limits/limit_min:0
+
+The limit for this interface is 16654 bytes, set by auto-tuning. To control this value, set limit_
+min and limit_max to clamp the accepted range.
+
+Resource Controls
+The container groups (cgroups) network priority (net_prio) subsystem can be used to apply a
+priority to outgoing network traffic, for processes or groups of processes. This can be used to
+favor high-priority network traffic, such as production load, over low-priority traffic, such as
+backups or monitoring. There is also the network classifier (net_cls) cgroup for tagging packets
+belonging to a cgroup with a class ID: these IDs can then be used by a queueing discipline for
+applying packet or bandwidth limits, and also by BPF programs. BPF programs can also use other
+information such as the cgroup v2 ID for container awareness, and can improve scalability by
+moving classification, measurement, and remarking to the tc egress hook, relieving pressure on
+the root qdisc lock [Fomichev 20].
+For more information on resource controls see the Network I/O heading in Chapter 11, Cloud
+Computing, Section 11.3.3, Resource Controls.
+
+Queueing Disciplines
+Described in Section 10.4.3, Software, and pictured in Figure 10.8, queueing disciplines
+(qdiscs) are algorithms for scheduling, manipulating, filtering, and shaping network packets.
+Section 10.7.6, tc, showed using the netem qdisc for creating packet loss. There are also various
+qdiscs that may improve performance for different workloads. You can list the qdiscs on your
+system using:
+# man -k tc-
+
+Each qdisc has its own man page. Qdiscs can be used to set packet rate or bandwidth policies, set
+the IP ECN flags, and more.
+The default qdisc can be viewed and set using:
+# sysctl net.core.default_qdisc
+net.core.default_qdisc = fq_codel
+
+Many Linux distributions have already switched to fq_codel as the default because it provides
+good performance in most cases.
+
+571
+
+572
+
+Chapter 10 Network
+
+The Tuned Project
+With so many tunables available, it can be laborious to work through them. The Tuned Project
+provides automatic tuning for some of these tunables based on selectable profiles, and supports
+Linux distributions including RHEL, Fedora, Ubuntu, and CentOS [Tuned Project 20]. After
+installing tuned, the available profiles can be listed using:
+# tuned-adm list
+Available profiles:
+[...]
+- balanced
+
+- General non-specialized tuned profile
+
+[...]
+- network-latency
+- Optimize for deterministic performance at the cost of
+increased power consumption, focused on low latency network performance
+- network-throughput
+- Optimize for streaming network throughput, generally
+only necessary on older CPUs or 40G+ networks
+[...]
+
+This output is truncated: the full list shows 28 profiles. To activate the network-latency profile:
+# tuned-adm profile network-latency
+
+To see which tunables this profile sets, its configuration file can be read from the tuned source
+[Škarvada 20]:
+$ more tuned/profiles/network-latency/tuned.conf
+[...]
+[main]
+summary=Optimize for deterministic performance at the cost of increased power
+consumption, focused on low latency network performance
+include=latency-performance
+[vm]
+transparent_hugepages=never
+[sysctl]
+net.core.busy_read=50
+net.core.busy_poll=50
+net.ipv4.tcp_fastopen=3
+kernel.numa_balancing=0
+[bootloader]
+cmdline_network_latency=skew_tick=1
+
+Note that this has an include directive that includes the tunables in the latency-performance
+profile as well.
+
+10.8
+
+Tuning
+
+10.8.2 Socket Options
+Sockets can be tuned individually by applications via the setsockopt(2) syscall. This may only
+be possible if you are developing or recompiling software, and can make modifications to the
+source.22
+setsockopt(2) allows different layers to be tuned (e.g., socket, TCP). Table 10.8 shows some tuning possibilities on Linux.
+
+Table 10.8
+
+Sample socket options
+
+Option Name
+
+Description
+
+SO_SNDBUF, SO_RCVBUF
+
+Send and receive buffer sizes (these can be tuned up to the
+system limits described earlier; there is also SO_SNDBUFFORCE
+to override the send limit).
+
+SO_REUSEPORT
+
+Allows multiple processes or threads to bind to the same port,
+allowing the kernel to distribute load across them for scalability
+(since Linux 3.9).
+
+SO_MAX_PACING_RATE
+
+Sets the maximum pacing rate, in bytes per second (see
+tc-fq(8)).
+
+SO_LINGER
+
+Can be used to reduce TIME_WAIT latency.
+
+SO_TXTIME
+
+Request time-based packet transmission, where deadlines
+can be supplied (since Linux 4.19) [Corbet 18c] (used for UDP
+pacing [Bruijn 18]).
+
+TCP_NODELAY
+
+Disables Nagle, sending segments as soon as possible. This
+may improve latency at the cost of higher network utilization
+(more packets).
+
+TCP_CORK
+
+Pause transmission until full packets can be sent, improving
+throughput. (There is also a system-wide setting for the kernel
+to automatically attempt corking: net.ipv4.tcp_autocorking.)
+
+TCP_QUICKACK
+
+Send ACKs immediately (can increase send bandwidth).
+
+TCP_CONGESTION
+
+Congestion control algorithm for the socket.
+
+For available socket options, see the man pages for socket(7), tcp(7), udp(7), etc.
+There are also some socket I/O syscall flags that can affect performance. For example, Linux 4.14
+added the MSG_ZEROCOPY flag for send(2) syscalls: it allows the user space buffer to be used
+during transmission, to avoid the expense of copying it to kernel space23 [Linux 20c].
+
+22
+23
+
+There are some dangerous ways to hack it into a running binary, but it would be irresponsible to show them here.
+
+Using MSG_ZEROCOPY is not as simple as just setting the flag: the send(2) syscall may return before the data
+has been sent, so the sending application must wait for a kernel notification to know when freeing or reusing the
+buffer memory is allowed.
+
+573
+
+574
+
+Chapter 10 Network
+
+10.8.3
+
+Configuration
+
+The following configuration options may also be available for tuning network performance:
+■
+
+■
+
+■
+
+Ethernet jumbo frames: Increasing the default MTU from 1,500 to ~9,000 can improve
+network throughput performance, if the network infrastructure supports jumbo frames.
+Link aggregation: Multiple network interfaces can be grouped together so that they act
+as one with the combined bandwidth. This requires switch support and configuration to
+work properly.
+Firewall configuration: For example, iptables or BPF programs on the egress hook can be
+used to set the IP ToS (DSCP) level in the IP headers based on a firewall rule. This could be
+used to prioritize traffic based on port, as well as other use cases.
+
+10.9 Exercises
+1. Answer the following questions about network terminology:
+■
+
+What is the difference between bandwidth and throughput?
+
+■
+
+What is TCP connection latency?
+
+■
+
+What is first-byte latency?
+
+■
+
+What is round-trip time?
+
+2. Answer the following conceptual questions:
+■
+
+Describe network interface utilization and saturation.
+
+■
+
+What is the TCP listen backlog, and how is it used?
+
+■
+
+Describe the pros and cons of interrupt coalescing.
+
+3. Answer the following deeper questions:
+■
+
+■
+
+For a TCP connection, explain how a network frame (or packet) error could hurt
+performance.
+Describe what happens when a network interface is overloaded with work, including the
+effect on application performance.
+
+4. Develop the following procedures for your operating system:
+■
+
+A USE method checklist for network resources (network interfaces and controllers). Include
+how to fetch each metric (e.g., which command to execute) and how to interpret the result.
+Try to use existing OS observability tools before installing or using additional software
+products.
+
+5. A workload characterization checklist for network resources. Include how to Perform these
+tasks (may require use of dynamic tracing):
+■
+
+Measure first-byte latency for outbound (active) TCP connections.
+
+■
+
+Measure TCP connect latency. The script should handle non-blocking connect(2) calls.
+
+10.10
+
+References
+
+6. (optional, advanced) Measure TCP/IP inter-stack latency for RX and TX. For RX, this measures
+time from interrupt to socket read; for TX, the time from socket write to device transmit.
+Test under load. Can additional information be included to explain the cause of any latency
+outliers?
+
+10.10 References
+[Postel 80] Postel, J., “RFC 768: User Datagram Protocol,” Information Sciences Institute,
+https://tools.ietf.org/html/rfc768, 1980.
+[Postel 81] Postel, J., “RFC 793: Transmission Control Protocol,” Information Sciences Institute,
+https://tools.ietf.org/html/rfc768, 1981.
+[Nagle 84] Nagle, J., “RFC 896: Congestion Control in IP/TCP Internetworks,” https://
+tools.ietf.org/html/rfc896,1984.
+[Saltzer 84] Saltzer, J., Reed, D., and Clark, D., “End-to-End Arguments in System Design,”
+ACM TOCS, November 1984.
+[Braden 89] Braden, R., “RFC 1122: Requirements for Internet Hosts—Communication
+Layers,” https://tools.ietf.org/html/rfc1122, 1989.
+[Jacobson 92] Jacobson, V., et al., “TCP Extensions for High Performance,” Network Working
+Group, https://tools.ietf.org/html/rfc1323, 1992.
+[Stevens 93] Stevens, W. R., TCP/IP Illustrated, Volume 1, Addison-Wesley, 1993.
+[Mathis 96] Mathis, M., and Mahdavi, J., “Forward Acknowledgement: Refining TCP
+Congestion Control,” ACM SIGCOMM, 1996.
+[Jacobson 97] Jacobson, V., “pathchar-a1-linux-2.0.30.tar.gz,” ftp://ftp.ee.lbl.gov/pathchar,
+1997.
+[Nichols 98] Nichols, K., Blake, S., Baker, F., and Black, D., “Definition of the Differentiated
+Services Field (DS Field) in the IPv4 and IPv6 Headers,” Network Working Group, https://
+tools.ietf.org/html/rfc2474, 1998.
+[Downey 99] Downey, A., “Using pathchar to Estimate Internet Link Characteristics,” ACM
+SIGCOMM, October 1999.
+[Ramakrishnan 01] Ramakrishnan, K., Floyd, S., and Black, D., “The Addition of Explicit
+Congestion Notification (ECN) to IP,” Network Working Group, https://tools.ietf.org/html/
+rfc3168, 2001.
+[Corbet 03] Corbet, J., “Driver porting: Network drivers,” LWN.net, https://lwn.net/
+Articles/30107, 2003.
+[Hassan 03] Hassan, M., and R. Jain., High Performance TCP/IP Networking, Prentice Hall,
+2003.
+[Deri 04] Deri, L., “Improving Passive Packet Capture: Beyond Device Polling,” Proceedings of
+SANE, 2004.
+[Corbet 06b] Corbet, J., “Reworking NAPI,” LWN.net, https://lwn.net/Articles/214457, 2006.
+
+575
+
+576
+
+Chapter 10 Network
+
+[Cook 09] Cook, T., “nicstat - the Solaris and Linux Network Monitoring Tool You Did Not
+Know You Needed,” https://blogs.oracle.com/timc/entry/nicstat_the_solaris_and_linux,
+2009.
+[Steenbergen 09] Steenbergen, R., “A Practical Guide to (Correctly) Troubleshooting with
+Traceroute,” https://archive.nanog.org/meetings/nanog47/presentations/Sunday/RAS_
+Traceroute_N47_Sun.pdf, 2009.
+[Paxson 11] Paxson, V., Allman, M., Chu, J., and Sargent, M., “RFC 6298: Computing TCP's
+Retransmission Timer,” Internet Engineering Task Force (IETF), https://tools.ietf.org/html/
+rfc6298, 2011.
+[Corbet 12] “TCP friends,” LWN.net, https://lwn.net/Articles/511254, 2012.
+[Fritchie 12] Fritchie, S. L., “quoted,” https://web.archive.org/web/20120119110658/http://
+www.snookles.com/slf-blog/2012/01/05/tcp-incast-what-is-it, 2012.
+[Hrubý 12] Hrubý, T., “Byte Queue Limits,” Linux Plumber’s Conference, https://
+blog.linuxplumbersconf.org/2012/wp-content/uploads/2012/08/bql_slide.pdf, 2012.
+[Nichols 12] Nichols, K., and Jacobson, V., “Controlling Queue Delay,” Communications of the
+ACM, July 2012.
+[Roskind 12] Roskind, J., “QUIC: Quick UDP Internet Connections,” https://docs.google.
+com/document/d/1RNHkx_VvKWyWg6Lr8SZ-saqsQx7rFV-ev2jRFUoVD34/edit#, 2012.
+[Dukkipati 13] Dukkipati, N., Cardwell, N., Cheng, Y., and Mathis, M., “Tail Loss Probe
+(TLP): An Algorithm for Fast Recovery of Tail Losses,” TCP Maintenance Working Group, https://
+tools.ietf.org/html/draft-dukkipati-tcpm-tcp-loss-probe-01, 2013.
+[Siemon 13] Siemon, D., “Queueing in the Linux Network Stack,” https://www.coverfire.
+com/articles/queueing-in-the-linux-network-stack, 2013.
+[Cheng 16] Cheng, Y., and Cardwell, N., “Making Linux TCP Fast,” netdev 1.2, https://
+netdevconf.org/1.2/papers/bbr-netdev-1.2.new.new.pdf, 2016.
+[Linux 16] “TCP Offload Engine (TOE),” https://wiki.linuxfoundation.org/networking/toe,
+2016.
+[Ather 17] Ather, A., “BBR TCP congestion control offers higher network utilization and
+throughput during network congestion (packet loss, latencies),” https://twitter.com/
+amernetflix/status/892787364598132736, 2017.
+[Bensley 17] Bensley, S., et al., “Data Center TCP (DCTCP): TCP Congestion Control for Data
+Centers,” Internet Engineering Task Force (IETF), https://tools.ietf.org/html/rfc8257, 2017.
+[Dumazet 17a] Dumazet, E., “Busy Polling: Past, Present, Future,” netdev 2.1, https://
+netdevconf.info/2.1/slides/apr6/dumazet-BUSY-POLLING-Netdev-2.1.pdf, 2017.
+[Dumazet 17b] Dumazet, E., “Re: Something hitting my total number of connections to
+the server,” netdev mailing list, https://lore.kernel.org/netdev/1503423863.2499.39.camel@
+edumazet-glaptop3.roam.corp.google.com, 2017.
+
+10.10
+
+References
+
+[Gallatin 17] Gallatin, D., “Serving 100 Gbps from an Open Connect Appliance,” Netflix
+Technology Blog, https://netflixtechblog.com/serving-100-gbps-from-an-open-connectappliance-cdb51dda3b99, 2017.
+[Bruijn 18] Bruijn, W., and Dumazet, E., “Optimizing UDP for Content Delivery: GSO,
+Pacing and Zerocopy,” Linux Plumber’s Conference, http://vger.kernel.org/lpc_net2018_talks/
+willemdebruijn-lpc2018-udpgso-paper-DRAFT-1.pdf, 2018.
+[Corbet 18b] Corbet, J., “Zero-copy TCP receive,” LWN.net, https://lwn.net/Articles/752188,
+2018.
+[Corbet 18c] Corbet, J., “Time-based packet transmission,” LWN.net, https://lwn.net/
+Articles/748879, 2018.
+[Deepak 18] Deepak, A., “eBPF / XDP firewall and packet filtering,” Linux Plumber’s
+Conference, http://vger.kernel.org/lpc_net2018_talks/ebpf-firewall-LPC.pdf, 2018.
+[Jacobson 18] Jacobson, V., “Evolving from AFAP: Teaching NICs about Time,” netdev
+0x12, July 2018, https://www.files.netdevconf.org/d/4ee0a09788fe49709855/files/?p=/
+Evolving%20from%20AFAP%20%E2%80%93%20Teaching%20NICs%20about%20time
+.pdf, 2018.
+[Høiland-Jørgensen 18] Høiland-Jørgensen, T., et al., “The eXpress Data Path: Fast
+Programmable Packet Processing in the Operating System Kernel,” Proceedings of the 14th
+International Conference on emerging Networking EXperiments and Technologies, 2018.
+[HP 18] “Netperf,” https://github.com/HewlettPackard/netperf, 2018.
+[Majkowski 18] Majkowski, M., “How to Drop 10 Million Packets per Second,” https://
+blog.cloudflare.com/how-to-drop-10-million-packets, 2018.
+[Stewart 18] Stewart, R., “This commit brings in a new refactored TCP stack called Rack,”
+https://reviews.freebsd.org/rS334804, 2018.
+[Amazon 19] “Announcing Amazon VPC Traffic Mirroring for Amazon EC2 Instances,”
+https://aws.amazon.com/about-aws/whats-new/2019/06/announcing-amazon-vpctraffic-mirroring-for-amazon-ec2-instances, 2019.
+[Dumazet 19] Dumazet, E., “Re: [LKP] [net] 19f92a030c: apachebench.requests_per_s
+econd -37.9% regression,” netdev mailing list, https://lore.kernel.org/lkml/20191113172102.
+GA23306@1wt.eu, 2019.
+[Gregg 19] Gregg, B., BPF Performance Tools: Linux System and Application Observability,
+Addison-Wesley, 2019.
+[Gregg 19b] Gregg, B., “BPF Theremin, Tetris, and Typewriters,” http://
+www.brendangregg.com/blog/2019-12-22/bpf-theremin.html, 2019.
+[Gregg 19c] Gregg, B., “LISA2019 Linux Systems Performance,” USENIX LISA, http://
+www.brendangregg.com/blog/2020-03-08/lisa2019-linux-systems-performance.html, 2019.
+[Gregg 19d] Gregg, B., “udplife.bt,” https://github.com/brendangregg/bpf-perf-tools-book/
+blob/master/exercises/Ch10_Networking/udplife.bt, 2019.
+
+577
+
+578
+
+Chapter 10 Network
+
+[Hassas Yeganeh 19] Hassas Yeganeh, S., and Cheng, Y., “TCP SO_TIMESTAMPING with
+OPT_STATS for Performance Analytics,” netdev 0x13, https://netdevconf.info/0x13/session.
+html?talk-tcp-timestamping, 2019.
+[Bufferbloat 20] “Bufferbloat,” https://www.bufferbloat.net, 2020.
+[Cheng 20] Cheng, Y., Cardwell, N., Dukkipati, N., and Jha, P., “RACK-TLP: A Time-Based
+Efficient Loss Detection for TCP,” TCP Maintenance Working Group, https://tools.ietf.org/html/
+draft-ietf-tcpm-rack-09, 2020.
+[Cilium 20a] “API-aware Networking and Security,” https://cilium.io, accessed 2020.
+[Corbet 20] Corbet, J., “Kernel operations structures in BPF,” LWN.net, https://lwn.net/
+Articles/811631, 2020.
+[DPDK 20] “AF_XDP Poll Mode Driver,” DPDK documentation, http://doc.dpdk.org/guides/
+index.html, accessed 2020.
+[Fomichev 20] Fomichev, S., et al., “Replacing HTB with EDT and BPF,” netdev 0x14,
+https://netdevconf.info/0x14/session.html?talk-replacing-HTB-with-EDT-and-BPF, 2020.
+[Google 20b] “Packet Mirroring Overview,” https://cloud.google.com/vpc/docs/packetmirroring, accessed 2020.
+[Høiland-Jørgensen 20] Høiland-Jørgensen, T., “The FLExible Network Tester,”
+https://flent.org, accessed 2020.
+[Linux 20i] “Segmentation Offloads,” Linux documentation, https://www.kernel.org/doc/
+Documentation/networking/segmentation-offloads.rst, accessed 2020.
+[Linux 20c] “MSG_ZEROCOPY,” Linux documentation, https://www.kernel.org/doc/html/
+latest/networking/msg_zerocopy.html, accessed 2020.
+[Linux 20j] “timestamping.txt,” Linux documentation, https://www.kernel.org/doc/
+Documentation/networking/timestamping.txt, accessed 2020.
+[Linux 20k] “AF_XDP,” Linux documentation, https://www.kernel.org/doc/html/latest/
+networking/af_xdp.html, accessed 2020.
+[Linux 20l] “HOWTO for the Linux Packet Generator,” Linux documentation,
+https://www.kernel.org/doc/html/latest/networking/pktgen.html, accessed 2020.
+[Nosachev 20] Nosachev, D., “How 1500 Bytes Became the MTU of the Internet,”
+https://blog.benjojo.co.uk/post/why-is-ethernet-mtu-1500, 2020.
+[Škarvada 20] Škarvada, J., “network-latency/tuned.conf,” https://github.com/redhatperformance/tuned/blob/master/profiles/network-latency/tuned.conf, last updated 2020.
+[Tuned Project 20] “The Tuned Project,” https://tuned-project.org, accessed 2020.
+[Wireshark 20] “Wireshark,” https://www.wireshark.org, accessed 2020.
+
+Chapter 11
+Cloud Computing
+
+The rise of cloud computing solves some old problems in the field of performance while creating
+new ones. A cloud environment can be created instantly and scaled on demand, without the
+typical overheads of building and managing an on-premises data center. Clouds also allow
+better granularity for deployments—fractions of a server can be used by different customers as
+needed. However, this brings its own challenges: the performance overhead of virtualization
+technologies, and resource contention with neighboring tenants.
+The learning objectives of this chapter are:
+■
+
+Understand cloud computing architecture and its performance implications.
+
+■
+
+Understand the types of virtualization: hardware, OS, and lightweight hardware.
+
+■
+
+■
+
+■
+
+Become familiar with virtualization internals, including the use of I/O proxies, and
+tuning techniques.
+Have a working knowledge of the expected overheads for different
+workloads under each virtualization type.
+Diagnose performance issues from hosts and guests, understanding how tool usage may
+vary depending on which virtualization is in use.
+
+While this entire book is applicable to cloud performance analysis, this chapter focuses on
+performance topics unique to the cloud: how hypervisors and virtualization work, how resource
+controls can be applied to guests, and how observability works from the host and guests. Cloud
+vendors typically provide their own custom services and APIs, which are not covered here: see
+the documentation that each cloud vendor provides for their own set of services.
+This chapter consists of four main parts:
+■
+
+■
+
+■
+
+Background presents general cloud computing architecture and the performance
+implications thereof.
+Hardware virtualization, where a hypervisor manages multiple guest operating system
+instances as virtual machines, each running its own kernel with virtualized devices. This
+section uses the Xen, KVM, and Amazon Nitro hypervisors as examples.
+OS virtualization, where a single kernel manages the system, creating virtual OS instances
+that are isolated from each other. This section uses Linux containers as the example.
+
+580
+
+Chapter 11 Cloud Computing
+
+■
+
+Lightweight hardware virtualization provides a best-of-both-worlds solution, where
+lightweight hardware virtualized instances run with dedicated kernels, with boot times
+and density benefits similar to containers. This section uses AWS Firecracker as the
+example hypervisor.
+
+The virtualization sections are ordered by when they were made widely available in the cloud.
+For example, the Amazon Elastic Compute Cloud (EC2) offered hardware virtualized instances
+in 2006, OS virtualized containers in 2017 (Amazon Fargate), and lightweight virtualized
+machines in 2019 (Amazon Firecracker).
+
+11.1
+
+Background
+
+Cloud computing allows computing resources to be delivered as a service, scaling from small
+fractions of a server to multi-server systems. The building blocks of your cloud depend on how
+much of the software stack is installed and configured. This chapter focuses on the following
+cloud offerings, both of which provide server instances that may be:
+■
+
+■
+
+Hardware instances: Also known as infrastructure as a service (IaaS), provided using
+hardware virtualization. Each server instance is a virtual machine.
+OS instances: For providing light-weight instances, typically via OS virtualization.
+
+Together, these may be referred to as server instances, cloud instances, or just instances. Examples
+of cloud providers that support these are Amazon Web Services (AWS), Microsoft Azure, and
+Google Cloud Platform (GCP). There are also other types of cloud primitives including functions
+as a service (FaaS) (see Section 11.5, Other Types).
+To summarize key cloud terminology: cloud computing describes a dynamic provisioning framework for instances. One or more instances run as guests of a physical host system. The guests
+are also called tenants, and the term multitenancy is used to describe them running on the same
+host. The host may be managed by cloud providers who operate a public cloud, or may be managed by your company for internal use only as part of a private cloud. Some companies construct
+a hybrid cloud that spans both public and private clouds.1 The cloud guests (tenants) are managed
+by their end users.
+For hardware virtualization, a technology called a hypervisor (or virtual machine monitor, VMM)
+creates and manages virtual machine instances, which appear as dedicated computers and allow
+entire operating systems and kernels to be installed.
+Instances can typically be created (and destroyed) in minutes or seconds and immediately put
+into production use. A cloud API is commonly provided so that this provisioning can be automated by another program.
+
+1
+Google Anthos, for example, is an application management platform that supports on-premises Google Kubernetes
+Engine (GKE) with GCP instances, as well as other clouds.
+
+11.1 Background
+
+Cloud computing can be understood further by discussing various performance-related topics:
+instance types, architecture, capacity planning, storage, and multitenancy. These are summarized in the following sections.
+
+11.1.1
+
+Instance Types
+
+Cloud providers typically offer different instance types and sizes.
+Some instance types are generic and balanced across the resources. Others may be optimized
+for a certain resource: memory, CPUs, disks, etc. As an example, AWS groups types as “families”
+(abbreviated by a letter) and generations (a number), currently offering:
+■
+
+m5: General purpose (balanced)
+
+■
+
+c5: Compute optimized
+
+■
+
+i3, d2: Storage optimized
+
+■
+
+r4, x1: Memory optimized
+
+■
+
+p1, g3, f1: Accelerated computing (GPUs, FPGAs, etc.)
+
+Within each family there are a variety of sizes. The AWS m5 family, for example, ranges from an
+m5.large (2 vCPUs and 8 Gbytes of main memory) to an m5.24xlarge (twenty-four extra-large:
+96 vCPUs and 384 Gbytes of main memory).
+There is typically a fairly consistent price/performance ratio across the sizes, allowing customers
+to pick the size that best suits their workload.
+Some providers, such as Google Cloud Platform, also offer custom machine types where the
+amount of resources can be selected.
+With so many options and the ease of redeploying instances, the instance type has become like
+a tunable parameter that can be modified as needed. This is a great improvement over the traditional enterprise model of selecting and ordering physical hardware that the company might be
+unable to change for years.
+
+11.1.2
+
+Scalable Architecture
+
+Enterprise environments have historically used a vertical scalability approach for handling
+load: building larger single systems (mainframes). This approach has its limitations. There is a
+practical limit to the physical size to which a computer can be built (which may be bounded by
+the size of elevator doors or shipping containers), and there are increasing difficulties with CPU
+cache coherency as the CPU count scales, as well as power and cooling. The solution to these
+limitations has been to scale load across many (perhaps small) systems; this is called horizontal
+scalability. In enterprise, it has been used for computer farms and clusters, especially with
+high-performance computing (HPC, where its use predates the cloud).
+Cloud computing is also based on horizontal scalability. An example environment is shown in
+Figure 11.1, which includes load balancers, web servers, application servers, and databases.
+
+581
+
+582
+
+Chapter 11 Cloud Computing
+
+Figure 11.1 Cloud architecture: horizontal scaling
+Each environment layer is composed of one or more server instances running in parallel, with
+more added to handle load. Instances may be added individually, or the architecture may be
+divided into vertical partitions, where a group composed of database servers, application servers,
+and web servers is added as a single unit.2
+A challenge of this model is the deployment of traditional databases, where one database
+instance must be primary. Data for these databases, such as MySQL, can be split logically into
+groups called shards, each of which is managed by its own database (or primary/secondary pair).
+Distributed database architectures, such as Riak, handle parallel execution dynamically, spreading load over available instances. There are now cloud-native databases, designed for use on the
+cloud, including Cassandra, CockroachDB, Amazon Aurora, and Amazon DynamoDB.
+With the per-server instance size typically being small, say, 8 Gbytes (on physical hosts with
+512 Gbytes and more of DRAM), fine-grained scaling can be used to attain optimum price/
+performance, rather than investing up front in huge systems that may remain mostly idle.
+
+11.1.3 Capacity Planning
+On-premises servers can be a significant infrastructure cost, both for the hardware and for service contract fees that may go on for years. It can also take months for new servers to be put into
+production: time spent in approvals, waiting for part availability, shipping, racking, installing,
+and testing. Capacity planning is critically important, so that appropriately sized systems can
+be purchased: too small means failure, too large is costly (and, with service contracts, may be
+costly for years to come). Capacity planning is also needed to predict increases in demand well
+in advance, so that lengthy purchasing procedures can be completed in time.
+
+2
+
+Shopify, for example, calls these units “pods” [Denis 18].
+
+11.1 Background
+
+On-premises servers, and data centers, were the norm for enterprise environments. Cloud
+computing is very different. Server instances are inexpensive, and can be created and destroyed
+almost instantly. Instead of spending time planning what may be needed, companies can
+increase the number of server instances they use as needed, in reaction to real load. This can be
+done automatically via the cloud API, based on metrics from performance monitoring software. A
+small business or startup can grow from a single small instance to thousands, without a detailed
+capacity planning study as would be expected in enterprise environments.3
+For growing startups, another factor to consider is the pace of code changes. Sites commonly
+update their production code weekly, daily, or even multiple times a day. A capacity planning
+study can take weeks and, because it is based on a snapshot of performance metrics, may be out
+of date by the time it is completed. This differs from enterprise environments running commercial software, which may change no more than a few times per year.
+Activities performed in the cloud for capacity planning include:
+■
+
+■
+
+Dynamic sizing: Automatically adding and removing server instances
+Scalability testing: Purchasing a large cloud environment for a short duration, in order to
+test scalability versus synthetic load (this is a benchmarking activity)
+
+Bearing in mind the time constraints, there is also the potential for modeling scalability (similar to
+enterprise studies) to estimate how actual scalability falls short of where it theoretically should be.
+
+Dynamic Sizing (Auto Scaling)
+Cloud vendors typically support deploying groups of server instances that can automatically
+scale up as load increases (e.g., an AWS auto scaling group (ASG)). This also supports a microservice
+architecture, where the application is split into smaller networked parts that can individually
+scale as needed.
+Auto scaling can solve the need to quickly respond to changes in load, but it also risks overprovisioning, as pictured in Figure 11.2. For example, a DoS attack may appear as an increase
+in load, triggering an expensive increase in server instances. There is a similar risk with application changes that regress performance, requiring more instances to handle the same load.
+Monitoring is important to verify that these increases make sense.
+
+Figure 11.2 Dynamic sizing
+3
+Things may get complex as a company scales to hundreds of thousands of instances, as cloud providers may temporarily run out of available instances of a given type due to demand. If you get to this scale, talk to your account
+representative about ways to mitigate this (e.g., purchasing reserve capacity).
+
+583
+
+584
+
+Chapter 11 Cloud Computing
+
+Cloud providers bill by the hour, minute, or even second, allowing users to scale up and down
+quickly. Cost savings can be realized immediately when they downsize. This can be automated
+so that the instance count matches a daily pattern, only provisioning enough capacity for each
+minute of the day as needed.4 Netflix does this for its cloud, adding and removing tens of thousands of instances daily to match its daily streams per second pattern, an example of which is
+shown in Figure 11.3 [Gregg 14b].
+
+Figure 11.3 Netflix streams per second
+As other examples, in December 2012, Pinterest reported cutting costs from $54/hour to $20/hour
+by automatically shutting down its cloud systems after hours in response to traffic load [Hoff 12],
+and in 2018 Shopify moved to the cloud and saw large infrastructure savings: moving from servers with 61% average idle time to cloud instances with 19% average idle time [Kwiatkowski 19].
+Immediate savings can also be a result of performance tuning, where the number of instances
+required to handle load is reduced.
+Some cloud architectures (see Section 11.3, OS Virtualization) can dynamically allocate more
+CPU resources instantly, if available, using a strategy called bursting. This can be provided at no
+extra cost and is intended to help prevent overprovisioning by providing a buffer during which
+the increased load can be checked to determine if it is real and likely to continue. If so, more
+instances can be provisioned so that resources are guaranteed going forward.
+Any of these techniques should be considerably more efficient than enterprise environments—
+especially those with a fixed size chosen to handle expected peak load for the lifetime of the
+server: such servers may run mostly idle.
+
+11.1.4
+
+Storage
+
+A cloud instance requires storage for the OS, application software, and temporary files. On Linux
+systems, this is the root and other volumes. This may be served by local physical storage or by
+network storage. This instance storage is volatile and is destroyed when the instance is destroyed
+(and are termed ephemeral drives). For persistent storage, an independent service is typically used,
+which provides storage to instances as either a:
+■
+
+File store: For example, files over NFS
+
+■
+
+Block store: Such as blocks over iSCSI
+
+■
+
+Object store: Over an API, commonly HTTP-based
+
+4
+Note that automating this can be complicated, for both scale up and scale down. Down scaling may involve waiting
+not just for requests to finish, but also for long-running batch jobs to finish, and databases to transfer local data.
+
+11.1 Background
+
+These operate over a network, and both the network infrastructure and storage devices are
+shared with other tenants. For these reasons, performance can be much less predictable than
+with local disks, although performance consistency can be improved by the use of resource
+controls by the cloud provider.
+Cloud providers typically provide their own services for these. For example, Amazon provides
+the Amazon Elastic File System (EFS) as a file store, the Amazon Elastic Block Store (EBS) as a
+block store, and the Amazon Simple Storage Service (S3) as an object store.
+Both local and network storage are pictured in Figure 11.4.
+
+Figure 11.4 Cloud storage
+The increased latency for network storage access is typically mitigated by using in-memory
+caches for frequently accessed data.
+Some storage services allow an IOPS rate to be purchased when reliable performance is desired
+(e.g., Amazon EBS Provisioned IOPS volume).
+
+11.1.5 Multitenancy
+Unix is a multitasking operating system, designed to deal with multiple users and processes
+accessing the same resources. Later additions by Linux have provided resource limits and controls to share these resources more fairly, and observability to identify and quantify when there
+are performance issues involving resource contention.
+Cloud computing differs in that entire operating system instances can coexist on the same physical system. Each guest is its own isolated operating system: guests (typically5) cannot observe
+users and processes from other guests on the same host—that would be considered an information leak—even though they share the same physical resources.
+Since resources are shared among tenants, performance issues may be caused by noisy neighbors.
+For example, another guest on the same host might perform a full database dump during your
+peak load, interfering with your disk and network I/O. Worse, a neighbor could be evaluating
+the cloud provider by executing micro-benchmarks that deliberately saturate resources in order
+to find their limit.
+5
+Linux containers can be assembled in different ways from namespaces and cgroups. It should be possible to
+create containers that share the process namespace with each other, which may be used for an introspection
+(“sidecar”) container that can debug other container processes. In Kubernetes, the main abstraction is a Pod, which
+shares a network namespace.
+
+585
+
+586
+
+Chapter 11 Cloud Computing
+
+There are some solutions to this problem. Multitenancy effects can be controlled by resource
+management: setting operating system resource controls that provide performance isolation (also
+called resource isolation). This is where per-tenant limits or priorities are imposed for the usage of
+system resources: CPU, memory, disk or file system I/O, and network throughput.
+Apart from limiting resource usage, being able to observe multitenancy contention can help
+cloud operators tune the limits and better balance tenants on available hosts. The degree of
+observability depends on the virtualization type.
+
+11.1.6
+
+Orchestration (Kubernetes)
+
+Many companies run their own private clouds using orchestration software running on their
+own bare metal or cloud systems. The most popular such software is Kubernetes (abbreviated as
+k8s), originally created by Google. Kubernetes, Greek for “Helmsman,” is an open-source system
+that manages application deployment using containers (commonly Docker containers, though
+any runtime implementing the Open Container Interface will also work, such as containerd)
+[Kubernetes 20b]. Public cloud providers have also created Kubernetes services to simplify
+deployment to those providers, including Google Kubernetes Engine (GKE), Amazon Elastic
+Kubernetes Service (Amazon EKS), and Microsoft Azure Kubernetes Service (AKS).
+Kubernetes deploys containers as co-located groups called Pods, where containers can share
+resources and communicate with each other locally (localhost). Each Pod has its own IP address
+that can be used to communicate (via networking) with other Pods. A Kubernetes service is an
+abstraction for endpoints provided by a group of Pods with metadata including an IP address, and
+is a persistent and stable interface to these endpoints, while the Pods themselves may be added
+and removed, allowing them to be treated as disposable. Kubernetes services support the microservices architecture. Kubernetes includes auto-scaling strategies, such as the “Horizontal Pod
+Autoscaler” that can scale replicas of a Pod based on a target resource utilization or other metric.
+In Kubernetes, physical machines are called Nodes, and a group of Nodes belong to a Kubernetes
+cluster if they connect to the same Kubernetes API server.
+Performance challenges in Kubernetes include scheduling (where to run containers on a cluster
+to maximize performance), and network performance, as extra components are used to implement container networking and load balancing.
+For scheduling, Kubernetes takes into account CPU and memory requests and limits, and metadata
+such as node taints (where Nodes are marked to be excluded from scheduling) and label selectors
+(custom metadata). Kubernetes does not currently limit block I/O (support for this, using the
+blkio cgroup, may be added in the future [Xu 20]) making disk contention a possible source of
+performance issues.
+For networking, Kubernetes allows different networking components to be used, and determining which to use is an important activity for ensuring maximum performance. Container
+networking can be implemented by plugin container network interface (CNI) software; example
+CNI software includes Calico, based on netfilter or iptables, and Cilium, based on BPF. Both are
+open source [Calico 20][Cilium 20b]. For load balancing, Cilium also provides a BPF replacement
+for kube-proxy [Borkmann 19].
+
+11.2 Hardware Virtualization
+
+11.2
+
+Hardware Virtualization
+
+Hardware virtualization creates a virtual machine (VM) that can run an entire operating system,
+including its own kernel. VMs are created by hypervisors, also called virtual machine managers
+(VMMs). A common classification of hypervisors identifies them as Type 1 or 2 [Goldberg 73],
+which are:
+■
+
+■
+
+Type 1 executes directly on the processors. Hypervisor administration may be performed
+by a privileged guest that can create and launch new guests. Type 1 is also called native
+hypervisor or bare-metal hypervisor. This hypervisor includes its own CPU scheduler for
+guest VMs. A popular example is the Xen hypervisor.
+Type 2 is executed within a host OS, which has privileges to administer the hypervisor
+and launch new guests. For this type, the system boots a conventional OS that then runs
+the hypervisor. This hypervisor is scheduled by the host kernel CPU scheduler, and guests
+appear as processes on the host.
+
+Although you may still encounter the terms Type 1 and Type 2, with advances in hypervisor
+technologies this classification is no longer strictly applicable [Liguori, 07]—Type 2 has been
+made Type 1-ish by using kernel modules so that parts of the hypervisor have direct access to
+hardware. A more practical classification is shown in Figure 11.5, illustrating two common configurations that I have named Config A and B [Gregg 19].
+
+Figure 11.5 Common hypervisor configurations
+These configurations are:
+■
+
+Config A: Also called a native hypervisor or a bare-metal hypervisor. The hypervisor software runs directly on the processors, creates domains for running guest virtual machines,
+and schedules virtual guest CPUs onto the real CPUs. A privileged domain (number 0 in
+Figure 11.5) can administer the others. A popular example is the Xen hypervisor.
+
+587
+
+588
+
+Chapter 11 Cloud Computing
+
+■
+
+Config B: The hypervisor software is executed by a host OS kernel, and may be composed
+of kernel-level modules and user-level processes. The host OS has privileges to administer
+the hypervisor, and its kernel schedules the VM CPUs along with other processes on the
+host. By use of kernel modules, this configuration also provides direct access to hardware.
+A popular example is the KVM hypervisor.
+
+Both configurations may involve running an I/O proxy (e.g., using the QEMU software) in
+domain 0 (Xen) or the host OS (KVM), for serving guest I/O. This adds overhead to I/O, and over
+the years has been optimized by adding shared memory transports and other techniques.
+The original hardware hypervisor, pioneered by VMware in 1998, used binary translations to perform full hardware virtualization [VMware 07]. This involved rewriting privileged instructions
+such as syscalls and page table operations before execution. Non-privileged instructions could
+be run directly on the processor. This provided a complete virtual system composed of virtualized hardware components onto which an unmodified operating system could be installed.
+The high-performance overhead for this was often acceptable for the savings provided by server
+consolidation.
+This has since been improved by:
+■
+
+■
+
+■
+
+Processor virtualization support: The AMD-V and Intel VT-x extensions were introduced
+in 2005–2006 to provide faster hardware support for VM operations by the processor.
+These extensions improved the speed of virtualizing privileged instructions and the MMU.
+Paravirtualization (paravirt or PV): Provides a virtual system that includes an interface
+for guest operating systems to efficiently use host resources (via hypercalls), without needing full virtualization of all components. For example, arming a timer usually involves
+multiple privileged instructions that must be emulated by the hypervisor. This can be
+simplified into a single hypercall for use by the paravirtualized guest, for more efficient
+processing by the hypervisor. For further efficiency, the Xen hypervisor batches these
+hypercalls into a multicall. Paravirtualization may include the use of a paravirtual network
+device driver by the guest for passing packets more efficiently to the physical network
+interfaces in the host. While performance is improved, this relies on guest OS support for
+paravirtualization (which Windows has historically not provided).
+Device hardware support: To further optimize VM performance, hardware devices other
+than processors have been adding virtual machine support. This includes single root I/O
+virtualization (SR-IOV) for network and storage devices, which allows guest VMs to access
+hardware directly. This requires driver support (example drivers are ixgbe, ena, hv_netvsc,
+and nvme).
+
+Over the years, Xen has evolved and improved its performance. Modern Xen VMs often boot in
+hardware VM mode (HVM) and then use PV drivers with HVM support for improved performance: a configuration called PVHVM. This can further be improved by depending entirely on
+hardware virtualization for some drivers, such as SR-IOV for network and storage devices.
+
+11.2.1
+
+Implementation
+
+There are many different implementations of hardware virtualization, and some have already
+been mentioned (Xen and KVM). Examples are:
+
+11.2 Hardware Virtualization
+
+■
+
+■
+
+■
+
+■
+
+■
+
+VMware ESX: First released in 2001, VMware ESX is an enterprise product for server consolidation and is a key component of the VMware vSphere cloud computing product. Its
+hypervisor is a microkernel that runs on bare metal, and the first virtual machine is called
+the service console, which can administer the hypervisor and new virtual machines.
+Xen: First released in 2003, Xen began as a research project at the University of Cambridge
+and was later acquired by Citrix. Xen is a Type 1 hypervisor that runs paravirtualized
+guests for high performance; support was later added for hardware-assisted guests for
+unmodified OS support (Windows). Virtual machines are called domains, with the most
+privileged being dom0, from which the hypervisor is administered and new domains
+launched. Xen is open source and can be launched from Linux. The Amazon Elastic
+Compute Cloud (EC2) was previously based on Xen.
+Hyper-V: Released with Windows Server 2008, Hyper-V is a Type 1 hypervisor that creates
+partitions for executing guest operating systems. The Microsoft Azure public cloud may be
+running a customized version of Hyper-V (exact details are not publicly available).
+KVM: This was developed by Qumranet, a startup that was bought by Red Hat in 2008.
+KVM is a Type 2 hypervisor, executing as a kernel module. It supports hardware-assisted
+extensions and, for high performance, uses paravirtualization for certain devices where
+supported by the guest OS. To create a complete hardware-assisted virtual machine
+instance, it is paired with a user process called QEMU (Quick Emulator), a VMM (hypervisor) that can create and manage virtual machines. QEMU was originally a high-quality
+open-source Type 2 hypervisor that used binary translation, written by Fabrice Bellard.
+KVM is open source, and is used by Google for the Google Compute Engine [Google 20c].
+Nitro: Launched by AWS in 2017, this hypervisor uses parts based on KVM with hardware
+support for all main resources: processors, network, storage, interrupts, and timers [Gregg
+17e]. No QEMU proxy is used. Nitro provides near bare-metal performance to guest VMs.
+
+The following sections describe performance topics related to hardware virtualization: overhead, resource controls, and observability. These differ based on the implementation and its
+configuration.
+
+11.2.2 Overhead
+Understanding when and when not to expect performance overhead from virtualization is
+important in investigating cloud performance issues.
+Hardware virtualization is accomplished in various ways. Resource access may require proxying
+and translation by the hypervisor, adding overhead, or it may use hardware-based technologies
+to avoid these overheads. The following sections summarize the performance overheads for CPU
+execution, memory mapping, memory size, performing I/O, and contention from other tenants.
+
+CPU
+In general, the guest applications execute directly on the processors, and CPU-bound applications may experience virtually the same performance as a bare-metal system. CPU overheads
+may be encountered when making privileged processor calls, accessing hardware, and mapping
+
+589
+
+590
+
+Chapter 11 Cloud Computing
+
+main memory, depending on how they are handled by the hypervisor. The following describe
+how CPU instructions are handled by the different hardware virtualization types:
+■
+
+■
+
+■
+
+Binary translation: Guest kernel instructions that operate on physical resources are identified and translated. Binary translation was used before hardware-assisted virtualization
+was available. Without hardware support for virtualization, the scheme used by VMware
+involved running a virtual machine monitor (VMM) in processor ring 0 and moving the
+guest kernel to ring 1, which had previously been unused (applications run in ring 3,
+and most processors provide four rings; protection rings were introduced in Chapter 3,
+Operating Systems, Section 3.2.2, Kernel and User Modes). Because some guest kernel
+instructions assume they are running in ring 0, in order to execute from ring 1 they need
+to be translated, calling into the VMM so that virtualization can be applied. This translation is performed during runtime, costing significant CPU overhead.
+Paravirtualization: Instructions in the guest OS that must be virtualized are replaced
+with hypercalls to the hypervisor. Performance can be improved if the guest OS is
+modified to optimize the hypercalls, making it aware that it is running on virtualized
+hardware.
+Hardware-assisted: Unmodified guest kernel instructions that operate on hardware are
+handled by the hypervisor, which runs a VMM at a ring level below 0. Instead of translating binary instructions, the guest kernel privileged instructions are forced to trap to the
+higher-privileged VMM, which can then emulate the privilege to support virtualization
+[Adams 06].
+
+Hardware-assisted virtualization is generally preferred, depending on the implementation and
+workload, while paravirtualization is used to improve the performance of some workloads (especially I/O) if the guest OS supports it.
+As an example of implementation differences, VMware’s binary translation model has been
+heavily optimized over the years, and as they wrote in 2007 [VMware 07]:
+Due to high hypervisor to guest transition overhead and a rigid programming model,
+VMware’s binary translation approach currently outperforms first generation hardware
+assist implementations in most circumstances. The rigid programming model in the
+first generation implementation leaves little room for software flexibility in managing
+either the frequency or the cost of hypervisor to guest transitions.
+The rate of transitions between the guest and hypervisor, as well as the time spent in the
+hypervisor, can be studied as a metric of CPU overhead. These events are commonly referred
+to as guest exits, as the virtual CPU must stop executing inside the guest when this happens.
+Figure 11.6 shows CPU overhead related to guest exits inside KVM.
+The figure shows the flow of guest exits between the user process, the host kernel, and the guest.
+The time spent outside of the guest-handling exits is the CPU overhead of hardware virtualization; the more time spent handling exits, the greater the overhead. When the guest exits,
+a subset of the events can be handled directly in the kernel. Those that cannot must leave the
+kernel and return to the user process; this induces even greater overhead compared to exits that
+can be handled by the kernel.
+
+11.2 Hardware Virtualization
+
+Figure 11.6 Hardware virtualization CPU overhead
+For example, with the Linux KVM implementation, these overheads can be studied via their
+guest exit functions, which are mapped in the source code as follows (from arch/x86/kvm/vmx/
+vmx.c in Linux 5.2, truncated):
+/*
+* The exit handlers return 1 if the exit was handled fully and guest execution
+* may resume.
+
+Otherwise they set the kvm_run parameter to indicate what needs
+
+* to be done to userspace and return 0.
+*/
+static int (*kvm_vmx_exit_handlers[])(struct kvm_vcpu *vcpu) = {
+[EXIT_REASON_EXCEPTION_NMI]
+
+= handle_exception,
+
+[EXIT_REASON_EXTERNAL_INTERRUPT]
+
+= handle_external_interrupt,
+
+[EXIT_REASON_TRIPLE_FAULT]
+
+= handle_triple_fault,
+
+[EXIT_REASON_NMI_WINDOW]
+
+= handle_nmi_window,
+
+[EXIT_REASON_IO_INSTRUCTION]
+
+= handle_io,
+
+[EXIT_REASON_CR_ACCESS]
+
+= handle_cr,
+
+[EXIT_REASON_DR_ACCESS]
+
+= handle_dr,
+
+[EXIT_REASON_CPUID]
+
+= handle_cpuid,
+
+[EXIT_REASON_MSR_READ]
+
+= handle_rdmsr,
+
+[EXIT_REASON_MSR_WRITE]
+
+= handle_wrmsr,
+
+[EXIT_REASON_PENDING_INTERRUPT]
+
+= handle_interrupt_window,
+
+[EXIT_REASON_HLT]
+
+= handle_halt,
+
+[EXIT_REASON_INVD]
+
+= handle_invd,
+
+[EXIT_REASON_INVLPG]
+
+= handle_invlpg,
+
+[EXIT_REASON_RDPMC]
+
+= handle_rdpmc,
+
+[EXIT_REASON_VMCALL]
+
+= handle_vmcall,
+
+591
+
+592
+
+Chapter 11 Cloud Computing
+
+[...]
+[EXIT_REASON_XSAVES]
+
+= handle_xsaves,
+
+[EXIT_REASON_XRSTORS]
+
+= handle_xrstors,
+
+[EXIT_REASON_PML_FULL]
+
+= handle_pml_full,
+
+[EXIT_REASON_INVPCID]
+
+= handle_invpcid,
+
+[EXIT_REASON_VMFUNC]
+
+= handle_vmx_instruction,
+
+[EXIT_REASON_PREEMPTION_TIMER]
+
+= handle_preemption_timer,
+
+[EXIT_REASON_ENCLS]
+
+= handle_encls,
+
+};
+
+While the names are terse, they may provide an idea of the reasons a guest may call into a hypervisor, incurring CPU overhead.
+One common guest exit is the halt instruction, usually called by the idle thread when the
+kernel can find no more work to perform (which allows the processor to operate in low-power
+modes until interrupted). It is handled by the handle_halt() function (seen in the earlier listing
+for EXIT_REASON_HLT), which ultimately calls kvm_vcpu_halt() (arch/x86/kvm/x86.c):
+int kvm_vcpu_halt(struct kvm_vcpu *vcpu)
+{
+++vcpu->stat.halt_exits;
+if (lapic_in_kernel(vcpu)) {
+vcpu->arch.mp_state = KVM_MP_STATE_HALTED;
+return 1;
+} else {
+vcpu->run->exit_reason = KVM_EXIT_HLT;
+return 0;
+}
+}
+
+As with many guest exit types, the code is kept small to minimize CPU overhead. This example
+begins with a vcpu statistic increment, which tracks how many halts occurred. The remaining
+code performs the hardware emulation required for this privileged instruction. These functions
+can be instrumented on Linux using kprobes on the hypervisor host, to track their type and the
+duration of their exits. Exits can also be tracked globally using the kvm:kvm_exit tracepoint,
+which is used in Section 11.2.4, Observability.
+Virtualizing hardware devices such as the interrupt controller and high-resolution timers also
+incur some CPU (and a small amount of memory) overhead.
+
+Memory Mapping
+As described in Chapter 7, Memory, the operating system works with the MMU to create page
+mappings from virtual to physical memory, caching them in the TLB to improve performance.
+
+11.2 Hardware Virtualization
+
+For virtualization, mapping a new page of memory (page fault) from the guest to the hardware
+involves two steps:
+1. Virtual-to-guest physical translation, as performed by the guest kernel
+2. Guest-physical-to-host-physical (actual) translation, as performed by the hypervisor VMM
+The mapping, from guest virtual to host physical, can then be cached in the TLB, so that subsequent accesses can operate at normal speed—not requiring additional translation. Modern
+processors support MMU virtualization, so that mappings that have left the TLB can be recalled
+more quickly in hardware alone (page walk), without calling in to the hypervisor. The feature
+that supports this is called extended page tables (EPT) on Intel and nested page tables (NPT) on
+AMD [Milewski 11].
+Without EPT/NPT, another approach to improve performance is to maintain shadow page tables
+of guest-virtual-to-host-physical mappings, which are managed by the hypervisor and then
+accessed during guest execution by overwriting the guest’s CR3 register. With this strategy, the
+guest kernel maintains its own page tables, which map from guest virtual to guest physical, as
+normal. The hypervisor intercepts changes to these page tables and creates equivalent mappings
+to the host physical pages in the shadow pages. Then, during guest execution, the hypervisor
+overwrites the CR3 register to point to the shadow pages.
+
+Memory Size
+Unlike OS virtualization, there are some additional consumers of memory when using hardware
+virtualization. Each guest runs its own kernel, which consumes a small amount of memory. The
+storage architecture may also lead to double caching, where both the guest and host cache the
+same data. KVM-style hypervisors also run a VMM process for each VM, such as QEMU, which
+itself consumes some main memory.
+
+I/O
+Historically, I/O was the largest source of overhead for hardware virtualization. This was because
+every device I/O had to be translated by the hypervisor. For high-frequency I/O, such as 10
+Gbit/s networking, a small degree of overhead per I/O (packet) could cause a significant overall
+reduction in performance. Technologies have been created to mitigate these I/O overheads,
+culminating with hardware support for eliminating these overheads entirely. Such hardware
+support includes I/O MMU virtualization (AMD-Vi and Intel VT-d).
+One method for improving I/O performance is the use of paravirtualized drivers, which can
+coalesce I/O and perform fewer device interrupts to reduce the hypervisor overhead.
+Another technique is PCI pass-through, which assigns a PCI device directly to the guest, so it can
+be used as it would on a bare-metal system. PCI pass-through can provide the best performance
+of the available options, but it reduces flexibility when configuring the system with multiple
+tenants, as some devices are now owned by guests and cannot be shared. This may also complicate live migration [Xen 19].
+There are some technologies to improve the flexibility of using PCI devices with virtualization, including single root I/O virtualization (SR-IOV, mentioned earlier) and multiroot I/O
+
+593
+
+594
+
+Chapter 11 Cloud Computing
+
+virtualization (MR-IOV). These terms refer to the number of root complex PCI topologies that
+are exposed, providing hardware virtualization in different ways. The Amazon EC2 cloud has
+been adopting these technologies to accelerate first networking and then storage I/O, which are
+in use by default with the Nitro hypervisor [Gregg 17e].
+Common configurations of the Xen, KVM, and Nitro hypervisors are pictured in Figure 11.7.
+
+Figure 11.7 Xen, KVM, and Nitro I/O path
+GK is “guest kernel,” and BE is “back end.” The dotted arrows indicate the control path, where
+components inform each other, either synchronously or asynchronously, that more data is ready
+to transfer. The data path (solid arrows) may be implemented in some cases by shared memory
+and ring buffers. A control path is not shown for Nitro, as it uses the same data path for direct
+access to hardware.
+There are different ways to configure Xen and KVM, not pictured here. This figure shows them
+using I/O proxy processes (typically the QEMU software), which are created per guest VM. But
+they can also be configured to use SR-IOV, allowing guest VMs to access hardware directly (not
+pictured for Xen or KVM in Figure 11.7). Nitro requires such hardware support, eliminating the
+need for I/O proxies.
+Xen improves its I/O performance using a device channel—an asynchronous shared memory
+transport between dom0 and the guest domains (domU). This avoids the CPU and bus overhead
+of creating an extra copy of I/O data as it is passed between the domains. It may also use separate
+domains for performing I/O, as described in Section 11.2.3, Resource Controls.
+The number of steps in the I/O path, both control and data, is critical for performance: the fewer,
+the better. In 2006, the KVM developers compared a privileged-guest system like Xen with KVM
+and found that KVM could perform I/O using half as many steps (five versus ten, although the
+test was performed without paravirtualization so does not reflect most modern configurations)
+[Qumranet 06].
+
+11.2 Hardware Virtualization
+
+As the Nitro hypervisor eliminates extra I/O steps, I would expect all large cloud providers seeking maximum performance to follow suit, using hardware support to eliminate I/O proxies.
+
+Multi-Tenant Contention
+Depending on the hypervisor configuration and how much CPUs and CPU caches are shared
+between tenants, there may be CPU stolen time and CPU cache pollution caused by other
+tenants, reducing performance. This is typically a larger problem with containers than VMs, as
+containers promote such sharing to support CPU bursting.
+Other tenants performing I/O may cause interrupts that interrupt execution, depending on the
+hypervisor configuration.
+Contention for resources can be managed by resource controls.
+
+11.2.3 Resource Controls
+As part of the guest configuration, CPU and main memory are typically configured with resource
+limits. The hypervisor software may also provide resource controls for network and disk I/O.
+For KVM-like hypervisors, the host OS ultimately controls the physical resources, and resource
+controls available from the OS may also be applied to the guests, in addition to the controls the
+hypervisor provides. For Linux, this means cgroups, tasksets, and other resource controls. See
+Section 11.3, OS Virtualization, for more about the resource controls that may be available from
+the host OS. The following sections describe resource controls from the Xen and KVM hypervisors, as examples.
+
+CPUs
+CPU resources are usually allocated to guests as virtual CPUs (vCPUs). These are then scheduled
+by the hypervisor. The number of vCPUs assigned coarsely limits CPU resource usage.
+For Xen, a fine-grained CPU quota for guests can be applied by a hypervisor CPU scheduler.
+Schedulers include [Cherkasova 07][Matthews 08]:
+■
+
+■
+
+■
+
+Borrowed virtual time (BVT): A fair-share scheduler based on the allocation of virtual
+time, which can be borrowed in advance to provide low-latency execution for real-time
+and interactive applications
+Simple earliest deadline first (SEDF): A real-time scheduler that allows runtime guarantees to be configured, with the scheduler giving priority to the earliest deadline
+Credit-based: Supports priorities (weights) and caps for CPU usage, and load balancing
+across multiple CPUs
+
+For KVM, fine-grained CPU quotas can be applied by the host OS, for example when using the
+host kernel fair-share scheduler described earlier. On Linux, this can be applied using the cgroup
+CPU bandwidth controls.
+There are limitations on how either technology can respect guest priorities. A guest’s CPU usage
+is typically opaque to the hypervisor, and guest kernel thread priorities cannot typically be seen
+
+595
+
+596
+
+Chapter 11 Cloud Computing
+
+or respected. For example, a low-priority log rotation daemon in one guest may have the same
+hypervisor priority as a critical application server in another guest.
+For Xen, CPU resource usage can be further complicated by high-I/O workloads that consume
+extra CPU resources in dom0. The back-end driver and I/O proxy in the guest domain alone may
+consume more than their CPU allocation but are not accounted for [Cherkasova 05]. A solution
+has been to create isolated driver domains (IDDs), which separate out I/O servicing for security,
+performance isolation, and accounting. This is pictured in Figure 11.8.
+
+Figure 11.8 Xen with isolated driver domains
+The CPU usage by IDDs can be monitored, and the guests can be charged for this usage. From
+[Gupta 06]:
+Our modified scheduler, SEDF-DC for SEDF-Debt Collector, periodically receives
+feedback from XenMon about the CPU consumed by IDDs for I/O processing on behalf
+of guest domains. Using this information, SEDF-DC constrains the CPU allocation to
+guest domains to meet the specified combined CPU usage limit.
+A more recent technique used in Xen is stub domains, which run a mini-OS.
+
+CPU Caches
+Apart from the allocation of vCPUs, CPU cache usage can be controlled using Intel cache allocation technology (CAT). It allows the LLC to be partitioned between guests, and partitions to be
+shared. While this can prevent a guest polluting another guest’s cache, it can also hurt performance by limiting cache usage.
+
+Memory Capacity
+Memory limits are imposed as part of the guest configuration, with the guest seeing only the set
+amount of memory. The guest kernel then performs its own operations (paging, swapping) to
+remain within its limit.
+
+11.2 Hardware Virtualization
+
+In an effort to increase flexibility from the static configuration, VMware developed a balloon driver
+[Waldspurger 02], which is able to reduce the memory consumed by the running guest by “inflating” a balloon module inside it, which consumes guest memory. This memory is then reclaimed
+by the hypervisor for use by other guests. The balloon can also be deflated, returning memory to
+the guest kernel for use. During this process, the guest kernel executes its normal memory management routines to free memory (e.g., paging). VMware, Xen, and KVM all have support for
+balloon drivers.
+When balloon drivers are in use (to check from the guest, search for “balloon” in the output of
+dmesg(1)), I would be on the lookout for performance issues that they may cause.
+
+File System Capacity
+Guests are provided with virtual disk volumes from the host. For KVM-like hypervisors, these
+may be software volumes created by the OS and sized accordingly. For example, the ZFS file
+system can create virtual volumes of a desired size.
+
+Device I/O
+Resource controls by hardware virtualization software have historically focused on controlling
+CPU usage, which can indirectly control I/O usage.
+Network throughput may be throttled by external dedicated devices or, in the case of KVM-like
+hypervisors, by host kernel features. For example, Linux has network bandwidth controls from
+cgroups as well as different qdiscs, which can be applied to guest network interfaces.
+Network performance isolation for Xen has been studied, with the following conclusion
+[Adamczyk 12]:
+...when the network virtualization is considered, the weak point of Xen is its lack of
+proper performance isolation.
+The authors of [Adamczyk 12] also propose a solution for Xen network I/O scheduling, which
+adds tunable parameters for network I/O priority and rate. If you are using Xen, check whether
+this or a similar technology has been made available.
+For hypervisors with full hardware support (e.g., Nitro), I/O limits may be supported by the
+hardware, or by external devices. In the Amazon EC2 cloud, network I/O and disk I/O to
+network-attached devices are throttled to quotas using external systems.
+
+11.2.4
+
+Observability
+
+What is observable on virtualized systems depends on the hypervisor and the location from
+which the observability tools are launched. In general:
+■
+
+From the privileged guest (Xen) or host (KVM): All physical resources should be
+observable using standard OS tools covered in previous chapters. Guest I/O can be observed
+by analyzing I/O proxies, if in use. Per-guest resource usage statistics should be made
+
+597
+
+598
+
+Chapter 11 Cloud Computing
+
+available from the hypervisor. Guest internals, including their processes, cannot be
+observed directly. Some I/O may not be observable if the device uses pass-through
+or SR-IOV.
+■
+
+■
+
+From the hardware-supported host (Nitro): The use of SR-IOV may make device I/O
+more difficult to observe from the hypervisor as the guest is accessing hardware directly,
+and not via a proxy or host kernel. (How Amazon actually does hypervisor observability
+on Nitro is not public knowledge.)
+From the guests: Virtualized resources and their usage by the guest can be seen, and
+physical problems inferred. Since the VM has its own dedicated kernel, kernel internals
+can be analyzed, and kernel tracing tools, including BPF-based tools, all work.
+
+From the privileged guest or host (Xen or KVM hypervisors), physical resource usage can typically be observed at a high level: utilization, saturation, errors, IOPS, throughput, I/O type. These
+factors can usually be expressed per guest, so that heavy users can be quickly identified. Details
+of which guest processes are performing I/O and their application call stacks cannot be observed
+directly. They can be observed by logging in to the guest (provided that a means to do so is authorized and configured, e.g., SSH) and using the observability tools that the guest OS provides.
+When pass-through or SR-IOV is used, the guest may be making I/O calls directly to hardware.
+This may bypass I/O paths in the hypervisor, and the statistics they typically collect. The result
+is that I/O can become invisible to the hypervisor, and not appear in iostat(1) or other tools. A
+possible workaround is to use PMCs to examine I/O-related counters, and infer I/O that way.
+To identify the root cause of a guest performance issue, the cloud operator may need to log in to
+both the hypervisor and the guest and execute observability tools from both. Tracing the path
+of I/O becomes complex due to the steps involved and may also include analysis of hypervisor
+internals and an I/O proxy, if used.
+From the guest, physical resource usage may not be observable at all. This may tempt the guest
+customers to blame mysterious performance issues on resource contention caused by noisy
+neighbors. To give cloud customers peace of mind (and reduce support tickets) information
+about physical resource usage (redacted) may be provided via other means, including SNMP or a
+cloud API.
+To make container performance easier to observe and understand, there are various monitoring
+solutions that present graphs, dashboards, and directed graphs to show your container environment. Such software includes Google cAdvisor [Google 20d] and Cilium Hubble [Cilium 19]
+(both are open source).
+The following sections demonstrate the raw observability tools that can be used from different
+locations, and describe a strategy for analyzing performance. Xen and KVM are used to demonstrate the kind of information that virtualization software may provide (Nitro is not included as
+it is Amazon proprietary).
+
+11.2.4.1
+
+Privileged Guest/Host
+
+All system resources (CPUs, memory, file system, disk, network) should be observable using the
+tools covered in previous chapters (with the exception of I/O via pass-through/SR-IOV).
+
+11.2 Hardware Virtualization
+
+Xen
+For Xen-like hypervisors, the guest vCPUs exist in the hypervisor and are not visible from the
+privileged guest (dom0) using standard OS tools. For Xen, the xentop(1) tool can be used instead:
+# xentop
+xentop - 02:01:05
+
+Xen 3.3.2-rc1-xvm
+
+2 domains: 1 running, 1 blocked, 0 paused, 0 crashed, 0 dying, 0 shutdown
+Mem: 50321636k total, 12498976k used, 37822660k free
+
+CPUs: 16 @ 2394MHz
+
+NAME STATE
+CPU(sec) CPU(%)
+MEM(k) MEM(%) MAXMEM(k) MAXMEM(%) VCPUS NETS
+NETTX(k) NETRX(k) VBDS
+VBD_OO
+VBD_RD
+VBD_WR SSID
+Domain-0 -----r
+0
+0
+
+6087972
+0
+
+2.6
+0
+
+9692160
+0
+0
+
+19.3
+
+no limit
+
+n/a
+
+16
+
+0
+
+Doogle_Win --b--0
+0
+2
+
+172137
+0
+
+2.0
+0
+
+2105212
+0
+0
+
+4.2
+
+2105344
+
+4.2
+
+1
+
+2
+
+0
+
+[...]
+
+The fields include
+■
+
+CPU(%): CPU usage percentage (sum for multiple CPUs)
+
+■
+
+MEM(k): Main memory usage (Kbytes)
+
+■
+
+MEM(%): Main memory percentage of system memory
+
+■
+
+MAXMEM(k): Main memory limit size (Kbytes)
+
+■
+
+MAXMEM(%): Main memory limit as a percentage of system memory
+
+■
+
+VCPUS: Count of assigned VCPUs
+
+■
+
+NETS: Count of virtualized network interfaces
+
+■
+
+NETTX(k): Network transmit (Kbytes)
+
+■
+
+NETRX(k): Network receive (Kbytes)
+
+■
+
+VBDS: Count of virtual block devices
+
+■
+
+VBD_OO: Virtual block device requests blocked and queued (saturation)
+
+■
+
+VBD_RD: Virtual block device read requests
+
+■
+
+VBD_WR: Virtual block device write requests
+
+The xentop(1) output is updated every 3 seconds by default and is selectable using
+-d delay_secs.
+For advanced Xen analysis there is the xentrace(8) tool, which can retrieve a log of fixed
+event types from the hypervisor. This can then be viewed using xenanalyze for investigating scheduling issues with the hypervisor and CPU scheduler used. There is also xenoprof,
+the system-wide profiler for Xen (MMU and guests) in the Xen source.
+
+599
+
+600
+
+Chapter 11 Cloud Computing
+
+KVM
+For KVM-like hypervisors, the guest instances are visible within the host OS. For example:
+host$ top
+top - 15:27:55 up 26 days, 22:04,
+
+1 user,
+
+load average: 0.26, 0.24, 0.28
+
+Tasks: 499 total,
+
+1 running, 408 sleeping,
+
+2 stopped,
+
+%Cpu(s): 19.9 us,
+
+4.8 sy,
+
+1.1 wa,
+
+KiB Mem : 24422712 total,
+
+0.0 ni, 74.2 id,
+
+0 zombie
+
+0.0 hi,
+
+6018936 free, 12767036 used,
+
+KiB Swap: 32460792 total, 31868716 free,
+PID USER
+
+PR
+
+NI
+
+24881 libvirt+
+
+20
+
+0 6161864 1.051g
+
+VIRT
+
+RES
+
+21897 root
+
+0 -20
+
+0
+
+23445 root
+
+0 -20
+
+0
+
+15476 root
+
+0 -20
+
+23038 root
+22784 root
+
+592076 used.
+SHR S
+
+0.1 si,
+
+0.0 st
+
+5636740 buff/cache
+8715220 avail Mem
+
+%CPU %MEM
+
+TIME+ COMMAND
+
+19448 S 171.9
+
+4.5
+
+0:25.88 qemu-system-x86
+
+0
+
+0 I
+
+2.3
+
+0.0
+
+0:00.47 kworker/u17:8
+
+0
+
+0 I
+
+2.3
+
+0.0
+
+0:00.24 kworker/u17:7
+
+0
+
+0
+
+0 I
+
+2.0
+
+0.0
+
+0:01.23 kworker/u17:2
+
+0 -20
+
+0
+
+0
+
+0 I
+
+2.0
+
+0.0
+
+0:00.28 kworker/u17:0
+
+0 -20
+
+0
+
+0
+
+0 I
+
+1.7
+
+0.0
+
+0:00.36 kworker/u17:1
+
+[...]
+
+The qemu-system-x86 process is a KVM guest, which includes threads for each vCPU and threads
+for I/O proxies. The total CPU usage for the guest can be seen in the previous top(1) output, and
+per-vCPU usage can be examined using other tools. For example, using pidstat(1):
+host$ pidstat -tp 24881 1
+03:40:44 PM
+
+UID
+
+TGID
+
+03:40:45 PM 64055 24881
+
+TID
+
+%usr %system %guest %wait
+
+- 17.00
+
+%CPU CPU Command
+
+17.00 147.00
+
+0.00 181.00
+
+0 qemu-system-x86
+
+0.00
+
+0.00
+
+14.00
+
+0 |__qemu-system-x86
+
+03:40:45 PM 64055
+
+- 24881
+
+9.00
+
+5.00
+
+03:40:45 PM 64055
+
+- 24889
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+6 |__qemu-system-x86
+
+03:40:45 PM 64055
+
+- 24897
+
+1.00
+
+3.00
+
+69.00
+
+1.00
+
+73.00
+
+4 |__CPU 0/KVM
+
+03:40:45 PM 64055
+
+- 24899
+
+1.00
+
+4.00
+
+79.00
+
+0.00
+
+84.00
+
+5 |__CPU 1/KVM
+
+03:40:45 PM 64055
+
+- 24901
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+2 |__vnc_worker
+
+03:40:45 PM 64055
+
+- 25811
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+7 |__worker
+
+03:40:45 PM 64055
+
+- 25812
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+0.00
+
+6 |__worker
+
+[...]
+
+This output shows the CPU threads, named CPU 0/KVM and CPU 1/KVM consuming 73% and
+84% CPU.
+Mapping QEMU processes to their guest instance names is usually a matter of examining their
+process arguments (ps -wwfp PID) to read the -name option.
+Another important area for analysis is guest vCPU exits. The types of exits that occur can show
+what a guest is doing: whether a given vCPU is idle, performing I/O, or performing compute. On
+Linux, the perf(1) kvm subcommand provides high-level statistics for KVM exits. For example:
+
+11.2 Hardware Virtualization
+
+host# perf kvm stat live
+11:12:07.687968
+Analyze events for all VMs, all VCPUs:
+VM-EXIT Samples Samples%
+
+Time%
+
+Min Time
+
+Max Time
+
+Avg time
+
+31.74us
+
+3.25us ( +-
+
+MSR_WRITE
+
+1668
+
+68.90%
+
+0.28%
+
+0.67us
+
+2.20% )
+
+HLT
+
+466
+
+19.25%
+
+99.63%
+
+2.61us 100512.98us 4160.68us ( +- 14.77% )
+
+PREEMPTION_TIMER
+
+112
+
+4.63%
+
+0.03%
+
+2.53us
+
+10.42us
+
+4.71us ( +-
+
+2.68% )
+
+PENDING_INTERRUPT
+
+82
+
+3.39%
+
+0.01%
+
+0.92us
+
+18.95us
+
+3.44us ( +-
+
+6.23% )
+
+EXTERNAL_INTERRUPT
+
+53
+
+2.19%
+
+0.01%
+
+0.82us
+
+7.46us
+
+3.22us ( +-
+
+6.57% )
+
+IO_INSTRUCTION
+
+37
+
+1.53%
+
+0.04%
+
+5.36us
+
+84.88us
+
+19.97us ( +- 11.87% )
+
+MSR_READ
+
+2
+
+0.08%
+
+0.00%
+
+3.33us
+
+4.80us
+
+4.07us ( +- 18.05% )
+
+EPT_MISCONFIG
+
+1
+
+0.04%
+
+0.00%
+
+19.94us
+
+19.94us
+
+19.94us ( +-
+
+0.00% )
+
+Total Samples:2421, Total events handled time:1946040.48us.
+[...]
+
+This shows the reasons for virtual machine exit, and statistics for each reason. The longest-duration exits in this example output were for HLT (halt), as virtual CPUs enter the idle state. The
+columns are:
+■
+
+VM-EXIT: Exit type
+
+■
+
+Samples: Number of exits while tracing
+
+■
+
+Samples%: Number of exits as an overall percent
+
+■
+
+Time%: Time spent in exits as an overall percent
+
+■
+
+Min Time: Minimum exit time
+
+■
+
+Max Time: Maximum exit time
+
+■
+
+Avg time: Average exit time
+
+While it may not be easy for an operator to directly see inside a guest virtual machine, examining the exits lets you characterize how the overhead of hardware virtualization may or may not
+be affecting a tenant. If you see a low number of exits and a high percentage of those are HLT,
+you know that the guest CPU is fairly idle. On the other hand, if you have a high number of I/O
+operations, with interrupts both generated and injected into the guest, then it is very likely that
+the guest is doing I/O over its virtual NICs and disks.
+For advanced KVM analysis, there are many tracepoints:
+host# perf list | grep kvm
+kvm:kvm_ack_irq
+
+[Tracepoint event]
+
+kvm:kvm_age_page
+
+[Tracepoint event]
+
+kvm:kvm_apic
+
+[Tracepoint event]
+
+601
+
+

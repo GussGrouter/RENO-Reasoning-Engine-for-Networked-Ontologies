@@ -1,0 +1,669 @@
+                                                                Organization of the book            xxi
+
+
+
+prefix lookups, packet classification, switching, and the implementation of measurement and security
+primitives. Chapter 1 goes into more detail about the inherent causes of these bottlenecks.
+    The fundamental methods that encompass network algorithmics include implementation models
+(Chapter 2) and 15 implementation principles (Chapter 3). The implementation models include models
+of operating systems, protocols, hardware, and architecture. They are included because the world of
+network protocol implementation requires the skills of several different communities, including operat-
+ing system experts, protocol pundits, hardware designers, and computer architects. The implementation
+models are an attempt to bridge the gaps between these traditionally separate communities.
+    On the other hand, the implementation principles are an attempt to abstract the main ideas behind
+many specific implementation techniques. They include such well-known principles as “Optimize the
+expected case.” They also include somewhat less well-known principles, such as “Combine DRAM
+with SRAM,” which is a surprisingly powerful principle for producing fast hardware designs for net-
+work devices.
+    While Part 1 of the book lays out the methodology of network algorithmics, Part 2 applies the
+methodology to specific network bottlenecks in endnodes and servers. For example, Part 2 discusses
+copy avoidance techniques (such as passing virtual memory pointers and RDMA) and efficient control
+transfer methods (such as bypassing the kernel, as in the VIA proposal, and techniques for building
+event-driven servers).
+    Similarly, Part 3 of the book applies the methodology of Part 1 to interconnect devices, such as
+network routers. For example, Part 3 discusses efficient prefix-lookup schemes (such as multibit or
+compressed tries) and efficient switching schemes (such as those based on virtual output queues and
+bipartite matching).
+    Finally, Part 4 of the book applies the methodology of Part 1 to new functions for security and mea-
+surement that could be housed in either servers or interconnect devices. For example, Part 4 discusses
+efficient methods to compress large traffic reports and efficient methods to detect attacks.
+
+
+
+Organization of the book
+This book is organized into four overall parts. Each part is made as self-contained as possible to al-
+low detailed study. Readers that are pressed for time can consult the index or Table of Contents for
+a particular topic (e.g., IP lookups). More importantly, the opening section of each chapter concludes
+with a Quick Reference Guide that points to the most important topics for implementors. The Quick
+Reference Guide may be the fastest guide for usefully skimming a chapter.
+    Part 1 of the book aims to familiarize the reader with the rules and philosophy of network algorith-
+mics. It starts with Chapter 2, which describes simple models of protocols, operating systems, hardware
+design, and endnode and router architectures. Chapter 3 describes in detail the 15 principles used as
+a cornerstone for the book. Chapter 4 rounds out the first part by providing 15 examples, drawn for
+the most part from real implementation problems, to allow the reader a first opportunity to see the
+principles in action on real problems.
+    Part 2 of the book, called “Playing with Endnodes,” shows how to build fast endnode implemen-
+tations, such as Web servers, that run on general-purpose operating systems and standard computer
+architectures. It starts with Chapter 5, which shows how to reduce or avoid extra data copying. (Copy-
+ing often occurs when network data is passed between implementation modules) and how to increase
+xxii       Preface
+
+
+
+cache efficiency. Chapter 6 shows how to reduce or avoid the overhead of transferring control between
+implementation modules, such as the device driver, the kernel, and the application. Chapter 7 describes
+how to efficiently manage thousands of outstanding timers, a critical issue for large servers. Chap-
+ter 8 describes how to efficiently demultiplex data to receiving applications in a single step, allowing
+innovations such as user-level networking. Chapter 9 describes how to implement specific functions
+that often recur in specific protocol implementations, such as buffer allocation, checksums, sequence
+number bookkeeping, and reassembly. An overview of Part 2 can be found in Fig. 1.1.
+    Part 3 of the book, called “Playing with Routers,” shows how to build fast routers, bridges, and
+gateways. It begins with three chapters that describe state lookups of increasing complexity. Chapter 10
+describes exact-match lookups, which are essential for the design of bridges and ARP caches. Chap-
+ter 11 describes prefix-match lookups, which are used by Internet routers to forward packets. Chapter 12
+describes packet classification, a more sophisticated form of lookup required for security and quality of
+service. Chapter 13 describes how to build crossbar switches, which interconnect input and output links
+of devices such as routers. Finally, Chapter 14 describes packet-scheduling algorithms, which are used
+to provide quality-of-service, and Chapter 15 discusses routers as distributed systems, with examples
+focusing on performance and the use of design and reasoning techniques from distributed algorithms.
+While this list of functions seems short, one can build a fast router by designing a fast lookup algorithm,
+a fast switch, and fast packet-scheduling algorithms. Part 4, called “Endgame,” starts by speculating on
+the potential need for implementing more complex tasks in the future. For example, Chapter 16 de-
+scribes efficient implementation techniques for measurement primitives, while Chapter 17 describes
+efficient implementation techniques for security primitives. The book ends with a short chapter, Chap-
+ter 18, which reaches closure by distilling the unities that underly the many different topics in this book.
+This chapter also briefly presents examples of the use of algorithmics in a canonical router (the Cisco
+GSR) and a canonical server (the Flash Web server). A more detailed overview of Parts 3 and 4 of the
+book can be found in Fig. 1.2.
+
+
+
+Features
+The book has the following features that readers, implementors, students, and instructors can take
+advantage of.
+Intuitive introduction: The introductory paragraph of each chapter in Parts 2, 3, and 4 uses an intu-
+    itive, real-world analogy to motivate each bottleneck. For example, we use the analogy of making
+    multiple photocopies of a document for data copying and the analogy of a flight database for prefix
+    lookups.
+Quick Reference Guide: For readers familiar with a topic and pressed for time, the opening section
+    of each chapter concludes with a Quick Reference Guide that points to the most important imple-
+    mentation ideas and the corresponding section numbers.
+Chapter organization: To help orient the reader, immediately after the Quick Reference Guide in
+    each chapter is a map of the entire chapter.
+Summary of techniques: To emphasize the correlation between principles and techniques, at the start
+    of each chapter is a table that summarizes the techniques described, together with the corresponding
+    principles.
+                                                               Why this book was written            xxiii
+
+
+
+Consistent use of principles: After a detailed description in Chapter 3 of 15 principles, the rest of the
+   book consistently uses these principles in describing specific techniques. For reference, the princi-
+   ples are summarized inside the front cover. Principles are referred to consistently by number—for
+   example, P9 for Principle 9. Since principle numbers are hard to remember, three aids are provided.
+   Besides the inside front cover summary and the summary at the start of each chapter, the first use
+   of a principle in any chapter is accompanied by an explicit statement of the principle.
+Exercises: Chapter 4 of the book provides a set of real-life examples of applying the principles that
+   have been enjoyed by past attendees of tutorials on network algorithmics. Every subsequent chapter
+   through Chapter 17 is followed by a set of exercises. Brief solutions to these exercises can be found
+   in an instructor’s manual obtainable from Elsevier.
+Additional Teacher and Student Resources: Helpful ancillaries have been prepared to aid learning
+   and teaching.
+    • For students, resources are available here: https://www.elsevier.com/books-and-journals/book-
+      companion/9780443136795.
+    • For qualified professors, instructor-only teaching materials (including Lecture slides in PDF for
+      most chapters) can be requested here: https://educate.elsevier.com/book/details/9780128099278.
+
+
+
+Usage
+This book can be used in many ways.
+Textbook: Students and instructors can use this book as the basis of a one-semester class. A semester
+    class on network algorithmics can include most of Part 1 and can sample chapters from Part 2 (e.g.,
+    Chapter 5 on copying, Chapter 6 on control overhead) and from Part 3 (e.g., Chapter 11 on prefix
+    lookups, Chapter 13 on switching).
+Implementation guide: Implementors who care about performance may wish to read all of Part 1 and
+    then sample Parts 2 and 3 according to their needs.
+Reference book: Implementors and students can also use this book as a reference book in addition to
+    other books on network protocols.
+
+
+
+Why this book was written
+The impetus for this book came from my academic research into efficient protocol implementation. It
+also came from three networking products I worked on with colleagues: the first bridge, the Gigaswitch,
+and the Procket 40 Gbps router. To prove itself against detractors, the first bridge was designed to
+operate at wire speed, an idea that spread to routers and the entire industry. My experience watching
+the work of Mark Kempf on the first bridge (see Chapter 10) led to a lasting interest in speeding up
+networking devices.
+    Next, the DEC Gigaswitch introduced me to the world of switching. Finally, the Procket router
+was designed by an interdisciplinary team that included digital designers who had designed processors,
+experts who had written vast amounts of the software in core routers, and some people like myself who
+xxiv      Preface
+
+
+
+were interested in algorithms. Despite the varied backgrounds, the team produced innovative new ideas,
+which convinced me of the importance of interdisciplinary thinking for performance breakthroughs.
+This motivated the writing of Chapter 2 on implementation models, an attempt to bridge the gaps
+between the different communities involved in high-performance designs.
+    For several years, I taught a class that collected together these techniques. The 15 principles emerged
+as a way to break up the techniques more finely and systematically. In retrospect, some principles seem
+redundant and glib. However, they serve as part of a first attempt to organize a vast amount of material.
+    I have taught five classes and three tutorials based on the material in this book, and so this book has
+been greatly influenced by student responses and ideas.
+
+
+
+Acknowledgments
+A special thanks to my editors: Karen Gettman and Rick Adams and Karyn Johnson; to all my advi-
+sors, who taught me so much: Wushow Chou, Arne Nillson, Baruch Awerbuch, Nancy Lynch; to all
+my mentors: Alan Kirby, Radia Perlman, Tony Lauck, Bob Thomas, Bob Simcoe, Jon Turner; to nu-
+merous colleages at DEC and other companies, especially to Sharad Merhotra, Bill Lynch, and Tony
+Li of Procket Networks, who taught me about real routers; to students who adventured in the field of
+network algorithmics with me; to numerous reviewers of this book and especially to Jon Snader, Tony
+Lauck, Brian Kernighan, Craig Partridge, and Radia Perlman for detailed comments; to Kevin D’Souza,
+Stefano Previdi, Anees Shaikh, and Darryl Veitch for their reviews and ideas; to my family, my mother,
+my wife’s father and mother, and my sister; and, of course, to my wife, Aju, and my sons, Tim and
+Andrew.
+    I’d like to end by acknowledging my heroes: four teachers who have influenced me. The first is
+Leonard Bernstein, who taught me in his lectures on music that a teacher’s enthusiasm for the material
+can be infectious. The second is George Polya, who taught me in his books on problem solving that
+the process of discovery is as important as the final discoveries themselves. The third is Socrates, who
+taught me through Plato that it is worth always questioning assumptions. The fourth is Jesus, who has
+taught me that life, and indeed this book, is not a matter of merit but of grace and gift.
+15 principles used to overcome network
+bottlenecks
+
+
+    Number                      Principle                Used In/Networking Example
+    P1       Avoid obvious waste                         Zero-copy interfaces
+    P2       Shift computation in time
+      P2a      Precompute                                Application device channels
+      P2b      Evaluate lazily                           Copy-on-write
+      P2c      Share expenses, batch                     Integrated layer processing
+    P3       Relax system requirements
+      P3a      Trade certainty for time                  Stochastic fair queueing
+      P3b      Trade accuracy for time                   Switch load balancing
+      P3c      Shift computation in space                IPv6 fragmentation
+    P4       Leverage off system components
+      P4a      Exploit locality                          Locality-driven receiver
+      P4b      Trade memory for speed                    Processing; Lulea IP lookups
+      P4c      Exploit existing hardware                 Fast TCP checksum
+    P5       Add hardwareg
+      P5a      Use memory interleaving and pipelinin     Pipelined IP lookups
+      P5b      Use wide word parallelism                 Shared memory switches
+      P5c      Combine DRAM and SRAM effectively         Maintaining counters
+    P6       Create efficient specialized routines       UDP checksums
+    P7       Avoid unnecessary generality                Fbufs
+    P8       Don’t be tied to reference implementation   Upcalls
+    P9       Pass hints in layer interfaces              Packet filters
+    P10      Pass hints in protocol headers              Tag switching
+    P11      Optimize the expected case                  Header prediction
+      P11a     Use caches                                  Fbufs
+    P12      Add state for speed                         Active VC list
+      P12a     Compute incrementally                       Recomputing CRCs
+    P13      Optimize degrees of freedom                 IP trie lookups
+    P14      Use bucket sorting, bitmaps                 Timing wheels
+    P15      Create efficient data structures            Level-4 switching
+
+
+
+
+                                                                                        xxv
+This page intentionally left blank
+                                                                                      PART
+
+The rules of the game
+                                                                                   1
+                                                      “Come, Watson, come!” he cried. “The game is afoot!”
+                                                                 —Arthur Conan Doyle in The Abbey Grange
+
+
+The first part of this book deals with specifying the rules of the network algorithmics game. We start with
+a quick introduction where we define network algorithmics and contrast it to algorithm design. Next,
+we present models of protocols, operating systems, processor architecture, and hardware design; these
+are the key disciplines used in the rest of the book. Then we present a set of 15 principles abstracted
+from the specific techniques presented later in the book. Part 1 ends with a set of sample problems
+together with solutions obtained using the principles. Implementors pressed for time should skim the
+Quick Reference Guides directly following the introduction to each chapter.
+This page intentionally left blank
+                                                                                                       CHAPTER
+
+
+Introducing network algorithmics
+                                                                                                           1
+                        What really makes it an invention is that someone decides not to change the solution to a known
+                                                                                   problem, but to change the question.
+                                                                                                        —Dean Kamen
+
+
+
+Just as the objective of chess is to checkmate the opponent and the objective of tennis is to win matches,
+the objective of the network algorithmics game is to battle networking implementation bottlenecks.
+    Beyond specific techniques, this book distills a fundamental way of crafting solutions to internet
+bottlenecks that we call network algorithmics. This provides the reader tools to design different im-
+plementations for specific contexts and to deal with new bottlenecks that will undoubtedly arise in the
+changing world of networks.
+    So what is network algorithmics? Network algorithmics goes beyond the design of efficient algo-
+rithms for networking tasks, though this has an important place. In particular, network algorithmics
+recognizes the primary importance of taking an interdisciplinary systems approach to streamlining net-
+work implementations.
+    Network algorithmics is an interdisciplinary approach because it encompasses such fields as ar-
+chitecture and operating systems (for speeding up servers), hardware design (for speeding up network
+devices such as routers), and algorithm design (for designing scalable algorithms). Network algorith-
+mics is also a systems approach, because it is described in this book using a set of 15 principles that
+exploit the fact that routers and servers are systems, in which efficiencies can be gained by moving
+functions in time and space between subsystems.
+    The problems addressed by network algorithmics are fundamental networking performance bottle-
+necks. The solutions advocated by network algorithmics are a set of fundamental techniques to address
+these bottlenecks. Next, we provide a quick preview of both the bottlenecks and the methods.
+
+
+
+1.1 The problem: network bottlenecks
+The main problem considered in this book is how to make networks easy to use while at the same time
+realizing the performance of the raw hardware. Ease of use comes from the use of powerful network
+abstractions, such as socket interfaces and prefix-based forwarding. Unfortunately, without care, such
+abstractions exact a large performance penalty when compared to the capacity of raw transmission
+links such as optical fiber. To study this performance gap in more detail, we examine two fundamental
+categories of networking devices, endnodes and routers.
+Network Algorithmics. https://doi.org/10.1016/B978-0-12-809927-8.00006-3
+Copyright © 2022 Elsevier Inc. All rights reserved.
+                                                                                                                     3
+4         Chapter 1 Introducing network algorithmics
+
+
+
+1.1.1 Endnode bottlenecks
+Endnodes are the endpoints of the network. They include personal computers and workstations as well
+as large servers that provide services. Endnodes are specialized toward computation, as opposed to
+networking, and are typically designed to support general-purpose computation. Thus endnode bottle-
+necks are typically the result of two forces: structure and scale.
+• Structure: To be able to run arbitrary code, personal computers and large servers typically have
+  an operating system that mediates between applications and the hardware. To ease the software
+  development, most large operating systems are carefully structured as layered software; to pro-
+  tect the operating system from other applications, operating systems implement a set of protection
+  mechanisms; finally, core operating systems routines, such as schedulers and allocators, are written
+  using general mechanisms that target as wide a class of applications as possible. Unfortunately, the
+  combination of layered software, protection mechanisms, and excessive generality can slow down
+  networking software greatly, even with the fastest processors.
+• Scale: The emergence of large servers providing Web and other services causes further performance
+  problems. In particular, a large server such as a Web server will typically have thousands of con-
+  current clients. Many operating systems use inefficient data structures and algorithms that were
+  designed for an era when the number of connections was small.
+    Fig. 1.1 previews the main endnode bottlenecks covered in this book, together with causes and so-
+lutions. The first bottleneck occurs because conventional operating system structures cause packet data
+copying across protection domains; the situation is further complicated in Web servers by similar copy-
+ing with respect to the file system and by other manipulations, such as checksums, that examine all the
+
+
+
+
+FIGURE 1.1
+Preview of endnode bottlenecks, solutions to which are described in Part 2 of the book.
+                                                  1.1 The problem: network bottlenecks                   5
+
+
+
+packet data. Chapter 5 describes a number of techniques to reduce these overheads while preserving the
+goals of system abstractions, such as protection and structure. The second major overhead is the control
+overhead caused by switching between threads of control (or protection domains) while processing a
+packet; this is addressed in Chapter 6.
+   Networking applications use timers to deal with failure. With a large number of connections, the
+timer overhead at a server can become large; this overhead is addressed in Chapter 7. Similarly, network
+messages must be demultiplexed (i.e., steered) on receipt to the right end application; techniques to
+address this bottleneck are addressed in Chapter 8. Finally, there are several other common protocol
+processing tasks, such as buffer allocation and checksums, which are addressed in Chapter 9.
+
+
+1.1.2 Router bottlenecks
+Though we concentrate on Internet routers, almost all the techniques described in this book apply
+equally well to any other network devices, such as bridges, switches, gateways, monitors, and security
+appliances, and to protocols other than IP, such as FiberChannel.
+    Thus throughout the rest of the book, it is often useful to think of a router as a “generic network in-
+terconnection device.” Unlike endnodes, these are special-purpose devices devoted to networking. Thus
+there is very little structural overhead within a router, with only the use of a very lightweight operat-
+ing system and a clearly separated forwarding path that often is completely implemented in hardware.
+Instead of structure, the fundamental problems faced by routers are caused by scale and services.
+• Scale: Network devices face two areas of scaling: bandwidth scaling and population scaling. Band-
+  width scaling occurs because optical links keep getting faster, as the progress from 1-Gbps to
+  40-Gbps links shows, and because Internet traffic keeps growing due to a diverse set of new ap-
+  plications. Population scaling occurs because more endpoints get added to the Internet as more
+  enterprises go online.
+• Services: The need for speed and scale drove much of the networking industry in the 1980s and
+  1990s as more businesses went online (e.g., Amazon.com) and whole new online services were cre-
+  ated (e.g., eBay). But the very success of the Internet requires careful attention in the next decade
+  to make it more effective by providing guarantees in terms of performance, security, and reliability.
+  After all, if manufacturers (e.g., Dell) sell more online than by other channels, it is important to pro-
+  vide network guarantees—delay in times of congestion, protection during attacks, and availability
+  when failures occur. Finding ways to implement these new services at high speeds will be a major
+  challenge for router vendors in the next decade.
+    Fig. 1.2 previews the main router (bridge/gateway) bottlenecks covered in this book, together with
+causes and solutions.
+    First, all networking devices forward packets to their destination by looking up a forwarding table.
+The simplest forwarding table lookup does an exact match with a destination address, as exemplified by
+bridges. Chapter 10 describes fast and scalable exact-match lookup schemes. Unfortunately, population
+scaling has made lookups far more complex for routers. To deal with large Internet populations, routers
+keep a single entry called a prefix (analogous to a telephone area code) for a large group of stations.
+Thus routers must do a more complex longest-prefix-match lookup. Chapter 11 describes solutions to
+this problem that scale to increasing speeds and table sizes.
+6         Chapter 1 Introducing network algorithmics
+
+
+
+
+FIGURE 1.2
+Preview of router bottlenecks, solutions to which are described in Parts 3 and 4 of the book.
+
+
+    Many routers today offer what is sometimes called service differentiation, where different packets
+can be treated differently in order to provide service and security guarantees. Unfortunately, this re-
+quires an even more complex form of lookup called packet classification, in which the lookup is based
+on the destination, source, and even the services that a packet is providing. This challenging issue is
+tackled in Chapter 12.
+    Next, all networking devices can be abstractly considered as switches that shunt packets coming in
+from a set of input links to a set of output links. Thus a fundamental issue is that of building a high-
+speed switch. This is hard, especially in the face of the growing gap between optical and electronic
+speeds. The standard solution is to use parallelism via a crossbar switch. Unfortunately, it is nontrivial
+to schedule a crossbar at high speeds, and parallelism is limited by a phenomenon known as head-of-
+line blocking. Worse, population scaling and optical multiplexing are forcing switch vendors to build
+switches with a large number of ports (e.g., 256), which exacerbates these other problems. Solutions to
+these problems are described in Chapter 13.
+    While the previous bottlenecks are caused by scaling, the next bottleneck is caused by the need for
+new services. The issue of providing performance guarantees at high speeds is treated in Chapter 14,
+where the issue of implementing so-called QoS (quality of service) mechanisms is studied. Chapter 15
+briefly surveys another bottleneck that is becoming an increasing problem: the issue of bandwidth
+within a router. It describes sample techniques, such as striping across internal buses and chip-to-chip
+links.
+                                               1.2 The techniques: network algorithmics                      7
+
+
+
+    The final sections of the book take a brief look at emerging services that must, we believe, be part of
+a well-engineered Internet of the future. First, routers of the future must build in support for measure-
+ment, because measurement is the key to engineering networks to provide guarantees. While routers
+today provide some support for measurement in terms of counters and NetFlow records, Chapter 16
+also considers more innovative measurement mechanisms that may be implemented in the future.
+    Chapter 17 describes security support, some of which is already being built into routers. Given the
+increased sophistication, virulence, and rate of network attacks, we believe that implementing security
+features in networking devices (whether routers or dedicated intrusion prevention/detection devices)
+will be essential. Further, unless the security device can keep up with high-speed links, the device may
+miss vital information required to spot an attack.
+
+
+
+1.2 The techniques: network algorithmics
+Throughout this book, we will talk of many specific techniques: of interrupts, copies, and timing
+wheels; of Pathfinder and Sting; of why some routers are very slow; and whether Web servers can
+scale. But what underlies the assorted techniques in this book and makes it more than a recipe book
+is the notion of network algorithmics. As said earlier, network algorithmics recognizes the primary
+importance of taking a systems approach to streamlining network implementations.
+    While everyone recognizes that the Internet is a system consisting of routers and links, it is perhaps
+less obvious that every networking device, from the Cisco GSR to an Apache Web server, is also a sys-
+tem. A system is built out of interconnected subsystems that are instantiated at various points in time.
+For example, a core router consists of line cards with forwarding engines and packet memories con-
+nected by a crossbar switch. The router behavior is affected by decisions at various time scales, which
+range from manufacturing time (when default parameters are stored in NVRAM) to route computation
+time (when routers conspire to compute routes) to packet-forwarding time (when packets are sent to
+adjoining routers).
+    Thus one key observation in the systems approach is that one can often design an efficient sub-
+system by moving some of its functions in space (i.e., to other subsystems) or in time (i.e., to points
+in time before or after the function is apparently required). In some sense, the practitioner of network
+algorithmics is an unscrupulous opportunist willing to change the rules at any time to make the game
+easier. The only constraint is that the functions provided by the overall system continue to satisfy users.
+    In one of Mark Twain’s books, a Connecticut Yankee is transported back in time to King Arthur’s
+court. The Yankee then uses a gun to fight against dueling knights accustomed to jousting with lances.
+This is an example of changing system assumptions (replacing lances by guns) to solve a problem
+(winning a duel).
+    Considering the constraints faced by the network implementor at high speeds—increasingly com-
+plex tasks, larger systems to support, small amounts of high-speed memory, and a small number of
+memory accesses—it may require every trick, every gun in one’s arsenal, to keep pace with the increas-
+ing speed and scale of the Internet. The designer can throw hardware at the problem, change the system
+assumptions, design a new algorithm—whatever it takes to get the job done.
+    This book is divided into four parts. The first part, of which this is the first chapter, lays a foundation
+for applying network algorithmics to packet processing. The second chapter of the first part outlines
+models, and the third chapter presents general principles used in the remainder of the book.
+8         Chapter 1 Introducing network algorithmics
+
+
+
+
+FIGURE 1.3
+Getting wind of an evil packet by noticing the frequency of unprintable characters.
+
+
+   One of the best ways to get a quick idea about what network algorithmics is about is to plunge right
+away into a warm-up example. While the warm-up example that follows is in the context of a device
+within the network where new hardware can be designed, note that Part 2 is about building efficient
+servers using only software design techniques.
+
+
+1.2.1 Warm-up example: scenting an evil packet
+Imagine a front-end network monitor (or intrusion detection system) on the periphery of a corporate
+network that wishes to flag suspicious incoming packets—packets that could contain attacks on internal
+computers. A common such attack is a buffer overflow attack, where the attacker places machine code
+C in a network header field F .
+    If the receiving computer allocates a buffer too small for header field F and is careless about check-
+ing for overflow, the code C can spill onto the receiving machine’s stack. With a little more effort, the
+intruder can make the receiving machine actually execute evil code C. C then takes over the receiver
+machine. Fig. 1.3 shows such an attack embodied in a familiar field, a destination Web URL (uniform
+resource locator). How might the monitor detect the presence of such a suspicious URL? A possible
+way is to observe that URLs containing evil code are often too long (an easy check) and often have a
+large fraction of unusual (at least in URLs) characters, such as #. Thus the monitor could mark such
+packets (containing URLs that are too long and have too many occurrences of such unusual characters)
+for a more thorough examination.
+    It is worth stating at the outset that the security implications of this strategy need to be carefully
+thought out. For example, there may be several innocuous programs, such as CGI scripts, in URLs that
+lead to false positives. Without getting too hung up in overall architectural implications, let us assume
+that this was a specification handed down to a chip architect by a security architect. We now use this
+sample problem, suggested by Mike Fisk, to illustrate algorithmics in action.
+    Faced with such a specification, a chip designer may use the following design process, which illus-
+trates some of the principles of network algorithmics. The process starts with a strawman design and
+refines the design using techniques such as designing a better algorithm, relaxing the specification, and
+exploiting hardware.
+
+
+1.2.2 Strawman solution
+The check of overall length is straightforward to implement, so we concentrate on checking for a
+prevalence of suspicious characters. The first strawman solution is illustrated in Fig. 1.4. The chip
+                                                  1.2 The techniques: network algorithmics                        9
+
+
+
+
+FIGURE 1.4
+Strawman solution for detecting an evil packet by counting occurrences of each character via a count array (middle)
+and then comparing in a final pass with an array of acceptable thresholds (left).
+
+
+maintains two arrays, T and C, with 256 elements each, one for each possible value of an 8-bit character.
+The threshold array, T -, contains the acceptable percentage (as a fraction of the entire URL length) for
+each character. If the occurrences of a character in an actual URL fall above this fraction, the packet
+should be flagged. Each character can have a different threshold.
+    The count array, C, in the middle, contains the current count C[i] for each possible character i.
+When the chip reads a new character “i” in the URL, it increments C[i] by 1. C[i] is initialized to 0 for
+all values of i when a new packet is encountered. The incrementing process starts only after the chip
+parses the HTTP header and recognizes the start of a URL.
+    In HTTP, the end of a URL is signified by two newline characters; thus one can tell the length of the
+URL only after parsing the entire URL string. Thus, after the end of the URL is encountered, the chip
+makes a final pass over the array C. If C[ j ] ≥ L · T [ j ] for any j , where L is the length of the URL,
+the packet is flagged.
+    Assume that packets are coming into the monitor at high speed and that we wish to finish processing
+a packet before the next one arrives. This requirement, called wire-speed processing, is very common in
+networking; it prevents processing backlogs even in the worst case. To meet wire-speed requirements,
+ideally the chip should do a small constant number of operations for every URL byte. Assume the main
+step of incrementing a counter can be done in the time to receive a byte.
+    Unfortunately, the two passes over the array, first to initialize it and then to check for threshold
+violations, make this design slow. Minimum packet sizes are often as small as 40 bytes and include
+only network headers. Adding 768 more operations (1 write and 1 read to each element of C, and 1
+read of T for each of 256 indices) can make this design infeasible.
+
+
+1.2.3 Thinking algorithmically
+Intuitively, the second pass through the arrays C and T at the end seems like a waste. For example,
+it suffices to alarm if any character is over the threshold. So why check all characters? This suggests
+keeping track only of the largest character count c; at the end, perhaps the algorithm needs to check
+only whether c is over threshold with respect to the total URL length L.
+10        Chapter 1 Introducing network algorithmics
+
+
+
+
+FIGURE 1.5
+Avoiding the final loop through the threshold array by keeping track only of Max, the highest counter encountered so
+far relative to its threshold value.
+
+
+    This does not quite work. A nonsuspicious character such as “e” may well have a very high occur-
+rence count. However, “e” is also likely to be specified with a high threshold. Thus if we keep track only
+of “e” with, say, a count of 20, we may not keep track of “#” with, say, a count of 10. If the threshold of
+“#” is much smaller, the algorithm may cause a false negative: The chip may fail to alarm on a packet
+that should be flagged.
+    The counterexample suggests the following fix. The chip keeps track in a register of the highest
+counter relativized to the threshold value. More precisely, the chip keeps track of the highest relativized
+counter Max corresponding to some character k, such that C[k]/T [k] = Max is the highest among all
+characters encountered so far. If a new character i is read, the chip increments C[i]. If C[i]/T [i] > Max,
+then the chip replaces the current stored value of Max with C[i]/T [i]. At the end of URL processing,
+the chip alarms if Max ≥ L.
+    Here’s why this works. If Max = C[k]/T[k] ≥ L, clearly the packet must be flagged, because char-
+acter k is over threshold. On the other hand, if C[k]/T [k] < L, then for any character i, it follows that
+C[i]/T [i] ≤ C[k]/T [k] < L. Thus if Max falls below threshold, then no character is above threshold.
+Thus there can be no false negatives. This solution is shown in Fig. 1.5.
+
+
+1.2.4 Refining the algorithm: exploiting hardware
+The new algorithm has eliminated the loop at the end but still has to deal with a divide operation while
+processing each byte. Divide logic is somewhat complicated and worth avoiding if possible—but how?
+    Returning to the specification and its intended use, it seems likely that thresholds are not meant to
+be exact floating-point numbers. It is unlikely that the architect providing thresholds can estimate the
+values precisely; one is likely to approximate 2.78% as 3% without causing much difference to the
+security goals. So why not go further and approximate the threshold by some power of 2 less than the
+exact intended threshold? Thus if the threshold is 1/29, why not approximate it as 1/32?
+    Changing the specification in this way requires negotiation with the system architect. Assume that
+the architect agrees to this new proposal. Then a threshold such as 1/32 can be encoded compactly as
+                                                 1.2 The techniques: network algorithmics              11
+
+
+
+
+FIGURE 1.6
+Using a wide word and a coalesced array to combine 2 reads into one.
+
+
+the corresponding power of 2—i.e., 5. This threshold shift value can be stored in the threshold array
+instead of a fraction.
+     Thus when a character j is encountered, the chip increments C[ j ] as usual and then shifts C[ j ]
+to the left—dividing by 1/x is the same as multiplying by x—by the specified threshold. If the shifted
+value is higher than the last stored value for Max, the chip replaces the old value with the new value
+and marches on.
+     Thus the logic required to implement the processing of a byte is a simple shift-and-compare. The
+stored state is only a single register to store Max. As it stands, however, the design requires a Read to
+the Threshold array (to read the shift value), a Read to the Count array (to read the old count), and a
+Write to the Count array (to write back the incremented value).
+     Now reads to memory—1–2 nsec even for the fastest on-chip memories but possibly even as slow
+as 10 nsec for slower memories—are slower than logic. Single gate delays are only in the order of
+picoseconds, and shift logic does not require too many gate delays. Thus the processing bottleneck is
+the number of memory accesses.
+     The chip implementation can combine the 2 Reads to memory into 1 Read by coalescing the Count
+and Threshold arrays into a single array, as shown in Fig. 1.6. The idea is to make the memory words
+wide enough to hold the counter (say, 15 bits to handle packets of length 32K) and the threshold (de-
+pending on the precision necessary, no more than 14 bits). Thus the two fields can easily be combined
+into a larger word of size 29 bits. In practice, hardware can handle much larger words sizes of up to
+1000 bits. Also, note that extracting the two fields packed into a single word, quite a chore in software,
+is trivial in hardware by routing wires appropriately between registers or by using multiplexers.
+
+
+1.2.5 Cleaning up
+We have postponed one thorny issue to this point. The terminal loop has been eliminated while leaving
+the initial initialization loop. To handle this, note that the chip has spare time for initialization after
+parsing the URL of the current packet and before encountering the URL of the next packet.
+    Unfortunately, packets can be as small as 50 bytes, even with an HTTP header. Thus even assuming
+a slack of 40 non-URL bytes other than the 10 bytes of the URL, this still does not suffice to initialize
+12        Chapter 1 Introducing network algorithmics
+
+
+
+a 256-byte array without paying 256/40 = 6 more operations per byte than during the processing of
+a URL. As in the URL processing loop, each initialization step requires a Read and Write of some
+element of the coalesced array.
+    A trick among lazy people is to postpone work until it is absolutely needed, in the hope that it may
+never be needed. Note that, strictly speaking, the chip does not need to initialize a C[i] until character i
+is accessed for the first time in a subsequent packet. But how can the chip tell that it is seeing character
+i for the first time?
+    To implement lazy evaluation, each memory word representing an entry in the coalesced array must
+be expanded to include, say, a 3-bit generation number G[i]. The generation number can be thought of
+as a value of clock time measured in terms of packets encountered so far, except that it is limited to 3
+bits. Thus, the chip keeps an additional register g, besides the extra G[i] for each i, that is 3 bits long;
+g is incremented mod 8 for every packet encountered. In addition, every time C[i] is updated, the chip
+updates G[i] as well to reflect the current value of g.
+    Given the generation numbers, the chip need not initialize the count array after the current packet has
+been processed. However, consider the case of a packet whose generation number is h, which contains
+a character i in its URL. When the chip encounters i while processing the packet, the chip reads C[i]
+and G[i] from the Count array. If G[i] = h, this clearly indicates that entry i was last accessed by an
+earlier packet and has not been subsequently initialized. Thus the logic will write back the value of C[i]
+as 1 (initialization plus increment) and set G[i] to h. This is shown in Fig. 1.7.
+    The careful reader will immediately object. Since the generation number is only 3 bits, once the
+value of g wraps around, there can be aliasing. Thus if G[i] is 5 and entry i is not accessed until eight
+more packets have gone by, g will have wrapped around to 5. If the next packet contains i, C[i] will
+not be initialized and the count will (wrongly) accumulate the count of i in the current packet together
+with the count that occurred eight packets in the past.
+    The chip can avoid such aliasing by doing a separate “scrubbing” loop that reads the array and
+initializes all counters with outdated generation numbers. For correctness, the chip must guarantee one
+complete scan through the array for every eight packets processed. Given that one has a slack of (say)
+40 non-URL bytes per packet, this guarantees a slack of 320 non-URL bytes after eight packets, which
+suffices to initialize a 256-element array using one Read and one Write per byte, whether the byte is a
+
+
+
+
+FIGURE 1.7
+The final solution with generation numbers to finesse an initialization loop.
+                                              1.2 The techniques: network algorithmics                  13
+
+
+
+URL or a non-URL byte. Clearly, the designer can gain more slack, if needed, by increasing the bits in
+the generation number, at the cost of slightly increased storage in the array.
+    The chip, then, must have two states: one for processing URL bytes and one for processing non-
+URL bytes. When the URL is completely processed, the chip switches to the “Scrub” state. The chip
+maintains another register, which points to the next array entry s to be scrubbed. In the scrub state,
+when a non-URL character is received, the chip reads entry s in the coalesced array. If G[s] = g, G[s]
+is reset to g and C[s] is initialized to 0.
+    Thus the use of 3 extra bits of generation number per array entry has reduced initialization process-
+ing cycles, trading processing for storage. Altogether a coalesced array entry is now only 32 bits, 15
+bits for a counter, 14 bits for a threshold shift value, and 3 bits for a generation number. Note that the
+added initialization check needed during URL byte processing does not increase memory references
+(the bottleneck) but adds slightly to the processing logic. In addition, it requires two more chip registers
+to hold g and s, a small additional expense.
+
+
+1.2.6 Characteristics of network algorithmics
+The example of scenting an evil packet illustrates three important aspects of network algorithmics.
+a. Network algorithmics is interdisciplinary: Given the high rates at which network processing must
+   be done, a router designer would be hard pressed not to use hardware. The example exploited several
+   features of hardware: It assumed that wide words of arbitrary size were easily possible; it assumed
+   that shifts were easier than divides; it assumed that memory references were the bottleneck; it as-
+   sumed that a 256-element array contained in fast on-chip memory was feasible; it assumed that
+   adding a few extra registers was feasible; and finally it assumed that small changes to the logic to
+   combine URL processing and initialization were trivial to implement.
+      For the reader unfamiliar with hardware design, this is a little like jumping into a game of cards
+   without knowing the rules and then finding oneself finessed and trumped in unexpected ways. A con-
+   tention of this book is that mastery of a few relevant aspects of hardware design can help even a
+   software designer understands at least the feasibility of different hardware designs. A further con-
+   tention of this book is that such interdisciplinary thinking can help produce the best designs.
+      Thus Chapter 2 presents the rules of the game. It presents simple models of hardware that point
+   out opportunities for finessing and trumping troublesome implementation issues. It also presents
+   simple models of operating systems. This is done because end systems such as clients and Web
+   servers require tinkering with and understanding operating system issues to improve performance,
+   just as routers and network devices require tinkering with hardware.
+b. Network algorithmics recognizes the primacy of systems thinking: The specification was relaxed
+   to allow approximate thresholds in powers of 2, which simplified the hardware. Relaxing specifica-
+   tions and moving work from one subsystem to another is an extremely common systems technique,
+   but it is not encouraged by current educational practice in universities, in which each area is taught
+   in isolation.
+      Thus today, one has separate courses in algorithms, in operating systems, and in networking.
+   This tends to encourage “black box” thinking instead of holistic or systems thinking. The example
+   alluded to other systems techniques, such as the use of lazy evaluation and trading memory for
+   processing in order to scrub the Count array.
+

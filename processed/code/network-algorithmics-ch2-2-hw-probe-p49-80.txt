@@ -1,0 +1,1244 @@
+22       Chapter 2 Network implementation models
+
+
+
+  because a missing TCP segment (containing the SCSI message length) makes it impossible to find
+  later message boundaries. An alternate proposal suggests having the iSCSI layer insert headers at
+  periodic intervals in the TCP byte stream, but the jury is still out.
+
+
+
+
+2.2 Hardware
+As links approach 40-gigabit/sec OC-768 speeds, a 40-byte packet must be forwarded in 8 nsec. At such
+speeds, packet forwarding is typically directly implemented in hardware instead of on a programmable
+processor. You cannot participate in the design process of such hardware-intensive designs without
+understanding the tools and constraints of hardware designers. And yet, a few simple models can allow
+you to understand and even play with hardware designs. Even if you have no familiarity with and
+have a positive distaste for hardware, you are invited to take a quick tour of hardware design, full of
+networking examples to keep you awake.
+   Internet lookups are often implemented using combinational logic, Internet packets are stored in
+router memories, and an Internet router is put together with components such as switches and lookup
+chips. Thus our tour begins with logic implementation, continues with memory internals, and ends
+with component-based design. For more details, we refer the reader to the classic VLSI text (Mead
+and Conway, 1980), which still wears well despite its age, and the classic computer architecture text
+(Hennessey and Patterson, 1996).
+
+
+2.2.1 Combinatorial logic
+Section A.2.1 in Appendix describes very simple models of basic hardware gates, such as NOT, NAND,
+and NOR, that can be understood by even a software designer who is willing to read a few pages.
+However, even knowing how basic gates are implemented is not required to have some insight into
+hardware design.
+    The first key to understanding logic design is the following observation. Given NOT, NAND, and
+NOR gates, Boolean algebra shows that any Boolean function f (I1 , . . . , In ) of n inputs can be imple-
+mented. Each bit of a multibit output can be considered a function of the input bits. Logic minimization
+is often used to eliminate redundant gates and sometimes to increase speed. For example, if + denotes
+OR and · denotes AND, then the function O = I1 · I2 + I1 · I2 can be simplified to O = I1 .
+
+Example 1. Quality of Service and Priority Encoders: Suppose we have a network router that maintains
+n output packet queues for a link, where queue i has higher priority than queue j if i < j . This problem
+comes under the category of providing quality of service (QoS), which is covered in Chapter 14. The
+transmit scheduler in the router must pick a packet from the first nonempty packet queue in priority
+order. Assume the scheduler maintains an N -bit vector (bitmap) I such that I [ j ] = 1 if and only if
+queue j is nonempty. Then the scheduler can find the highest-priority nonempty queue by finding the
+smallest position in I in which a bit is set. Hardware designers know this function intimately as a
+priority encoder. However, even a software designer should realize that this function is feasible for
+hardware implementation for reasonable n. This function is examined more closely in Example 2.
+                                                                                                   2.2 Hardware     23
+
+
+
+2.2.2 Timing and power
+To forward a 40-byte packet at OC-768 speeds, any networking function on the packet must complete
+in 8 nsec. Thus the maximum signal transmission delay from inputs to outputs on any logic path must
+not exceed 8 nsec.2 To ensure this constraint, a model of signal transmission delay in a transistor is
+needed.
+    Roughly speaking, each logic gate, such as a NAND or NOT gate, can be thought of as a set of
+capacitors and resistors that must be charged (when input values change) in order to compute output
+values. Worse, charging one input gate can cause the outputs of later gates to charge further inputs,
+and so on. Thus for a combinatorial function, the delay to compute the function is the sum of the
+charging and discharging delays over the worst-case path of transistors. Such path delays must fit within
+a minimum packet arrival time. Besides the time to charge capacitors, another source of delay is wire
+delay. More details can be found in Section A.2.2.
+    It also takes energy to charge capacitors, where the energy per unit time (power) scales with the
+square of the voltage, the capacitance, and the clock frequency at which inputs can change; P = CV 2 f .
+While new processes shrink voltage levels and capacitance, higher-speed circuits must increase clock
+frequency. Similarly, parallelism implies more capacitors being charged at a time. Thus many high-
+speed chips dissipate a lot of heat, requiring nontrivial cooling techniques such as heat sinks. ISPs and
+colocation facilities are large consumers of power. While our level of abstraction precludes understand-
+ing power trade-offs, it is good to be aware that chips and routers are sometimes power limited. Some
+practical limits today are 30 watts per square centimeter on a single die and 10,000 watts per square
+foot in a data center.
+Example 2. Priority Encoder Design: Consider the problem of estimating timing for the priority en-
+coder of Example 1 for an OC-768 link using 40-byte packets. Thus the circuit has 8 nsec to produce
+the output. Assume the input I and outputs O are N -bit vectors such that O[j ] = 1 if and only if
+I [j ] = 1 and I [k] = 0 for all k < j . Notice that the output is represented in unary (often called 1-hot
+representation) rather than binary. The specification leads directly to the combinational logic equation
+O[j ] = I [1] . . . I [j − 1]I [j ] for j > 0.
+     This design can be implemented directly using N AND gates, one for each output bit, where the N
+gates take a number of inputs that range from 1 to N . Intuitively, since N input AND gates take O(N )
+transistors, we have a design, Design 1, with O(N 2 ) transistors that appears to take O(1) time.3 Even
+this level of design is helpful, though one can do better.
+     A more area-economical design is based on the observation that every output bit O[j ] requires
+the AND of the complement of the first j − 1 input bits. Thus we define the partial results P [j ] =
+I [1] . . . I [j − 1] for j = 2 . . . N. Clearly, O[j ] = I [j ]P [j ]. But P [j ] can be constructed recursively us-
+ing the equation P [j ] = P [j − 1]I [j − 1], which can be implemented using N two-input AND gates,
+connected in series. This produces a design, Design 2, that takes O(N ) transistors but takes O(N ) time.
+     Design 1 is fast and fat, and Design 2 is slow and lean. This is a familiar time–space trade-off
+and suggests we can get something in between. The computation of P [j ] in Design 2 resembles an
+unbalanced binary tree of height N . However, it is obvious that P [N ] can be computed using a fully
+
+
+2 Alternatively, parts of the function can be parallelized/pipelined, but then each part must complete in 8 nsec.
+3 A more precise argument, due to David Harris, using the method of Sutherland et al. (1999), shows the delay scales as
+log(N log N ) because of the effort required to charge a tree of N transistors in each AND gate.
+24       Chapter 2 Network implementation models
+
+
+
+balanced binary of 2-input AND gates of height log N . A little thought then shows that the partial
+results of the binary tree can be combined in simple ways to get P [j ] for all j < N using the same
+binary tree (Wang and Huang, 2000).
+    For example, if N = 8, to compute P [8] we compute X = I [0] . . . I [3] and Y = I [4] . . . I [7] and
+compute the AND of X and Y at the root. Thus, it is easy to calculate P [5], for instance, using one
+more AND gate by computing X · I [4]. Such a method is very commonly used by hardware designers
+to replace apparently long O(N) computation chains with chains of length 2 log N . Since it was first
+used to speed up carry chains in addition, it is known as carry look-ahead or simply look-ahead. While
+look-ahead techniques appear complex, even software designers can master them because, at their core,
+they use divide-and-conquer.
+
+
+2.2.3 Raising the abstraction level of hardware design
+Hand designing each transistor in a network chip design consisting of 1 million transistors would be
+time consuming. The design process can be reduced to a few months using building blocks. A quick
+description of building block technologies, such as PLAs, PALs, and standard cells, can be found in
+Section A.2.5.
+    The high-order bit, however, is that just as software designers reuse code, so also hardware designers
+reuse a repertoire of commonly occurring functions. Besides common computational blocks, such as
+adders, multipliers, comparators, and priority encoders, designs also use decoders, barrel shifters, mul-
+tiplexers, and demultiplexers. It is helpful to be familiar with these “arrows” in the hardware designer’s
+quiver.
+    A decoder converts a log N -bit binary value to an N -bit unary encoding of the same value; while
+binary representations are more compact, unary representations are more convenient for computation.
+A barrel shifter shifts an input I by s positions to the left or right, with the bits shifted off from an end
+coming around to the other end.
+    A multiplexer (mux) connects one of several inputs to a common output, while its dual, the de-
+multiplexer, routes one input to one of several possible outputs. More precisely, a multiplexer (mux)
+connects one of n input bits Ij to the output O if a log n-bit select signal S encodes the value j in
+binary. Its dual, the demultiplexer, connects input I to output Oj if the signal S encodes the value j in
+binary.
+    Thus the game becomes one of decomposing a complex logic function into instances of the standard
+functions, even using recursion when needed. This is exactly akin to reduction and divide-and-conquer
+and is easily picked up by software designers. For example, Fig. 2.3 shows the typical Lego puzzle faced
+by hardware designers: Build a 4-input multiplexer from 2-input multiplexers. Start by choosing one of
+I0 and I1 using a 2-input mux and then choosing one of I2 and I3 by another 2-input mux. Clearly, the
+outputs of the 2-input muxes in the first stage must be combined using a third 2-input mux; the only
+cleverness required is to realize that the select signal for the first two muxes is the least significant bit
+S0 of the 2-bit select signal, while the third mux chooses between the upper and lower halves and so
+uses S1 as the select bit.
+    The following networking example shows that reduction is a powerful design tool for designing
+critical networking functions.
+Example 3. Crossbar Scheduling and Programmable Priority Encoders: Examples 1 and 2 motivated
+and designed a fast priority encoder (PE). A commonly used router arbitration mechanism uses an
+                                                                                       2.2 Hardware             25
+
+
+
+
+FIGURE 2.3
+Building a 4-input mux with select bits S0 and S1 from three 2-input muxes. The figure uses the standard trapezoidal
+icon for a mux.
+
+
+enhanced form of priority encoder called a programmable priority encoder (PPE). There is an N -bit
+input I as before, together with an additional log N -bit input P . The PPE circuit must compute an
+output O such that O[j ] = 1, where j is the first position beyond P (treated as a binary value) that has
+a nonzero bit in I . If P = 0, this reduces to a simple priority encoder.
+    PPEs arise naturally in switch arbitration (see Chapter 13 for details). For now, suppose a router
+connects N communication links. Suppose several input links wish to transmit a packet at the same
+time to output link L. To avoid contention at L, each of the inputs sends a request to L in the first time
+slot; L chooses which input link to grant a request to in the second slot; the granted input sends a packet
+in the third time slot.
+    To make its grant decision, L can store the requests received at the end of Slot 1 in an N -bit request
+vector R, where R[i] = 1 if input link i wishes to transmit to L. For fairness, L should remember the
+last input link P it granted a request to. Then, L should confer the grant to the first input link beyond
+P that has a request. This is exactly a PPE problem with R and P as inputs. Since a router must do
+arbitration for each time slot and each output link, a fast and area-efficient PPE design is needed. Even
+a software designer can understand and possibly repeat the process (Gupta and McKeown, 1999b) used
+to design the PPE found in the Tiny Tera, a switch built at Stanford and later commercialized. The basic
+idea is reduction: reducing the design of a PPE to the design of a PE (Example 2).
+    The first idea is simple. A PPE is essentially a PE whose highest-priority value starts at position P
+instead of at 0. A barrel shifter can be used to shift I first to the left by P bits. After this, a simple PE
+can be used. Of course, the output-bit vector is now shifted; we recover the original order by shifting
+the output of the PE to the right by P bits. A barrel shifter for N -bit inputs can be implemented using a
+tree of 2-input multiplexers in around log N time. Thus two barrel shifters and a PE take around 3 log N
+gate delays.
+    A faster design used in Gupta and McKeown (1999b), which requires only 2 log N gate delays, is
+as follows. Split the problem into two parts. If the input has some bit set at position P or greater, then
+the result can be found by using a PE operating on the original input after setting to zero all input bits
+26        Chapter 2 Network implementation models
+
+
+
+
+FIGURE 2.4
+The Tiny Tera PPE design uses copy 1 of a priority encoder to find the highest bit set, if any, of all bits greater than
+P using a mask encoding of P . If such a bit is not found, the output of a second copy of a priority encoder is enabled
+using the bottom AND gate. The results of the two copies are then combined using an N-input OR gate.
+
+
+with positions less than P .4 On the other hand, if the input has no bit set at a position P or greater, then
+the result can be found by using a PE on the original input with no masking at all. This results in the
+design of Fig. 2.4, which, when tested on a Texas Instrument Cell Library, was nearly twice as fast and
+took three times less area than the barrel shifter design for a 32-port router.
+    The message here is that the logic design used for a time-critical component of a very influential
+switch design can be achieved using simple reductions and simple models. Such models are not beyond
+the reach of those of us who do not live and breathe digital design.
+
+
+2.2.4 Memories
+In endnodes and routers, packet forwarding is performed using combinational logic, but packets and
+forwarding state are stored in memories. Since memory access times are significantly slower than logic
+delays, memories form major bottlenecks in routers and endnodes.
+
+
+4 This can be done by ANDing the input with P encoded as a mask; such a mask is commonly known in the hardware community
+as a thermometer encoding of P .
+                                                                                          2.2 Hardware               27
+
+
+
+    Further, different subsystems require different memory characteristics. For example, router vendors
+feel it is important to buffer 200 msec—an upper bound on a round-trip delay—worth of packets to
+avoid dropping packets during periods of congestion. At, say, 40 Gbit/sec per link, such packet buffer-
+ing requires an enormous amount of memory. On the other hand, router lookups require a smaller
+amount of memory, which is accessed randomly. Thus it helps to have simple models for different
+memory technologies. Next, we describe registers, SRAMs, DRAMs, and interleaved memory tech-
+nology. Simple implementation models of these memory components can be found in Section A.2.4 in
+Appendix.
+
+Registers
+A flip-flop is a way of connecting two or more transistors in a feedback loop so that (in the absence of
+Writes and power failures) the bit stays indefinitely without “leaking” away. A register is an ordered
+collection of flip-flops. For example, most modern processors have a collection of 32- or 64-bit on-chip
+registers. A 32-bit register contains 32 flip-flops, each storing a bit. Access from logic to a register on
+the same chip is extremely fast, around 0.5–1 nsec.
+
+SRAM
+A static random access memory (SRAM) contains N registers addressed by log N address bits A.
+SRAM is so named because the underlying flip-flops refresh themselves and so are “static.” Besides
+flip-flops, an SRAM also needs a decoder that decodes A into a unary value used to select the right
+register. Accessing an SRAM on-chip is only slightly slower than accessing a register because of the
+added decode delay. At the time of writing, it was possible to obtain on-chip SRAMs with 0.5-nsec
+access times. Access times of 1–2 nsec for on-chip SRAM and 5–10 nsec for off-chip SRAM are
+common.
+
+Dynamic RAM
+An SRAM bit cell requires at least five transistors. Thus SRAM is always less dense or more expensive
+than memory technology based on dynamic RAM (DRAM). The key idea is to replace the feedback
+loop (and extra transistors) used to store a bit in a flip-flop with an output capacitance that can store
+the bit; thus the charge leaks, but it leaks slowly. Loss due to leakage is fixed by refreshing the DRAM
+cell externally within a few milliseconds. Of course, the complexity comes in manufacturing a high
+capacitance using a tiny amount of silicon.
+    DRAM chips appear to quadruple in capacity every 3 years (Fromm et al., 1997) and are heading
+towards 1 gigabit on a single chip. Addressing these bits, even if they are packed together as 4- or even
+32-bit “registers,” is tricky. Recall that the address must be decoded from (say) 20 bits to (say) one of
+220 values. The complexity of such decode logic suggests divide-and-conquer. Why not decode in two
+stages?
+    Fig. 2.5 shows that most memories are internally organized two-dimensionally into rows and
+columns. The upper address bits are decoded to select the row, and then the lower address bits are
+used to decode the column. More precisely, the user first supplies the row address bits and enables a
+signal called RAS (row address strobe); later, the user supplies the column address bits,5 and enables
+
+5 Many DRAM chips take advantage of the fact that row and column addresses are not required at the same time to multiplex
+row and column addresses on the same set of pins, reducing the pin count of the chip.
+28        Chapter 2 Network implementation models
+
+
+
+
+FIGURE 2.5
+Most large memories are organized two-dimensionally in terms of rows and columns. Selecting a word consists of
+selecting first the row and then the column within the row.
+
+
+a signal called CAS (column address strobe). After a specified time, the desired memory word can
+be read
+      √ out. Assuming equal-size rows and columns, this reduces decode gate complexity from O(N )
+to O( (N )) at the expense of one extra decode delay. Besides the required delay between RAS and
+CAS, there is also a precharge delay between successive RAS and CAS invocations to allow time for
+capacitors to charge.
+    The fastest off-chip DRAMs take around 40–60 nsec to access (latency), with longer times, such
+as 100 nsec, between successive reads (throughput) because of precharge restrictions. Some of this
+latency includes the time to drive the address using external lines onto the DRAM interface pins; recent
+innovations allow on-chip DRAM with lower access times of around 30 nsec. It seems clear that DRAM
+will always be denser but slower than SRAM.
+
+Page-mode DRAMs
+One reason to understand DRAM structure is to understand how function can follow form. A classic
+example is a trick to speed up access times called page mode. Page mode is beneficial for access patterns
+that exhibit spatial locality, in which adjacent memory words are successively accessed. But having
+made a row access in Fig. 2.5, one can access words within the row without incurring additional RAS
+and precharge delays. Video RAMs exploit the same structure by having a row read into an SRAM,
+which can be read out serially to refresh a display at high speed. Besides page mode and video RAMS,
+perhaps there are other ideas that exploit DRAM structure that could be useful in networking.
+
+Interleaved DRAMs
+While memory latency is critical for computation speed, memory throughput (often called bandwidth)
+is also important for many network applications. Suppose a DRAM has a word size of 32 bits and a
+cycle time of 100 nsec. Then the throughput using a single copy of the DRAM is limited to 32 bits
+every 100 nsec. Clearly, throughput can be improved using access to multiple DRAMs. As in Fig. 2.6,
+multiple DRAMs (called banks) can be strung together on a single bus. The user can start a Read to
+                                                                               2.2 Hardware            29
+
+
+
+
+FIGURE 2.6
+The idea behind RAMBUS, SDRAM, and numerous variants is to create a single chip containing multiple DRAM
+parallel memories to gain memory bandwidth while using only one set of address and data lines.
+
+
+Bank 1 by placing the address on the address bus. Assume each DRAM bank takes 100 nsec to return
+the selected data.
+    Instead of idling during this 100-nsec delay, the user can place a second address for Bank 2, a third
+for Bank 3, and so on. If the placing of each address takes 10 nsec, the user can “feed” 10 DRAM banks
+before the answer to the first DRAM bank query arrives, followed 10 nsec later by the answer to the
+second DRAM bank query, and so on. Thus the net memory bandwidth in this example is 10 times the
+memory bandwidth of a single DRAM, as long as the user can arrange to have consecutive accesses
+touch different banks.
+    While using multiple memory banks is a very old idea, it is only in the last 5 years that memory
+designers have integrated several banks into a single memory chip (Fig. 2.6), where the address and
+data lines for all banks are multiplexed using a common high-speed network called a bus. In addition,
+page-mode accesses are often allowed on each bank. Memory technologies based on this core idea
+abound, with different values for the DRAM sizes, the protocol to read and write, and the number of
+banks. Prominent examples include SDRAM with two banks and RDRAM with 16 banks.
+Example 4. Pipelined Flow ID Lookups: A flow is characterized by source and destination IP addresses
+and TCP ports. Some customers would like routers to keep track of the number of packets sent by each
+network flow, for accounting purposes. This requires a data structure that stores a counter for each flow
+ID and supports the two operations of Insert (FlowId) to insert a new flow ID, and Lookup (FlowId)
+to find the location of a counter for a flow ID. Lookup requires an exact match on the flow ID—which
+is around 96 bits—in the time to receive a packet. This can be done by any exact-matching algorithm,
+such as hashing.
+    However, if, as many router vendors wish to do, the worst-case lookup time must be small and
+bounded, binary search (Cormen et al., 1990) is a better idea. Assume that flow ID lookups must be
+done at wire speeds for worst-case 40-byte packets at 2.5 Gbits/sec or OC-48 speeds. Thus the chip has
+128 nsec to look up a flow ID.
+    To bound lookup delays, consider using a balanced binary tree, such as a B-tree. The logic for
+tree traversal is fairly easy. For speed, ideally the flow IDs and counters should be stored in SRAM.
+30        Chapter 2 Network implementation models
+
+
+
+
+FIGURE 2.7
+Solving the flow ID lookup problem by using a pipelined lookup chip that works on up to 16 concurrent flow ID
+lookups, each of which accesses an independent bank of the RDRAM. The lookup chip returns an index to, say,
+a network processor that updates the flow ID counter.
+
+
+
+However, current estimates in core routers (Thompson et al., 1997) show around a million concurrent
+flows. Keeping state for a million flows in SRAM is expensive. However, plain DRAM using a binary
+tree with a branching factor of 2 would require log2 1,000,000 = 20 memory accesses. Even assuming
+an optimistic DRAM cycle time of 50 nsec, the overall lookup time is 1 usec, which is too slow.
+    A solution is to use pipelining, as shown in Fig. 2.7, where the pipelined logic accesses flow IDs
+stored in an RDRAM with 16 banks of memory, as shown in Fig. 2.6. All the nodes at height i in the
+binary tree are stored in Bank i of the RDRAM. The lookup chip works on 16 flow ID lookups (for
+16 packets) concurrently. For example, after looking at the root node for Packet 1 in Bank 1, the chip
+can look up the second-level tree node for Packet 1 in Bank 2 and (very slightly after that) look up the
+root for Packet 2 in Bank 1. When Packet 1’s lookup “thread” is accessing Bank 16, Packet 16’s lookup
+thread is accessing Bank 1. Since direct RDRAM runs at 800 MHz, the time between address requests
+to the RAMBUS is small compared with the read access time of around 60 nsec. Thus while a single
+packet takes around 16 ∗ 60 nsec to complete, processing 16 packets concurrently allows a throughput
+of one flow ID lookup every 60 nsec.
+    Unfortunately, a binary tree with 16 levels allows only 216 = 64 K flow IDs, which is too small.
+Fortunately, RAMBUS allows a variation of page mode where 8 data words of 32 bits can be accessed
+in almost the same time as 1 word. This allows us to retrieve two 96-bit keys and three 20-bit pointers
+in one 256-bit memory access. Thus a tree with 3-way branching can be used, which allows potentially
+316 , or potentially 43 million, flow IDs.
+
+
+2.2.5 Memory subsystem design techniques
+The flow ID lookup problem illustrates three major design techniques commonly used in memory
+subsystem designs for networking chips.
+• Memory Interleaving and Pipelining: Similar techniques are used in IP lookup, classification, and
+  in scheduling algorithms that implement QoS. The multiple banks can be implemented using several
+  external memories, a single external memory like a RAMBUS, or on-chip SRAM within a chip that
+  also contains processing logic.
+                                                                                          2.2 Hardware               31
+
+
+
+• Wide Word Parallelism: A common theme in many networking designs, such as the Lucent bit
+  vector scheme (Chapter 12), is to use wide memory words that can be processed in parallel. This
+  can be implemented using DRAM and exploiting page mode or by using SRAM and making each
+  memory word wider.
+• Combining DRAM and SRAM: Given that SRAM is expensive and fast and that DRAM is cheap
+  and slow, it makes sense to combine the two technologies to attempt to obtain the best of both
+  worlds. While the use of SRAM as a cache for DRAM databases is classical, there are many more
+  creative applications of the idea of a memory hierarchy. For instance, the exercises explore the effect
+  of a small amount of SRAM on the design of the flow ID lookup chip. Chapter 16 describes a more
+  unusual application of this technique to implement a large number of counters, where the low-order
+  bits of each counter are stored in SRAM.
+It is more important for a novice designer to understand these design techniques (than to know memory
+implementation details) in order to produce creative hardware implementations of networking func-
+tions.
+
+
+2.2.6 Component-level design
+The methods of the last two subsections can be used to implement a state machine that implements
+arbitrary computation. A state machine has a current state stored in memory; the machine processes
+inputs using combinatorial logic that reads the current state and possibly writes the state. An example
+of a complex state machine is a Pentium processor, whose state is the combination of registers, caches,
+and main memory. An example of a simpler state machine is the flow ID lookup chip of Fig. 2.7, whose
+state is the registers used to track each of 16 concurrent lookups and the RDRAM storing the B-tree.
+    While a few key chips may have to be designed to build a router or a network interface card, the
+remainder of the design can be called component-level design: organizing and interconnecting chips
+on a board and placing the board in a box while paying attention to form factor, power, and cooling. A
+key aspect of the component-level design is understanding pin-count limitations, which often provide a
+quick “parity check” on feasible designs.
+
+Example 5. Pin-Count Implications for Router Buffers: Consider a router that has forty 10 Gb/sec
+links. The overall buffering required is 200 msec * 400 Gb/sec, which is 80 gigabits. For cost and
+power, we use DRAM for packet buffers. Since each packet must go in and out of the buffer, the overall
+memory bandwidth needs to be twice the bandwidth into the box—i.e., 800 Gb/sec. Assuming 100%
+overhead for internal packet headers, links between packets in queues, and wasted memory bandwidth,
+it is reasonable to aim for 1600-Gb/sec memory bandwidth.
+     Using a single direct 64-bit-wide RDRAM with 16 banks, specifications show peak memory band-
+width of 1.28 GB/sec,6 or 10.24 Gb/sec. Accessing each RDRAM requires 64 interface pins for data
+and 25 other pins for address and control, for a total of roughly 90 pins. A 1600-Gbps memory band-
+width requires 160 RDRAMs, which require 14400 pins in total. A conservative upper bound on the
+number of pins on a chip is around 1000. This implies that even if the router vendor were to build an
+
+
+6 Assuming the DRAM takes 100 ns between reads, if the width is 64 bits (8 bytes), with a single bank we can read 8 bytes
+every 100 ns (as mentioned on page 28), or 0.08 GB/sec.
+32        Chapter 2 Network implementation models
+
+
+
+extremely fast custom-designed packet-forwarding chip that could handle all packets at the maximum
+box rate, one would still need at least one more chip to drive data in and out of the RAMBUS packet
+buffers. Our message is that pin limitations are a key constraint in partitioning a design between chips.
+
+
+2.2.7 Final hardware lessons
+If all else is forgotten in this hardware design section, it is helpful to remember the design techniques
+of Section 2.2.5. Knowledge of the following parameter values is also useful to help system designers
+quickly weed out infeasible designs without detailed knowledge of hardware design. Unfortunately,
+these parameters are a moving target, and the following numbers were written based on technology
+available in 2004.
+• Chip Complexity Scaling: The number of components per chip appears to double every 2 years.
+  While 0.13-micron processes are common, 90-nm technology is ramping up, and 65-nm technology
+  is expected after that. As a result, current ASICs can pack several million gate equivalents (that’s
+  a lot of combinatorial logic) plus up to 50 Mbits (at the time of writing, using half a 12-mm/side
+  die) of on-chip SRAM on an ASIC.7 Embedded DRAM is also a common option to get more space
+  on-chip at the cost of larger latency.
+• Chip Speeds: As feature sizes go down, on-chip clock speeds of 1 GHz are becoming common, with
+  some chips even pushing close to 3 GHz. To put this in perspective, the clock cycle to do a piece
+  of computation on a 1-GHz chip is 1 nsec. By using parallelism via pipelining and wide memory
+  words, multiple operations can be performed per clock cycle.
+• Chip I/O: The number of pins per chip grows, but rather slowly. While there are some promising
+  technologies, it is best to assume that designs are pin limited to around 1000 pins.
+• Serial I/O: Chip-to-chip I/O has also come a long way, with 10-Gbit serial links available to connect
+  chips.
+• Memory Scaling: On-chip SRAM with access times of 1 nsec are available, with even smaller ac-
+  cess times being worked on. Off-chip SRAM with access times of 2.5 nsec are commonly available.
+  On-chip DRAM access times are around 30 nsec, while off-chip DRAM of around 60 nsec is com-
+  mon. Of course, the use of interleaved DRAM, as discussed in the memory subsection, is a good
+  way to increase memory subsystem throughput for certain applications. DRAM costs roughly 4–10
+  times less than SRAM per bit.
+• Power and Packaging: The large power consumption of high-speed routers requires careful de-
+  sign of the cooling system. Finally, most ISPs have severe rack space limitations, and so there is
+  considerable pressure to build routers that have small form factors.
+    These parameter values have clear implications for high-speed networking designs. For instance,
+at OC-768 speeds, a 40-byte packet arrives in 3.2 nsec. Thus it seems clear that all states required to
+process the packet must be in on-chip SRAM. While the amount of on-chip SRAM is growing, this
+memory is not growing as fast as the number of flows seen by a router. Similarly, with 1-nsec SRAMs,
+at most, three memory accesses can be made to a single memory bank in a packet arrival time.
+    Thus the design techniques of Section 2.2.5 must be used within a chip to gain parallelism using
+multiple memory banks and wide words and to increase the usable memory by creative combinations
+
+7 FPGAs are more programmable chips that can only offer smaller amounts of on-chip SRAM.
+                                                                     2.3 Network device architectures                         33
+
+
+
+that involve off- and on-chip memory. However, given that chip densities and power constraints limit
+parallelism to, say, a factor of at most 60, the bottom line is that all packet-processing functions at high
+speeds must complete using at most 200 memory accesses and limited on-chip memory.8 Despite these
+limitations, a rich variety of packet-processing functions have been implemented at high speeds.
+
+
+
+2.3 Network device architectures
+Optimizing network performance requires optimizing the path of data through the internals of the
+source node, the sink node, and every router. Thus it is important to understand the internal archi-
+tecture of endnodes and routers. The earlier part of this chapter argued that logic and memory can
+be combined to form state machines. In essence, both routers and endnodes are state machines. How-
+ever, their architectures are optimized for different purposes: endnode architectures (Section 2.3.1) for
+general computation and router architectures (Section 2.3.2) for Internet communication.
+
+
+2.3.1 Endnode architecture
+A processor such as a Pentium is a state machine that takes a sequence of instructions and data as
+input and writes output to I/O devices, such as printers and terminals. To allow programs that have a
+large state space, the bulk of the processor state is stored externally in cheap DRAM. In PCs, this is
+referred to as main memory and is often implemented using 1 GB or more of interleaved DRAM, such
+as SDRAM. However, recall that DRAM access times are large, say, 60 nsec. If the processor state
+were stored only in DRAM, an instruction would take 60 nsec to read or write to memory.
+    Processors gain speed using caches, which are comparatively small chunks of SRAM that can store
+commonly used pieces of state for faster access. Some SRAM (i.e., the L1 cache) is placed on the
+processor chip, and some more SRAM (i.e., the L2 cache) is placed external to the processor. A cache
+is a hash table that maps between memory address locations and contents. CPU caches use a simple
+hash function: They extract some bits from the address to index into an array and then search in parallel
+for all the addresses that map into the array element.9 When a memory location has to be read from
+DRAM, it is placed in the cache, and an existing cache element may be evicted. Commonly used data
+is stored in a data cache, and commonly used instructions in an instruction cache.
+    Caching works well if the instructions and data exhibit temporal locality (i.e., the corresponding
+location is reused frequently in a small time period) or spatial locality (i.e., accessing a location is
+followed by access to a nearby location). Spatial locality is taken advantage of as follows. Recall that
+accessing a DRAM location involves accessing a row R and then a column within the row. Thus reading
+words within row R are cheaper after R is accessed. A Pentium takes advantage of this observation by
+prefetching 128 (cache line size) contiguous bits into the cache whenever 32 bits of data are accessed.
+Access to the adjoining 96 bits will not incur a cache miss penalty.
+
+
+8 Of course, there are ways to work around these limits, for instance, by using multiple chips, but such implementations often
+do badly in terms of cost, complexity, and power consumption.
+9 The number of elements that can be searched in parallel in a hash bucket is called the associativity of the cache. While
+router designers rightly consider bit extraction to be a poor hash function, the addition of associativity improves overall hashing
+performance, especially on computing workloads.
+34       Chapter 2 Network implementation models
+
+
+
+
+FIGURE 2.8
+Model of a workstation.
+
+
+    Many computing benchmarks exhibit temporal and spatial locality; however, a stream of packets
+probably exhibits only spatial locality. Thus improving endnode protocol implementations often re-
+quires paying attention to cache effects.
+    The foregoing discussion should set the stage for the endnode architecture model shown in Fig. 2.8.
+The processor, or CPU—e.g., a Pentium or an Alpha—sits on a bus. A bus can be thought of as a
+network like an Ethernet, but optimized for the fact that the devices on the bus are close to each other.
+The processor interacts with other components by sending messages across the bus.
+    The input–output (I/O) devices are typically memory mapped. In other words, even I/O devices like
+the network adaptor and the disk look like pieces of memory. For example, the adaptor memory may
+be mapped to 100–200 in the memory address space. This allows uniform communication between
+the CPU and any device by using the same conventions used to interact with memory. In terms of
+networking, a Read (or Write) can be thought of as a message sent on the bus addressed to the memory
+location. Thus a Read 100 is sent on the bus, and the device that owns memory location 100 (e.g., the
+adaptor) will receive the message and reply with the contents of location 100.
+    Modern machines allow direct memory access (DMA), where devices such as the disk or the net-
+work adaptor send Reads and Writes directly to the memory via the bus without processor intervention.
+However, only one entity can use the bus at a time. Thus the adaptor has to contend for the bus; any
+device that gets hold of the bus “steals cycles” from the processor. This is because the processor is
+forced to wait to access memory while a device is sending messages across the bus.
+    In Fig. 2.8, also notice that the adaptor actually sits on a different bus (system bus or memory bus)
+from the bus on which the network adaptor and other peripherals (I/O bus) sit. The memory bus is
+designed for speed and is redesigned for every new processor; the I/O bus is a standard bus (e.g., a PCI
+bus) chosen to stay compatible with older I/O devices. Thus the I/O bus is typically slower than the
+memory bus.
+    A big lesson for networking in Fig. 2.8 is that the throughput of a networking application is crucially
+limited by the speed of the slowest bus, typically the I/O bus. Worse, the need for extra copies to
+preserve operating system structure causes every packet received or sent by a workstation to traverse
+the bus multiple times. Techniques to avoid redundant bus traversals are described in Chapter 5.
+    Modern processors are heavily pipelined with instruction fetch, instruction decode, data reads, and
+data writes split into separate stages. Superscalar and multithreaded machines go beyond pipelining
+                                                             2.3 Network device architectures                   35
+
+
+
+
+FIGURE 2.9
+Using parallel connections within an endnode architecture to allow concurrent processing and network traffic via a
+parallel switch.
+
+
+
+by issuing multiple instructions concurrently. While these innovations (see, for example, the classic
+reference on endnode architecture [Hennessey and Patterson, 1996]) remove computation bottlenecks,
+they do little for data-movement bottlenecks. Consider the following speculative architecture instead.
+
+Example 6. Endnode Architecture Using a Crossbar Switch: Fig. 2.9 shows the endnode bus being
+replaced by a programmable hardware switch, as is commonly used by routers. The switch internally
+contains a number of parallel buses so that any set of disjoint endpoint pairs can be connected in parallel
+by the switch. Thus in the figure, the processor is connected to Memory 1, while the network adaptor is
+connected to Memory 2. Thus packets from the network can be placed in Memory 2 without interfering
+with the processor’s reading from Memory 1. If the processor now wishes to read the incoming packet,
+the switch can be reprogrammed to connect the processor to Memory 2 and the adaptor to Memory 1.
+This can work well if the queue of empty packet buffers used by the adaptor alternates between the two
+memories.
+    There are recent proposals for Infiniband switch technology to replace the I/O bus in processors
+(Chapter 5). The ultimate message of this example is not that architectures such as Fig. 2.9 are nec-
+essarily good but that simple architectural idea to improve network performance, such as Fig. 2.9,
+are not hard for even protocol designers to conceive, given simple models of hardware and architec-
+ture.
+
+
+2.3.2 Router architecture
+A router model that covers both high-end routers (such as Juniper’s M-series routers) and low-end
+routers (such as the Cisco Catalyst) is shown in Fig. 2.10. Basically, a router is a box with a set of input
+links, shown on the left, and a set of output links, shown on the right; the task of the router is to switch
+a packet from an input link to the appropriate output link based on the destination address in the packet.
+While the input and output links are shown separately, the two links in each direction between two
+routers are often packaged together. We review three main bottlenecks in a router: lookup, switching,
+and output queuing.
+36        Chapter 2 Network implementation models
+
+
+
+
+FIGURE 2.10
+A model of a router labeled with the three main bottlenecks in the forwarding path: address lookup (B1), switching
+(B2), and output scheduling (B3).
+
+
+Lookup
+A packet arrives on, say, the left link, input link i. Every packet carries a 32-bit Internet Protocol (IP)
+address.10 Assume that the first six bits of the destination address of a sample packet are 100100. A
+processor in the router inspects the destination address to determine where to forward the packet.
+    The processor consults a forwarding table to determine the output link for the packet. The forward-
+ing table is sometimes called a FIB, for forwarding information base. The FIB contains a set of prefixes
+with corresponding output links. The reason for prefixes will be explained in Chapter 11; for now, think
+of prefixes as variable-length “area codes” that greatly reduce the FIB size. A prefix like 01*, where the
+* denotes the usual “don’t care” symbol, matches IP addresses that start with 01. Assume that prefix
+100* has associated output link 6, while prefix 1* has output link 2. Thus our sample packet, whose
+destination address starts with 100100, matches both prefixes 100* and 1*. The disambiguating rule
+that IP routers use is to match an address to the longest matching prefix. Assuming no longer matching
+prefixes, our sample packet should be forwarded to output link 6.
+    The processor that does the lookup and basic packet processing can be either shared or dedicated
+and can be either a general processor or a special-purpose chip. Early router designs used a shared
+processor (or processors), but this proved to be a bottleneck. Later designs, including Cisco’s GSR
+family, use a dedicated processor per input link interface. The earliest designs used a standard CPU
+processor, but many of the fastest routers today, such as Juniper’s M-160, use a dedicated chip (ASIC)
+with some degree of programmability. There has been a backlash to this trend toward ASICs, however,
+with customers asking routers to perform new functions, such as Web load balancing. Thus some new
+routers use network processors (see Example 7), which are general-purpose processors optimized for
+networking.
+
+
+10 Recall that while most users deal with domain names, these names are translated to an IP address by a directory service,
+called DNS, before packets are sent.
+                                                                     2.3 Network device architectures                         37
+
+
+
+    Algorithms for prefix lookups are described in Chapter 11. Many routers today also offer a more
+complex lookup called packet classification (Chapter 12), where the lookup takes as input the destina-
+tion address as well as source address and TCP ports.
+
+Switching
+After address lookup in the example of Fig. 2.10, the processor instructs an internal switching system
+to transfer the packet from link i to output link 6. In older processors, the switch was a simple bus,
+such as shown in Fig. 2.8. This proved to be a major bottleneck because, if the switch has N input links
+running at B bits per second, the bus would have to have a bandwidth of B · N . Unfortunately, as N
+increases, electrical effects (such as the capacitive load of a bus) predominate, limiting the bus speed.
+    Thus the fastest routers today internally use a parallel switch of the sort shown in Fig. 2.9. The
+throughput of the switch is increased by using N parallel buses, one for each input and one for each
+output. An input and an output are connected by turning on transistors connecting the corresponding
+input bus and output bus. While it is easy to build the data path, it is harder to schedule the switch, be-
+cause multiple inputs may wish to send to the same output link at the same time. The switch-scheduling
+problem boils down to matching available inputs and outputs every packet arrival time. Algorithms for
+this purpose are described in Chapter 13.
+
+Queuing
+Once the packet in Fig. 2.10 has been looked up and switched to output link 6, output link 6 may be
+congested, and thus the packet may have to be placed in a queue for output link 6. Many older routers
+simply place the packet in a first-in-first-out (FIFO) transmission queue. However, some routers employ
+more sophisticated output scheduling to provide fair bandwidth allocation and delay guarantees. Output
+scheduling is described in Chapter 14.
+    Besides the major tasks of lookups, switching, and queuing, there are a number of other tasks that
+are less time-critical.
+
+Header validation and checksums
+The version number of a packet is checked, and the header-length field is checked for options. Options
+are additional processing directives that are rarely used; such packets are often shunted to a separate
+route processor. The header also has a simple checksum that must be verified. Finally, a time-to-live
+(TTL) field must be decremented and the header checksum recalculated. Chapter 9 shows how to
+incrementally update the checksum. Header validation and checksum computation are often done in
+hardware.
+
+Route processing
+Section A.1.2 describes briefly how routers build forwarding tables using routing protocols. Routers
+within domains implement RIP and OSPF, while routers that link domains also must implement BGP.11
+
+
+11 It is possible to buy versions of these protocols, but the software must be customized for each new hardware platform. A more
+insidious problem, especially with BGP and OSPF, is that many of the first implementations of these protocols vary in subtle
+ways from the actual specifications. Thus a new implementation that meets the specification may not interoperate with existing
+routers. Thus ISPs are reluctant to buy new routers unless they can trust the “quality” of the BGP code, in terms of its ability to
+interoperate with existing routers.
+38         Chapter 2 Network implementation models
+
+
+
+These protocols are implemented in one or more route processors. For example, when a LSP is sent
+to the router in Fig. 2.10, lookup will recognize that this is a packet destined for the router itself and
+will cause the packet to be switched to the route processor. The route processor maintains the link-state
+database and computes shortest paths; after computation, the route processor loads the new forwarding
+databases in each of the forwarding processors through either the switch or a separate out-of-band path.
+    In the early days, Cisco won its spurs by processing not just Internet packets but also other routing
+protocols, such as DECNET, SNA, and AppleTalk. The need for such multiprotocol processing is less
+clear now. A much more important trend is multi-protocol-label switching (MPLS), which appears to
+be de rigeur for core routers. In MPLS, the IP header is augmented with a header containing simple
+integer indices that can be looked up directly without a prefix lookup; Chapter 11 provides more details
+about MPLS.
+
+Protocol processing
+All routers today have to implement the simple network management protocol (SNMP) and provide a
+set of counters that can be inspected remotely. To allow remote communication with the router, most
+routers also implement TCP and UDP. In addition, routers have to implement the Internet control mes-
+sage protocol (ICMP), which is basically a protocol for sending error messages, such as “time-to-live
+exceeded.”
+
+Fragmentation, redirects, and ARPs
+While it is clear that route and protocol processing is best relegated to a route processor on a so-called
+“slow path,” there are a few router functions that are more ambiguous. For example, if a packet of 3000
+bytes is to be sent over a link with a maximum packet size (MTU) of 1500 bytes, the packet has to
+be fragmented into two pieces.12 While the prevailing trend is for sources, instead of routers, to do
+fragmentation, some routers do fragmentation in the fast path. Another such function is the sending of
+Redirects. If an endnode sends a message to the wrong router, the router is supposed to send a Redirect
+back to the endnode. A third such function is the sending of address resolution protocol (ARP) requests,
+whose operation is explored in the exercises.
+    Finally, routers today have a number of other tasks they may be called on to perform. Many routers
+within enterprises do content-based handling of packets, where the packet processing depends on
+strings found in the packet data. For example, a router that fronts a Web farm of many servers may
+wish to forward packets with the same Web URL to the same Web server. There are also the issues of
+accounting and traffic measurement. Some of these new services are described in Chapter 16.
+Example 7. Network Processors: Network processors are general-purpose programmable processors
+optimized for network traffic. Their proponents say that they are needed because the unpredictable
+nature of router tasks (such as content-based delivery) makes committing router forwarding to silicon a
+risky proposition. For example, the Intel IXP1200 network processor evaluated in Spalink et al. (2000)
+internally contains six processors, each running at 177 MHz with a 5.6-nsec clock cycle. Each processor
+receives packets from an input queue; packets are stored in a large DRAM; after the processor has
+looked up the packet destination, the packet is placed on the output queue with a tag describing the
+output link it should be forwarded to.
+
+
+12 Strictly speaking, since each fragment adds headers, there will be three pieces.
+                                                                    2.4 Operating systems              39
+
+
+
+    The biggest problem is that the processors are responsible for moving packets in and out of DRAM.
+In the IXP1200, moving 32 bytes from the queue to the DRAM takes 45 clock cycles, and moving from
+the DRAM to the queue takes 55 cycles. Since a minimum-size packet is at least 40 bytes, this requires
+a total of 200 cycles = 1.12 usec, which translates to a forwarding rate of only around 900 K pack-
+ets/second. The IXP1200 gets around this limit by using six parallel processors and an old architectural
+idea called multithreading. The main idea is that each processor works on multiple packets, each packet
+being a thread; when the processing for one packet stalls because of a memory reference, processing
+for the next thread is resumed. Using fast context switching between threads, and four contexts per
+processor, the IXP1200 can theoretically obtain 6 * 4 * 900 K = 21.6 M packets/second.
+    Network processors also offer special-purpose instructions for address lookup and other common
+forwarding functions. Some network processors also streamline the movement of data packets by hav-
+ing hardware engines that present only the header of each data packet to the processor. The remainder
+of the data packet flows directly to the output queue. The processor(s) read the header, do the lookup,
+and write the updated header to the output queue. The hardware magically glues together the updated
+header with the original packet and keeps all packets in order. While this approach avoids the move-
+ment of the remainder of the packet through the processor, it does nothing for the case of minimum-size
+packets.
+
+                            Case Study 2: Buffering and optical switching
+      As fiber-optic links scale to higher speeds, electronics implementing combinational logic and
+  memories in core routers becomes a bottleneck. Currently, packets arrive over fiber-optic links
+  with each bit encoded as a light pulse. Optics at the receiver convert light to electrical pulses; the
+  packet is then presented to forwarding logic implemented electronically. The packet is then queued
+  to an outbound link for transmission, upon which the transmitting link optics convert electrical
+  bits back to light. The electronic bottleneck can be circumvented by creating an all-optical router
+  without any electro-optical conversions.
+      Unfortunately, doing IP lookups optically, and especially building dense optical packet mem-
+  ories, seems hard today. But switching light between several endpoints is feasible. Thus the
+  numerous start-ups in the buzzing optical space tend to build optical circuit switches that use
+  electronics to set up the circuit switch. A circuit switch connects input X to output Y for a large
+  duration, as opposed to the duration of a single packet as in a packet switch. Such circuit switches
+  have found use as a flexible “core” of an ISP’s network to connect conventional routers. If traf-
+  fic between, say, routers R1 and R2 increases, an ISP operator can (at a large time scale of, say,
+  minutes) change the circuit switches to increase the bandwidth of the R1-to-R2 path. However,
+  the wastefulness of reserving switch paths for small flow durations makes it likely that packet-
+  switched routers will continue to be popular in the near future.
+
+
+
+
+2.4 Operating systems
+An operating system is a software that sits above hardware in order to make life easier for application
+programmers. For most Internet routers, time-critical packet forwarding runs directly on the hardware
+(Fig. 2.10) and is not mediated by an operating system. Less time-critical code runs on a router oper-
+40        Chapter 2 Network implementation models
+
+
+
+
+FIGURE 2.11
+The programmer sees the illusion of an uninterrupted timeline shown above, while the real processor timeline may
+switch back and forth between several processes.
+
+
+ating system that is stripped down, such as Cisco’s IOS. However, to improve end-to-end performance
+for, say, Web browsing, an implementor needs to understand the costs and benefits of operating systems.
+    Abstractions are idealizations or illusions we invent to deal with the perversity and irregularity of
+the real world. To finesse the difficulties of programming on a bare machine, operating systems offer
+abstractions to application programmers. Three central difficulties of dealing with raw hardware are
+dealing with interruptions, managing memory, and controlling I/O devices. To deal with these diffi-
+culties, operating systems offer the abstractions of uninterrupted computation, infinite memory, and
+simple I/O.
+    A good abstraction increases programmer productivity but has two costs. First, the mechanism im-
+plementing the abstraction has a price. For example, scheduling processes can cause overhead for a Web
+server. A second, less obvious cost is that the abstraction can hide power, preventing the programmer
+from making optimal use of resources. For example, operating system memory management may pre-
+vent the programmer of an Internet lookup algorithm from keeping the lookup data structure in memory
+in order to maximize performance. We now provide a model of the costs and underlying mechanisms of
+the process (Section 2.4.1), virtual memory (Section 2.4.2), and I/O (Section 2.4.3) abstractions. More
+details can be found in Tanenbaum (1992).
+
+
+2.4.1 Uninterrupted computation via processes
+A program may not run very long on the processor before being interrupted by the network adaptor.
+If application programmers had to deal with interrupts, a working 100-line program would be a mir-
+acle. Thus operating systems provide programmers with the abstraction of uninterrupted, sequential
+computation under the name of a process.
+    The process abstraction is realized by three mechanisms: context switching, scheduling, and protec-
+tion, the first two of which are depicted in Fig. 2.11. In Fig. 2.11, Process P1 has the illusion that it runs
+on the processor by itself. In reality, as shown on the timeline below, Process P1 may be interrupted by a
+timer interrupt, which causes the OS scheduler program to run on the processor. Displacing P1 requires
+the operating system to save the state of P1 in memory. The scheduler may run briefly and decide to give
+Process P2 a turn. Restoring P2 to run on the processor requires restoring the state of P2 from memory.
+Thus the actual time line of a processor may involve frequent context switches between processes, as
+orchestrated by the scheduler. Finally, protection ensures that incorrect or malicious behavior of one
+process cannot affect other processes.
+    As agents of computation, “processes” come in three flavors—interrupt handlers, threads, and user
+processes—ranked in order of increasing generality and cost. Interrupt handlers are small pieces of
+                                                                           2.4 Operating systems                  41
+
+
+
+
+FIGURE 2.12
+The processing of a received Internet packet in BSD is divided between the network adaptor, the kernel, and the
+destined process.
+
+
+computation used to service urgent requests, such as the arrival of a message to the network adaptor;
+interrupt handlers use only a small amount of state, typically a few registers. User processes use the
+complete state of the machine, such as memory as well as registers; thus, it is expensive to switch
+between user processes as directed by the scheduler. Within the context of a single process, threads offer
+a cheaper alternative to processes. A thread is a lightweight process that requires less state, because
+threads within the same process share the same memory (i.e., same variables). Thus context switching
+between two threads in the same process is cheaper than switching processes, because memory does
+not have to be remapped. The following example shows the relevance of these concepts to endnode
+networking.
+Example 8. Receiver Livelock in BSD Unix: In BSD UNIX, as shown in Fig. 2.12, the arrival of a
+packet generates an interrupt. The interrupt is a hardware signal that causes the processor to save the
+state of the currently running process, say, a Java program. The processor then jumps to the interrupt
+handler code, bypassing the scheduler for speed. The interrupt handler copies the packet to a kernel
+queue of IP packets waiting to be consumed, makes a request for an operating system thread (called a
+software interrupt), and exits. Assuming no further interrupts, the interrupt exit passes control to the
+scheduler, which is likely to cede the processor to the software interrupt, which has higher priority than
+user processes.
+    The kernel thread does TCP and IP processing and queues the packet to the appropriate application
+queue, called a socket queue (Fig. 2.12). Assume that the application is a browser such as Netscape.
+Netscape runs as a process that may have been asleep waiting for data and is now considered for being
+run on the processor by the scheduler. After the software interrupt exits and control passes back to the
+scheduler, the scheduler may decide to run Netscape in place of the original Java program.
+42        Chapter 2 Network implementation models
+
+
+
+    Under high network load, the computer can enter what is called receiver livelock (Mogul and Ra-
+makrishnan, 1997), in which the computer spends all its time processing incoming packets, only to
+discard them later because the applications never run. In our example, if there is a series of back-to-
+back packet arrivals, only the highest-priority interrupt handler will run, possibly leaving no time for
+the software interrupt and certainly leaving none for the browser process. Thus either the IP or socket
+queues will fill up, causing packets to be dropped after resources have been invested in their processing.
+Methods to mitigate this effect are described in Chapter 6.
+    Notice also that the latency and throughput of network code in an endnode depend on “process”
+activation times. For example, current figures for Pentium IV machines show around 2 µsec of interrupt
+latency for a null interrupt call, around 10 µsec for a Process Context switch on a Linux machine
+with two processes, and much more time for Windows and Solaris on the same machine. These times
+may seem small, but recall that 30 minimum-size (40-byte) packets can arrive in 10 µsec on a Gigabit
+Ethernet link.
+
+
+
+2.4.2 Infinite memory via virtual memory
+In virtual memory (Fig. 2.13), the programmer works with an abstraction of memory that is a linear
+array into which a compiler assigns variable locations. Variable X could be stored in location 1010 in
+this imaginary (or virtual) array. The virtual memory abstraction is implemented using the twin mech-
+
+
+
+
+FIGURE 2.13
+The programmer sees the illusion of contiguous virtual memory, which is, in reality, mapped to a collection of main
+memory and disk memory pages via page tables.
+                                                                    2.4 Operating systems             43
+
+
+
+anisms of page table mapping and demand paging. Both these mechanisms are crucial to understand in
+order to optimize data transfer costs in an endnode.
+    Any virtual address must be mapped to a physical memory address. The easiest mapping is to use
+an offset into physical memory. For example, a virtual array of 15,000 locations could be mapped into
+physical memory from, say, 12,000 to 27,000. This has two disadvantages. First, when the program
+runs, a block of 15,000 contiguous locations has to be found. Second, the programmer is limited to
+using a total memory equal to the size of physical memory.
+    Both problems can be avoided by a mapping based on table lookup. Since it takes too much memory
+to implement a mapping from any virtual location to any physical location, a more restricted mapping
+based on pages is used. Thus for any virtual address, let us say that the high-order bits (e.g., 20 bits)
+form the page number and that the low-order bits (e.g., 12 bits) form the location within a page. All
+locations within a virtual page are mapped to the same relative location, but individual virtual pages
+can be mapped to arbitrary locations. Main memory is also divided into physical pages, such that every
+group of 212 memory words is a physical page.
+    To map a virtual into a physical address, the corresponding virtual page (i.e., high-order 20 bits) is
+mapped to a physical page number while retaining the same location within the page. The mapping is
+done by looking up a page table indexed by the virtual page number. A virtual page can be located on
+any physical memory page. More generally, some pages (e.g., Virtual Page 2 in Fig. 2.13) may not be
+memory resident and can be marked as being on disk. When such a page is accessed, the hardware will
+generate an exception and cause the operating system to read the page from the disk page into a main
+memory page. This second mechanism is called demand paging.
+    Together, page mapping and demand paging solve the two problems of storage allocation and
+bounded memory allocations. Instead of solving the harder variable size storage allocation problem,
+the OS needs only to keep a list of fixed size free pages and to assign some free pages to a new pro-
+gram. Also, the programmer can work with an abstraction of memory whose size is bounded only by
+the size of the disk and the number of instruction address bits.
+    The extra mapping can slow down each instruction considerably. A Read to virtual location X may
+require two main memory accesses: a page table access to translate X to physical address P , followed
+by a Read to address P . Modern processors get around this overhead by caching the most recently used
+mappings between virtual and physical addresses in a translation look-aside buffer (TLB), which is
+a processor-resident cache. The actual translation is done by a piece of hardware called the memory
+management unit (MMU), as shown in Fig. 2.8.
+    The page table mapping also provides a mechanism for protection between processes. When a
+process makes a Read to virtual location X, unless there is a corresponding entry in the page table, the
+hardware will generate a page fault exception. By ensuring that only the operating system can change
+page table entries, the operating system can ensure that one process cannot read from or write to the
+memory of another process in an unauthorized fashion.
+    While router forwarding works directly on physical memory, all endnode and server networking
+code works on virtual memory. While virtual memory is a potential cost (e.g., for TLB misses), it
+also reflects a possible opportunity. For example, it offers the potential for packet copying between the
+operating system and the application (see Example 8) to be done more efficiently by manipulating page
+tables. This idea is explored further in Chapter 5.
+44        Chapter 2 Network implementation models
+
+
+
+
+FIGURE 2.14
+The programmer sees devices as disparate as a disk and a network adaptor as pieces of memory that can be read and
+written using system calls, but in reality, the kernel manages a host of device-specific details.
+
+
+
+2.4.3 Simple I/O via system calls
+Having an application programmer be aware of the variety and complexity of each I/O device would
+be intolerable. Thus operating systems provide the programmer with the abstraction of the devices as a
+piece of memory (Fig. 2.14) that can be read and written.
+     The code that maps from a simple I/O interface call to the actual physical Read (with all parameters
+filled in) to the device is called a device driver. If abstraction were the only concern, the device driver
+code could be installed in a library of commonly available code that can be “checked out” by each
+application. However, since devices such as disks must be shared by all applications, if applications
+directly control the disk, an erroneous process could crash the disk. Instead, secure operating system
+design requires that only the buggy application fail.
+     Thus it makes sense for the I/O calls to be handled by device drivers that are in a secure portion of
+the operating system that cannot be affected by buggy processes. This secure portion, called the kernel,
+provides a core of essential services, including I/O and page table updates, that applications cannot be
+trusted to perform directly.
+     Thus when a browser such as Netscape wants to make a disk access to read a Web page, it must make
+a so-called system call across the application–kernel boundary. System calls are a protected form of a
+function call. The hardware instruction is said to “trap” to a more privileged level (kernel mode), which
+allows access to operating system internals. When the function call returns after the I/O completes, the
+application code runs at normal privilege levels. A system call is more expensive than a function call
+because of the hardware privilege escalation and the extra sanitizing checks for incorrect parameter
+values. A simple system call may take a few microseconds on modern machines.
+     The relevance to networking is that when a browser wishes to send a message over the network (e.g.,
+Process 2 in Fig. 2.14), it must do a system call to activate TCP processing. A few microseconds for
+a system call may seem small, but it is really very high overhead on a fast Pentium. Can applications
+speed up networking by bypassing the system call? If so, does OS protection get tossed out of the
+window? Answers to these tantalizing questions are postponed to Chapter 6.
+                                                                                   2.6 Exercises               45
+
+
+
+
+2.5 Summary
+This chapter is best sampled based on the reader’s needs. Structurally, the chapter works its way through
+four abstraction levels that affect performance: hardware, architecture, operating systems, and proto-
+cols. Viewing across abstraction levels is helpful because packet-processing speeds can be limited by
+transistor paths implementing packet processing, by architectural limits such as bus speeds, by OS ab-
+straction overheads such as system calls, and finally, even by protocol mechanisms. Several examples,
+which look ahead to the rest of the book, were described to show that performance can be improved by
+understanding each abstraction level.
+    Designers that consider all four abstraction levels for each problem will soon be lost in detail.
+However, there are a few important performance issues and major architectural decisions for which
+simultaneous understanding of all abstraction levels is essential. For example, the simple models given
+in this chapter can allow circuit designers, logic designers, architects, microcoders, and software pro-
+tocol implementors to work together to craft the architecture of a world-class router. They can also
+allow operating system designers, algorithm experts, and application writers to work together to design
+a world-class Web server. As link speeds cross 40 Gbps, such interdisciplinary teams will become even
+more important. This need is alluded to by Raymond Kurzweil in a different context (Kurzweil, 2001):
+   There’s another aspect of creativity. We’ve been talking about great individual contributors, but when
+   you’re creating technology it’s necessarily a group process, because technology today is so complex
+   that it has to be interdisciplinary . . . And they’re all essentially speaking their own languages, even
+   about the same concepts. So we will spend months establishing our common language . . . I have a
+   technique to get people to think outside the box: I’ll give a signal-processing problem to the linguists,
+   and vice versa, and let them apply the disciplines in which they’ve grown up to a completely different
+   problem. The result is often an approach that the experts in the original field would never have thought
+   of. Group process gives creativity a new dimension.
+   With fields like hardware implementation and protocol design replacing signal processing and lin-
+guistics, Kurzweil’s manifesto reflects the goal of this chapter.
+
+
+
+2.6 Exercises
+1. TCP Protocols and Denial-of-Service Attacks: A common exploit for a hacker is to attempt to
+   bring down a popular service, such as Yahoo, by doing a denial-of-service (DOS) attack. A simple
+   DOS attack that can be understood using the simple TCP model of Fig. A.1 is TCP Syn-Flooding.
+   In this attack, the hacker sends a number of SYN packets to the chosen destination D (e.g., Yahoo)
+   using randomly chosen source addresses. D sends back a SYN-ACK to the supposed source S
+   and waits for a response. If S is not an active IP address, then there will be no response from S.
+   Unfortunately, state for S is kept in a pending connection queue at D until D finally times out S. By
+   periodically sending bogus connection attempts pretending to be from different sources, the attacker
+   can ensure that the finite pending connection queue is always full. Thereafter, legitimate connection
+   requests to D will be denied.
+   • Assume there is a monitor that is watching all traffic. What algorithm can be used to detect
+     denial-of-service attacks? Try to make your algorithm as fast and memory-efficient as possible
+46        Chapter 2 Network implementation models
+
+
+
+     so that it can potentially be used in real-time, even in a router. This is a hard problem, but even
+     starting to think about the problem is instructive.
+   • Suppose the monitor realizes a TCP flood attack is underway. Why might it be hard to distinguish
+     between legitimate traffic and flood traffic?
+2. Digital Design: Multiplexers and barrel shifters are very useful in networking hardware, so working
+   on this problem can help even a software person to build up hardware intuition.
+   • First, design a 2-input multiplexer from basic gates (AND, OR, NOT).
+   • Next, generalize the idea shown in the chapter to design an N -input multiplexer from N/2 input
+     multiplexers. Use this to describe a design that takes log N gate delays and O(N ) transistors.
+   • Show how to design a barrel shifter using a reduction to multiplexers (i.e., use as many muxes as
+     you need in your solution). Based on your earlier solutions, what are the gate and time complex-
+     ities of your solution?
+   • Try to design a barrel shifter directly at the transistor level. What are its time and transistor
+     complexities? You can do better using direct design than the simple reduction earlier.
+3. Thermometer Encoding: Spell out the digital logic of the following 4-bit-input digital-to-analog
+   converter (a.k.a. thermometer encoding), a wider slight variant of which is used in Fig. 2.4 for
+   generating an N -bit mask. The inputs are i1 (the least significant bit), i2 , i3 , and i4 . The outputs are
+   j1 , j2 , · · · , j15 . If the binary number (i4 i3 i2 i1 )2 has value k, then j1 = j2 = · · · = jk = 1 and the rest
+   is 0. You need to spell out the formula for each jl (1 ≤ l ≤ 15) as a logic function of the inputs.
+   Please use notations ∨ (for OR), ∧ (for AND), and ¬ (for NOT).
+4. Memory Design: For the design of the pipelined flow ID lookup scheme described earlier, draw the
+   timing diagrams for the pipelined lookups. Use the numbers described in the chapter, and clearly
+   sketch a sample binary tree with 15 leaves and show how it can be looked up after four lookups on
+   four different banks. Assume a binary tree, not a ternary tree. Also, calculate the number of keys that
+   can be supported using 16 banks of RAMBUS if the first k levels of the tree are cached in on-chip
+   SRAM.
+5. Memories and Pipelining Trees: This problem studies how to pipeline a heap. A heap is important
+   for applications like QoS, where a router wishes to transmit the packet with the earliest timestamp
+   first. Thus it makes sense to have a heap ordered on timestamps. To make it efficient, the heap needs
+   to be pipelined in the same fashion as the binary search tree example in the chapter, though doing so
+   for a heap is somewhat harder. Fig. 2.15 shows an example of a P-heap capable of storing 15 keys.
+   A P-heap (Bhagwan and Lin, 2000) is a full binary tree, such as a standard heap, except that nodes
+   anywhere in the heap can be empty as long as all children of the node are also empty (e.g., nodes 6,
+   12, 13).
+       For the following explanations consult Fig. 2.15 and Fig. 2.16. Consider adding key 9 to the heap.
+   Assume every node N has a count of the number of empty nodes in the subtree rooted at N . Since
+   9 is less than the root value of 16, 9 must move below. Since both the left and right children have
+   empty nodes in their subtrees, we arbitrarily choose to add 9 to the left subtree (node 2). The index,
+   value, and position values shown on the left of each tree are registers used to show the state of the
+   current operation. Thus in Fig. 2.15, part (b), when 9 is added to the left subtree, the index represents
+   the depth of the subtree (depth 2) and the position is the number of the node (i.e., node 2) that the
+   value 9 is being added to.
+                                                                                       2.6 Exercises            47
+
+
+
+
+FIGURE 2.15
+An enqueue example in five snapshots to be read from left to right and then top-down. In each snapshot, the index
+represents the depth of the subtree, and the position is the number of the node that the value is being added to.
+
+
+
+      Next, since 9 is less than 14 and since only the right child has space in its subtree, 9 is added to
+   the subtree rooted at node 5. This time 9 is greater than 7, so 7 is replaced with 9 (in node 5) and 7 is
+   pushed down to the empty node, 10. Thus in Fig. 2.15, part (d), the index value is 4 (i.e., operation is
+   at depth 4) and the position is 10. Although in Fig. 2.15 only one of the registers at any index/depth
+   has nonempty information, keeping separate registers for each index will allow pipelining.
+      Consider next what is involved in removing the largest element (dequeue). Remove 16 and try to
+   push down the hole created until an empty subtree is created. Thus in Step 3, the hole is moved to
+   node 2 (because its value, 14, is larger than its sibling, with value 10), then to node 4, and finally to
+48      Chapter 2 Network implementation models
+
+
+
+
+FIGURE 2.16
+Dequeue example.
+
+
+   node 9. Each time a hole is moved down, the corresponding nonempty value from below replaces
+   the old hole.
+   • In order to make the enqueue operation work correctly, the count of empty subtree nodes must be
+     maintained. Explain briefly how the count should be maintained for each enqueue and dequeue
+     operation (the structure will be pipelined in a moment, so make sure the count values respect this
+     goal).
+   • A logical thing to do is to pipeline by level, as we did for the binary tree in the chapter. However,
+     here we have a problem. At each level (say, inserting 9 at the root), the operation has to consult
+     the two children at the next level as well. Thus when the first operation moves down to level 2,
+                                                                               2.6 Exercises          49
+
+
+
+       one cannot bring in a second operation to level 1 or there will be memory contention. Clearly,
+       waiting till one operation finishes completely will work, but this reduces to sequential processing
+       of operations. What is the fastest rate you can pipeline the heap?
+   •   Consider the operations “Enqueue 9; Enqueue 4.5; Dequeue” pipelined as you have answered
+       earlier. Show six consecutive snapshots of the tree supporting these three operations.
+   •   Assume that each level memory is an on-chip SRAM that takes 5 nsec for a memory access.
+       Assume that you can read and write the value and count fields together in one access. Remember
+       that some of the memories can be queried in parallel. What is the steady-state throughput of the
+       heap, in operations per second?
+   •   Could one improve the number of memory references by using a wider memory access and laying
+       out the tree appropriately?
+   •   Before this design, previous designs used a memory element for each heap element as well as
+       logic for each element. Thus the amount of logic required scaled directly with heap size, which
+       scales poorly in terms of density and power. In this design, the memory scales with the number
+       of heap elements and thus scales with SRAM densities and power, but the logic required scales
+       much better. Explain.
+6. Architecture, Caches, and Fast Hash Functions: The L1 cache in a CPU provides essentially
+   a fast hash function that maps from a physical memory address to its contents via the L1 cache.
+   Suppose that one wants to teach an old dog (the L1 cache) a new trick (to do IP lookups) using a
+   method suggested in Chiueh and Pradhan (1999). The goal is to use the L1 cache as a hash table to
+   map 32-bit IP addresses to 7-bit port numbers. Assume a 16-KB L1 cache, of which the first 4 KB
+   are reserved for the hash table, and a 32-byte cache block size. Assume a byte-addressable machine,
+   a 32-bit virtual address, and a page size of 4 KB. Thus there are 512 32-byte blocks in the cache.
+   Assume the L1 cache is directly indexed (called direct mapped). Thus bits 5 through 13 of a virtual
+   address are used to index into one of 512 blocks, with bits 0 through 4 identifying the byte within
+   each block.
+   • Given pages of size 4 KB and that the machine is byte addressable, how many bits in a virtual
+     address identify the virtual page? How many bits of the virtual page number intersect with bits 5
+     through 13 used to index into the L1 cache?
+   • The only way to ensure that the hash table is not thrown out of the L1 cache when some other
+     virtual pages arrive is to mark any pages that could map into the same portion of the L1 cache
+     as uncacheable at start-up (this can be done). Based on your previous answer and the fact that
+     the hash table uses the first 4 KB of L1 cache, precisely identify which pages must be marked as
+     uncacheable.
+   • To do a lookup of a 32-bit IP address, first convert the address to a virtual address by setting to
+     0 all bits except bits 5 through 11 (bits 12 and 13 are zero because only the top quarter of the
+     L1 cache is being used). Assume this is translated to the exact same physical address. When a
+     Read is done to this address, the L1 cache hardware will return the contents of the first 32-bit
+     word of the corresponding cache block. Each 32-bit word will contain a 25-bit tag and a 7-bit
+     port number. Next, compare all bits in the IP address, other than bits 5 through 11, with the tag,
+     and keep doing so for each 32-bit entry in the block. How many L1 cache accesses are required
+     in the worst case for a hash lookup? Why might this be faster than a standard hash lookup in
+     software?
+50      Chapter 2 Network implementation models
+
+
+
+7. Operating Systems and Lazy Receiver Processing: Example 8 described how BSD protocol pro-
+   cessing can lead to receiver livelock. Lazy receiver processing (Druschel and Banga, 1996) combats
+   this problem via two mechanisms.
+   • The first mechanism is to replace the single shared IP processing queue by a separate queue per
+     destination socket. Why does this help? Why might this not be easy to implement?
+   • The second mechanism is to implement the protocol processing at the priority of the receiving
+     process and as part of the context of the received process (and not a separate software interrupt).
+     Why does this help? Why might this not be easy to implement?
+                                                                                                          CHAPTER
+
+
+Fifteen implementation principles
+                                                                                                              3
+                        Instead of computing, I had to think about the problem, a formula for success that I recommend
+                                                                                                                 highly.
+                                                                                                     —Ivan Sutherland
+
+
+After understanding how queens and knights move in a game of chess, it helps to understand basic
+strategies, such as castling and the promotion of pawns in the endgame. Similarly, having studied some
+of the rules of the protocol implementation game in the last chapter, you will be presented in this chapter
+with implementation strategies in the form of 15 principles. The principles are abstracted from protocol
+implementations that have worked well. Many good implementors unconsciously use such principles.
+The point, however, is to articulate such principles so that they can be deliberately applied to craft
+efficient implementations.
+    This chapter is organized as follows. Section 3.1 motivates the use of the principles using a ternary
+CAM problem. Section 3.2 clarifies the distinction between algorithms and algorithmics using a net-
+work security forensics problem. Section 3.3 introduces 15 implementation principles; Section 3.4
+explains the differences between implementation and design principles. Finally, Section 3.5 describes
+some cautionary questions that should be asked before applying the principles.
+
+    Quick reference guide
+    The reader pressed for time should consult the summaries of the 15 principles found in Figs. 3.1–3.3. Two networking
+    applications of these principles can be found in a ternary CAM update problem (Section 3.1) and a network security
+    forensics problem (Section 3.2).
+
+
+
+
+3.1 Motivating the use of principles—updating ternary
+    content-addressable memories
+Call a string ternary if it contains characters that are either 0, 1, or *, where * denotes a wildcard that
+can match both a 0 and a 1. Examples of ternary strings of length 3 include S1 = 01* and S2 = *1*;
+the actual binary string 011 matches both S1 and S2, while 111 matches only S2. A ternary content-
+addressable memory (CAM) is a memory containing ternary strings of a specified length together with
+associated information; when presented with an input string, the CAM will search all its memory loca-
+tions in parallel to output (in one cycle) the lowest memory location whose ternary string matches the
+specified input key.
+Network Algorithmics. https://doi.org/10.1016/B978-0-12-809927-8.00008-7
+Copyright © 2022 Elsevier Inc. All rights reserved.
+                                                                                                                       51
+52       Chapter 3 Fifteen implementation principles
+
+
+
+
+FIGURE 3.1
+Summary of Principles 1–5—systems thinking.
+
+
+
+
+FIGURE 3.2
+Summary of Principles 6–10—recovering efficiency while retaining modularity.
+
+
+
+   Fig. 3.4 shows an application of ternary CAMs to the longest-matching prefix problem for Internet
+routers. For every incoming packet, each Internet router must extract a 32-bit destination IP address
+from the incoming packet and match it against a forwarding database of IP prefixes with their corre-
+sponding next hops. An IP prefix is a ternary string of length 32 where all the wildcards are at the end.
+We will change notation slightly and let * denote any number of wildcard characters, so 101* matches
+10100 and not just 1010.
+                                                        3.1 Motivating the use of principles        53
+
+
+
+
+FIGURE 3.3
+Summary of Principles 11–15—speeding up key routines.
+
+
+
+
+FIGURE 3.4
+Example of using a ternary CAM for prefix lookups.
+
+
+    Thus in Fig. 3.4 a packet sent to a destination address that starts with 010001 matches the prefixes
+010001* and 01* but should be sent to Port P5 because Internet forwarding requires that packets be
+forwarded using the longest match. We will have more to say about this problem in Chapter 11. For now,
+note that if the prefixes are arranged in a ternary CAM such that all longer prefixes occur before any
+shorter prefixes (as in Fig. 3.4), the ternary CAM provides the matching next hop in one memory cycle.
+    While ternary CAMs are extremely fast for message forwarding, they require that longer prefixes
+occur before shorter prefixes. But routing protocols often add or delete prefixes. Suppose in Fig. 3.4
+that a new prefix, 11*, with next hop Port 1 must be added to the router database. The naive way to do
+insertion would make space in the group of length-2 prefixes (i.e., create a hole before 0*) by pushing
+up by one position all prefixes of length 2 or higher.
+    Unfortunately, for a large database of around 100,000 prefixes kept by a typical core router, this
+would take 100,000 memory cycles, which would make it very slow to add a prefix. We can obtain a
+

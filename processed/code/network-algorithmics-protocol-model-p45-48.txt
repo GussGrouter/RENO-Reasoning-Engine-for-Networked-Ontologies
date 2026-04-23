@@ -1,0 +1,175 @@
+18       Chapter 2 Network implementation models
+
+
+
+
+2.1 Protocols
+Section 2.1.1 describes the transport protocol TCP and the IP routing protocol. These two examples are
+used to provide an abstract model of a protocol and its functions in Section 2.1.2. Section 2.1.3 ends
+with common network performance assumptions. Readers familiar with TCP/IP may wish to skip to
+Section 2.1.2.
+
+
+2.1.1 Transport and routing protocols
+Applications subcontract the job of reliable delivery to a transport protocol such as the Transmission
+Control Protocol (TCP). TCP’s job is to provide the sending and receiving applications with the illusion
+of two shared data queues in each direction—despite the fact that the sender and receiver machines
+are separated by a lossy network. Thus whatever the sender application writes to its local TCP send
+queue should magically appear in the same order at the local TCP receive queue at the receiver, and
+vice versa. TCP implements this mechanism by breaking the queued application data into segments
+and retransmitting each segment until an acknowledgment (ack) has been received. A more detailed
+description of TCP operation can be found in Section A.1.1.
+    If the application is (say) a videoconferencing application that does not want reliability guarantees,
+it can choose to use a protocol called UDP (User Datagram Protocol) instead of TCP. Unlike TCP, UDP
+does not need acks or retransmissions because it does not guarantee reliability.
+    Transport protocols such as TCP and UDP work by sending segments from a sender node to a
+receiver node across the Internet. The actual job of sending a segment is subcontracted to the Internet
+routing protocol IP.
+    Internet routing is broken into two conceptual parts, called forwarding and routing. Forwarding is
+the process by which packets move from source to destination through intermediate routers. A packet
+is a TCP segment together with a routing header that contains the destination Internet address.
+    While forwarding must be done at extremely high speeds, the forwarding tables at each router must
+be built by a routing protocol, especially in the face of topology changes, such as link failures. There are
+several commonly used routing protocols, such as distance vector (e.g., RIP), link state (e.g., OSPF),
+and policy routing (e.g., BGP). More details and references to other texts can be found in Section A.1.2
+in Appendix.
+
+
+2.1.2 Abstract protocol model
+A protocol is a state machine for all nodes participating in the protocol, together with interfaces and
+message formats. A model for a protocol state machine is shown in Fig. 2.1. The specification must
+describe how the state machine changes state and responds (e.g., by sending messages, setting timers)
+to interface calls, received messages, and timer events.
+    For instance, when an application makes a connect request, the TCP sender state machine initializes
+by picking an unused initial sequence number, goes to the so-called SYN-SENT state, and sends a
+SYN message. As a second example, a link-state routing protocol like OSPF has a state machine at
+each router; when a link state packet (LSP) arrives at a router with a higher sequence number than the
+last LSP from the source, the new LSP should be stored and sent to all neighbors. While the LSP is very
+different from TCP, both protocols can be abstracted by the state machine model shown in Fig. 2.1.
+                                                                                        2.1 Protocols            19
+
+
+
+
+FIGURE 2.1
+Abstract model of the state machine implementing a protocol at a node participating in a protocol.
+
+
+
+
+FIGURE 2.2
+Common protocol functions. The small shaded black box to the lower left represents the state table used by the
+protocol.
+
+
+    This book is devoted to protocol implementations. Besides TCP and IP, this book will consider other
+protocols, such as HTTP. Thus, it is worth abstracting out the generic and time-consuming functions
+that a protocol state machine performs based on our TCP and routing examples. Such a model, shown
+in Fig. 2.2, will guide us through this book.
+    First, at the bottom of Fig. 2.2, a protocol state machine must receive and send data packets. This
+involves data manipulations, or operations that must read or write every byte in a packet. For instance,
+a TCP must copy received data to application buffers, while a router has to switch packets from input
+links to output links. The TCP header also specifies a checksum that must be computed over all the data
+bytes. Data copying also requires the allocation of resources such as buffers.
+    Second, at the top of Fig. 2.2, the state machine must demultiplex data to one of many clients. In
+some cases, the client programs must be activated, requiring potentially expensive control transfer. For
+instance, when a receiving TCP receives a Web page, it has to demultiplex the data to the Web browser
+application using the port number fields and may have to wake up the process running the browser.
+20       Chapter 2 Network implementation models
+
+
+
+    Fig. 2.2 also depicts several generic functions shared by many protocols. First, protocols have a
+crucial state that must be looked up at high speeds and sometimes manipulated. For instance, a received
+TCP packet causes TCP to look up a table of connection state, while a received IP packet causes IP
+to look up a forwarding table. Second, protocols need to efficiently set timers, for example, to con-
+trol retransmission in TCP. Third, if a protocol module is handling several different clients, it needs
+to schedule these clients efficiently. For instance, TCP must schedule the processing of different con-
+nections, while a router must make sure that unruly conversations between some pair of computers do
+not lock out other conversations. Many protocols also allow large pieces of data to be fragmented into
+smaller pieces that need reassembly.
+    One of the major theses of this book is that though such generic functions are often expensive, their
+cost can be mitigated with the right techniques. Thus each generic protocol function is worth studying in
+isolation. Therefore after Part 1 of this book, the remaining chapters address specific protocol functions
+for endnodes and routers.
+
+
+2.1.3 Performance environment and measures
+This section describes some important measures and performance assumptions. Consider a system
+(such as a network or even a single router) where jobs (such as messages) arrive and, after completion,
+leave. The two most important metrics in networks are throughput and latency. Throughput roughly
+measures the number of jobs completed per second. Latency measures the time (typically the worst
+case) to complete a job. System owners (e.g., ISPs, routers) seek to maximize throughput to maximize
+revenues, while users of a system want end-to-end latencies lower than a few hundred milliseconds.
+Latency also affects the speed of computation across the network, as, for example, in the performance
+of a remote procedure call.
+    The following performance-related observations about the Internet milieu are helpful when consid-
+ering implementation trade-offs.
+• Link Speeds: Backbone links are upgrading to 10 Gbps and 40 Gbps, and local links are upgrading
+  to gigabit speeds. However, wireless and home links are currently orders of magnitude slower.
+• TCP and Web Dominance: Web traffic accounts for over 70% of traffic in bytes or packets. Similarly,
+  TCP accounts for 90% of traffic in a recent study (Braun, 1998).
+• Small Transfers: Most Web documents accessed are small; for example, a SPEC (Carlton, 1996)
+  study shows that 50% of accessed files are 50 kilobytes (KB) or less.
+• Poor Latencies: Real round-trip delays exceed speed-of-light limitations; measurements in Crovella
+  and Carter (1995) report a mean of 241 msec across the United States compared to speed-of-light
+  delays of less than 30 msec. Increased latency can be caused by efforts to improve throughput, such
+  as batch compression at modems and pipelining in routers.
+• Poor Locality: Backbone traffic studies (Thompson et al., 1997) show 250,000 different source–
+  destination pairs (sometimes called flows) passing through a router in a very short duration. More
+  recent estimates show around a million concurrent flows. Aggregating groups of headers with the
+  same destination address or other means does not reduce the number of header classes significantly.
+  Thus locality, or the likelihood of computation invested in a packet being reused on a future packet,
+  is small.
+• Small Packets: Thompson et al. (1997) also show that roughly half the packets received by a router
+  are minimum-size 40-byte TCP acknowledgments. To avoid losing important packets in a stream
+                                                                                             2.1 Protocols             21
+
+
+
+  of minimum-size packets, most router- and network-adaptor vendors aim for “wire-speed forward-
+  ing”—this is the ability to process minimum-size (40-byte) packets at the speed of the input link.1
+• Critical Measures: It is worth distinguishing between global performance measures, such as end-
+  to-end delay and bandwidth, and local performance measures, such as router lookup speeds. While
+  global performance measures are crucial to overall network performance, this book focuses only on
+  local performance measures, which are a key piece of the puzzle. In particular, this book focuses on
+  forwarding performance and resource (e.g., memory, logic) measures.
+• Tools: Most network management tools, such as HP’s OpenView, deal with global measures. The
+  tools needed for local measures are tools to measure performance within computers, such as profiling
+  software. Examples include Rational’s Quantify (http://www.rational.com) for application soft-
+  ware, Intel’s VTune (www.intel.com/software/products/vtune/), and even hardware oscilloscopes.
+  Network monitors such as tcpdump (www.tcpdump.org) are also useful.
+
+                                    Case Study 1: SANs and iSCSI
+       This case study shows that protocol features can greatly affect application performance. Many
+   large data centers connect their disk drives and computers together using a storage area network
+   (SAN). This allows computers to share disks. Currently, storage area networks are based on Fiber-
+   Channel (Benner, 1995) components, which are more expensive than, say, Gigabit Ethernet. The
+   proponents of iSCSI (Internet storage) (Satran et al., 2001) protocols seek to replace FiberChannel
+   protocols with (hopefully cheaper) TCP/IP protocols and components.
+       SCSI is the protocol used by computers to communicate with local disks. It can also be used
+   to communicate with disks across a network. A single SCSI command could ask to read 10
+   megabytes (MB) of data from a remote disk. Currently, such remote SCSI commands run over
+   a FiberChannel transport protocol implemented in the network adaptors. Thus a 10-MB transfer is
+   broken up into multiple FiberChannel packets, sent, delivered, and acknowledged (acked) without
+   any per-packet processing by the requesting computer or responding disk.
+       The obvious approach to reduce costs is to replace the proprietary FiberChannel transport
+   layer with TCP and the FiberChannel network layer with IP. This would allow us to replace ex-
+   pensive FiberChannel switches in SANs with commodity Ethernet switches. However, this has
+   three implications. First, to compete with FiberChannel performance, TCP will probably have
+   to be implemented in hardware. Second, TCP sends and delivers a byte stream (see Fig. A.1 in
+   Appendix if needed). Thus multiple sent SCSI messages can be merged at the receiver. Message
+   boundaries must be recovered by adding another iSCSI header containing the length of the next
+   SCSI message.
+       The third implication is trickier. Storage vendors (Satran et al., 2001) wish to process SCSI
+   commands out of order. If two independent SCSI messages C1 and C2 are sent in order but the
+   C2 data arrives before C1, TCP will buffer C2 until C1 arrives. But the storage enthusiast wishes
+   to steer C2 directly to a preallocated SCSI buffer and process C2 out of order, a prospect that
+   makes the TCP purist cringe. The length field method described earlier fails for this purpose
+
+
+
+
+1 The preoccupation with wire-speed forwarding in networking is extremely different from the mentality in computer architec-
+ture, which is content with optimizing typical (and not worst-case) performance as measured on benchmarks.
+

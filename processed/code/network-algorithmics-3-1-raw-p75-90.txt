@@ -1,0 +1,599 @@
+48      Chapter 2 Network implementation models
+
+
+
+
+FIGURE 2.16
+Dequeue example.
+
+
+   node 9. Each time a hole is moved down, the corresponding nonempty value from below replaces
+   the old hole.
+   • In order to make the enqueue operation work correctly, the count of empty subtree nodes must be
+     maintained. Explain briefly how the count should be maintained for each enqueue and dequeue
+     operation (the structure will be pipelined in a moment, so make sure the count values respect this
+     goal).
+   • A logical thing to do is to pipeline by level, as we did for the binary tree in the chapter. However,
+     here we have a problem. At each level (say, inserting 9 at the root), the operation has to consult
+     the two children at the next level as well. Thus when the first operation moves down to level 2,
+                                                                               2.6 Exercises          49
+
+
+
+       one cannot bring in a second operation to level 1 or there will be memory contention. Clearly,
+       waiting till one operation finishes completely will work, but this reduces to sequential processing
+       of operations. What is the fastest rate you can pipeline the heap?
+   •   Consider the operations “Enqueue 9; Enqueue 4.5; Dequeue” pipelined as you have answered
+       earlier. Show six consecutive snapshots of the tree supporting these three operations.
+   •   Assume that each level memory is an on-chip SRAM that takes 5 nsec for a memory access.
+       Assume that you can read and write the value and count fields together in one access. Remember
+       that some of the memories can be queried in parallel. What is the steady-state throughput of the
+       heap, in operations per second?
+   •   Could one improve the number of memory references by using a wider memory access and laying
+       out the tree appropriately?
+   •   Before this design, previous designs used a memory element for each heap element as well as
+       logic for each element. Thus the amount of logic required scaled directly with heap size, which
+       scales poorly in terms of density and power. In this design, the memory scales with the number
+       of heap elements and thus scales with SRAM densities and power, but the logic required scales
+       much better. Explain.
+6. Architecture, Caches, and Fast Hash Functions: The L1 cache in a CPU provides essentially
+   a fast hash function that maps from a physical memory address to its contents via the L1 cache.
+   Suppose that one wants to teach an old dog (the L1 cache) a new trick (to do IP lookups) using a
+   method suggested in Chiueh and Pradhan (1999). The goal is to use the L1 cache as a hash table to
+   map 32-bit IP addresses to 7-bit port numbers. Assume a 16-KB L1 cache, of which the first 4 KB
+   are reserved for the hash table, and a 32-byte cache block size. Assume a byte-addressable machine,
+   a 32-bit virtual address, and a page size of 4 KB. Thus there are 512 32-byte blocks in the cache.
+   Assume the L1 cache is directly indexed (called direct mapped). Thus bits 5 through 13 of a virtual
+   address are used to index into one of 512 blocks, with bits 0 through 4 identifying the byte within
+   each block.
+   • Given pages of size 4 KB and that the machine is byte addressable, how many bits in a virtual
+     address identify the virtual page? How many bits of the virtual page number intersect with bits 5
+     through 13 used to index into the L1 cache?
+   • The only way to ensure that the hash table is not thrown out of the L1 cache when some other
+     virtual pages arrive is to mark any pages that could map into the same portion of the L1 cache
+     as uncacheable at start-up (this can be done). Based on your previous answer and the fact that
+     the hash table uses the first 4 KB of L1 cache, precisely identify which pages must be marked as
+     uncacheable.
+   • To do a lookup of a 32-bit IP address, first convert the address to a virtual address by setting to
+     0 all bits except bits 5 through 11 (bits 12 and 13 are zero because only the top quarter of the
+     L1 cache is being used). Assume this is translated to the exact same physical address. When a
+     Read is done to this address, the L1 cache hardware will return the contents of the first 32-bit
+     word of the corresponding cache block. Each 32-bit word will contain a 25-bit tag and a 7-bit
+     port number. Next, compare all bits in the IP address, other than bits 5 through 11, with the tag,
+     and keep doing so for each 32-bit entry in the block. How many L1 cache accesses are required
+     in the worst case for a hash lookup? Why might this be faster than a standard hash lookup in
+     software?
+50      Chapter 2 Network implementation models
+
+
+
+7. Operating Systems and Lazy Receiver Processing: Example 8 described how BSD protocol pro-
+   cessing can lead to receiver livelock. Lazy receiver processing (Druschel and Banga, 1996) combats
+   this problem via two mechanisms.
+   • The first mechanism is to replace the single shared IP processing queue by a separate queue per
+     destination socket. Why does this help? Why might this not be easy to implement?
+   • The second mechanism is to implement the protocol processing at the priority of the receiving
+     process and as part of the context of the received process (and not a separate software interrupt).
+     Why does this help? Why might this not be easy to implement?
+                                                                                                          CHAPTER
+
+
+Fifteen implementation principles
+                                                                                                              3
+                        Instead of computing, I had to think about the problem, a formula for success that I recommend
+                                                                                                                 highly.
+                                                                                                     —Ivan Sutherland
+
+
+After understanding how queens and knights move in a game of chess, it helps to understand basic
+strategies, such as castling and the promotion of pawns in the endgame. Similarly, having studied some
+of the rules of the protocol implementation game in the last chapter, you will be presented in this chapter
+with implementation strategies in the form of 15 principles. The principles are abstracted from protocol
+implementations that have worked well. Many good implementors unconsciously use such principles.
+The point, however, is to articulate such principles so that they can be deliberately applied to craft
+efficient implementations.
+    This chapter is organized as follows. Section 3.1 motivates the use of the principles using a ternary
+CAM problem. Section 3.2 clarifies the distinction between algorithms and algorithmics using a net-
+work security forensics problem. Section 3.3 introduces 15 implementation principles; Section 3.4
+explains the differences between implementation and design principles. Finally, Section 3.5 describes
+some cautionary questions that should be asked before applying the principles.
+
+    Quick reference guide
+    The reader pressed for time should consult the summaries of the 15 principles found in Figs. 3.1–3.3. Two networking
+    applications of these principles can be found in a ternary CAM update problem (Section 3.1) and a network security
+    forensics problem (Section 3.2).
+
+
+
+
+3.1 Motivating the use of principles—updating ternary
+    content-addressable memories
+Call a string ternary if it contains characters that are either 0, 1, or *, where * denotes a wildcard that
+can match both a 0 and a 1. Examples of ternary strings of length 3 include S1 = 01* and S2 = *1*;
+the actual binary string 011 matches both S1 and S2, while 111 matches only S2. A ternary content-
+addressable memory (CAM) is a memory containing ternary strings of a specified length together with
+associated information; when presented with an input string, the CAM will search all its memory loca-
+tions in parallel to output (in one cycle) the lowest memory location whose ternary string matches the
+specified input key.
+Network Algorithmics. https://doi.org/10.1016/B978-0-12-809927-8.00008-7
+Copyright © 2022 Elsevier Inc. All rights reserved.
+                                                                                                                       51
+52       Chapter 3 Fifteen implementation principles
+
+
+
+
+FIGURE 3.1
+Summary of Principles 1–5—systems thinking.
+
+
+
+
+FIGURE 3.2
+Summary of Principles 6–10—recovering efficiency while retaining modularity.
+
+
+
+   Fig. 3.4 shows an application of ternary CAMs to the longest-matching prefix problem for Internet
+routers. For every incoming packet, each Internet router must extract a 32-bit destination IP address
+from the incoming packet and match it against a forwarding database of IP prefixes with their corre-
+sponding next hops. An IP prefix is a ternary string of length 32 where all the wildcards are at the end.
+We will change notation slightly and let * denote any number of wildcard characters, so 101* matches
+10100 and not just 1010.
+                                                        3.1 Motivating the use of principles        53
+
+
+
+
+FIGURE 3.3
+Summary of Principles 11–15—speeding up key routines.
+
+
+
+
+FIGURE 3.4
+Example of using a ternary CAM for prefix lookups.
+
+
+    Thus in Fig. 3.4 a packet sent to a destination address that starts with 010001 matches the prefixes
+010001* and 01* but should be sent to Port P5 because Internet forwarding requires that packets be
+forwarded using the longest match. We will have more to say about this problem in Chapter 11. For now,
+note that if the prefixes are arranged in a ternary CAM such that all longer prefixes occur before any
+shorter prefixes (as in Fig. 3.4), the ternary CAM provides the matching next hop in one memory cycle.
+    While ternary CAMs are extremely fast for message forwarding, they require that longer prefixes
+occur before shorter prefixes. But routing protocols often add or delete prefixes. Suppose in Fig. 3.4
+that a new prefix, 11*, with next hop Port 1 must be added to the router database. The naive way to do
+insertion would make space in the group of length-2 prefixes (i.e., create a hole before 0*) by pushing
+up by one position all prefixes of length 2 or higher.
+    Unfortunately, for a large database of around 100,000 prefixes kept by a typical core router, this
+would take 100,000 memory cycles, which would make it very slow to add a prefix. We can obtain a
+54        Chapter 3 Fifteen implementation principles
+
+
+
+
+FIGURE 3.5
+Finding a spot for the new prefix by moving X to Y ’s position recursively requires us to find a spot to move Y .
+
+
+
+better solution systematically by applying the following two principles (described later in this chapter
+as principles P13 and P15).
+
+Understand and exploit degrees of freedom
+In looking at the forwarding table on the left of Fig. 3.4 we see that all prefixes of the same length are
+arranged together and all prefixes of length i occur after all prefixes of length j > i. However, in the
+figure all prefixes of the same length are also sorted by value. Thus 00* occurs before 01*, which occurs
+before 10*. But it is unnecessary for the CAM to correctly return longest matching prefixes: We only
+require ordering between prefixes of different lengths; we do not require ordering between prefixes of
+the same length.
+    In looking at the more abstract view of Fig. 3.4 shown in Fig. 3.5, we see that if we are to add an
+entry to the start of the set of length-i prefixes, we have to create a hole at the end of the length-(i + 1)
+set of prefixes. Thus we have to move the entry X, already at this position, to another position. If we
+move X one step up, we will be forced into our prior inefficient solution.
+    However, our observation about degrees of freedom says that we can place X anywhere adjacent to
+the other length-(i + 1) prefixes. Thus, an alternative idea is to move X to the position held by Y , the
+last length-(i + 2) prefix. But this forces us to find a new position for Y . How does this help? We need
+a second principle.
+
+Use algorithmic techniques
+Again, recursion suggests itself: We solve a problem by reducing the problem to a “smaller” instance
+of the same problem. In this case, the new problem of assigning Y a new position is “smaller” because
+the set of length-(i + 2) prefixes is closer to the free space at the top of the CAM than the set of length-
+(i + 1) prefixes. Thus we move Y to the end of the length-(i + 3) set of prefixes, etc.
+    While recursion is a natural way to think, a better implementation is to unwind the recursion by
+starting from the top of the CAM and working downward by creating a hole at the end of the length-1
+                                                                  3.2 Algorithms versus algorithmics                          55
+
+
+
+prefixes,1 creating a hole at the end of the length-2 prefixes, etc., until we create a hole at the end of the
+length-i prefixes. Thus the worst-case time is 32 − i memory accesses, which is around 32 for small i.
+    Are we done? No, we can do better by further exploiting degrees of freedom. First, in Fig. 3.5 we
+assumed that the free space was at the top of the CAM. But the free space could be placed anywhere. In
+particular, it can be placed after the length-16 prefixes. This reduces the worst-case number of memory
+accesses by a factor of 2 (Shah and Gupta, 2001).
+    A more sophisticated degree of freedom is as follows. So far, the specification of the CAM insertion
+algorithm required that “a prefix of length i must occur before a prefix of length j if i > j .” Such
+a specification is sufficient for correctness but is not necessary. For example, 010* can occur before
+111001* because there is no address that can match both prefixes!
+    Thus a less exacting specification is “if two prefixes P and Q can match the same address, then P
+must come before Q in the CAM if P is longer than Q.” This is used in Shah and Gupta (2001) to
+further reduce the worst-case number of memory accesses for insertion for some practical databases.
+    While the last improvement is not worth its complexity, it points to another important principle. We
+often divide a large problem into subproblems and hand over the subproblem for a solution based on a
+specification. For example, the CAM hardware designer may have handed over the update problem to
+a microcoder, specifying that longer prefixes be placed before shorter ones.
+    But, as before, such a specification may not be the only way to solve the original problem. Thus
+changes to the specification (principle P3) can yield a more efficient solution. Of course, this requires
+curious and confident individuals who understand the big picture or who are brave enough to ask dan-
+gerous questions.
+
+
+
+3.2 Algorithms versus algorithmics
+It may be possible to argue that the previous example is still essentially algorithmic and does not
+require system thinking. One more quick example will help clarify the difference between algorithms
+and algorithmics.
+
+Security forensics problem
+In many intrusion detection systems, a manager often finds that a flow (defined by some packet header,
+for example, a source IP address) is likely to be misbehaving based on some probabilistic check. For
+example, a source doing a port scan may be identified after it has sent 100,000 packets to different
+machines in the attacked subnet.
+    While there are methods to identify such sources, one problem is that the evidence (the 100,000
+packets sent by the source) has typically disappeared (i.e., been forwarded from the router) by the time
+the guilty source is identified. The problem is that the probabilistic check requires accumulating some
+state (in, say, a suspicion table) for every packet received over some period of time before a source can
+be deemed suspicious. Thus if a source is judged to be suspicious after 10 seconds, how can one go
+back in time and retrieve the packets sent by the source during those 10 seconds?
+
+
+1 For simplicity, this description has assumed that the CAM contains prefixes of all lengths; it is easy to modify the algorithm to
+avoid this assumption.
+56        Chapter 3 Fifteen implementation principles
+
+
+
+
+FIGURE 3.6
+Keeping a queue of the last 100,000 packets that contains forensic information about what suspicious flows have
+been sent in the past.
+
+
+    To accomplish this, in Fig. 3.6 we keep a queue of the last 100,000 packets that were sent by the
+router. When a packet is forwarded, we also add a copy of the packet (or just keep a pointer to the
+packet) to the head of the queue. To keep the queue bounded, when the queue is full, we delete from
+the tail as well.
+    The main difficulty with this scheme is that when a guilty flow is detected, there may be lots of
+the flow’s packets in the queue (Fig. 3.6). All of these packets must be placed in the forensic log for
+transmission to a manager. The naive method of searching through a large DRAM buffer is very slow.
+    The textbook algorithms approach would be to add some index structure to search quickly for flow
+IDs. For example, one might maintain a hash table of flow IDs that maps every flow to a list of pointers
+to all packets with that flow ID in the queue. When a new packet is placed in the queue, the flow ID is
+looked up in the hash table and the address of the new packet in the queue is placed at the end of the
+flow’s list. Of course, when packets leave the queue, their entries must be removed from the list, and
+the list can be long. Fortunately, the entry to be deleted is guaranteed to be at the head of the queue for
+that flow ID.
+    Despite this, the textbook scheme has some difficulties. It adds more space to maintain these extra
+queues per flow ID, and space can be at a premium for a high-speed implementation. It also adds some
+extra complexity to packet processing to maintain the hash table and requires reading out all of a flow’s
+packets to the forensic log before the packet is overwritten by a packet that arrives 100,000 packets
+later. Instead, the following “systems” solution may be more elegant.
+
+Solution
+Do not attempt to immediately identify all of a flow F ’s packets when F is identified, but lazily identify
+them as they reach the end of the packet queue. This is shown in Fig. 3.7. When we add a packet to the
+head of the queue, we must remove a packet from the end of the queue (at least when the queue is full).
+             3.3 Fifteen implementation principles—categorization and description                                 57
+
+
+
+
+FIGURE 3.7
+Keeping a queue of the last 100,000 packets that contains forensic information about what suspicious flows have
+been sent in the past.
+
+
+
+    If that packet (say, Q, see Fig. 3.6) belongs to flow F that is in the Suspicion Table and flow F has
+reached some threshold of suspicion, we then add packet Q to the forensic log. The log can be sent
+to a manager. The overhead of this scheme is significant but manageable; we have to do two packet-
+processing steps, one for the packet being forwarded and one for the packet being removed from the
+queue. But these two packet-processing steps are also required in the textbook scheme; on the other
+hand, the elegant scheme requires no hashing and uses much less storage (no pointers between the
+100,000 packets).
+
+
+
+3.3 Fifteen implementation principles—categorization and description
+The two earlier examples and the warm-up exercise in Chapter 1 motivate the following 15 principles,
+which are used in the rest of the book. They are summarized inside the front cover. To add more
+structure, they are categorized as follows:
+• Systems Principles: Principles 1–5 take advantage of the fact that a system is constructed from
+  subsystems. By taking a systemwide rather than a black-box approach, one can often improve per-
+  formance.
+• Improving Efficiency While Retaining Modularity: Principles 6–10 suggest methods for improv-
+  ing performance while allowing complex systems to be built modularly.
+• Speeding It Up: Principles 11–15 suggest techniques for speeding up a key routine considered by
+  itself.
+58       Chapter 3 Fifteen implementation principles
+
+
+
+    Amazingly, many of these principles have been used for years by Chef Charlie at his Greasy Spoon
+restaurant. This chapter sometimes uses illustrations drawn from Chef Charlie’s experience, in addition
+to computer systems examples. One networking example is also described for each principle, though
+details are deferred to later chapters.
+
+
+3.3.1 Systems principles
+The first five principles exploit the fact that we are building systems.
+
+P1: Avoid obvious waste in common situations
+In a system, there may be wasted resources in special sequences of operations. If these patterns occur
+commonly, it may be worth eliminating the waste. This reflects an attitude of thriftiness toward system
+costs.
+    For example, Chef Charlie has to make a trip to the pantry to get the ice cream maker to make ice
+cream and to the pantry for a pie plate when he makes pies. But when he makes pie à la mode, he has
+learned to eliminate the obvious waste of two separate trips to the pantry.
+    Similarly, optimizing compilers look for obvious waste in terms of repeated subexpressions. For
+example, if a statement calculates i = 5.1 ∗ n + 2 and a later statement calculates j := (5.1 ∗ n + 2) ∗ 4,
+the calculation of the common subexpression 5.1 ∗ n + 2 is wasteful and can be avoided by computing
+the subexpression once, assigning it to a temporary variable t, and then calculating i := t and j := t ∗ 4.
+A classic networking example, described in Chapter 5, is avoiding making multiple copies of a packet
+between the operating system and user buffers.
+    Notice that each operation (e.g., walk to pantry, line of code, single packet copy) considered by
+itself has no obvious waste. It is the sequence of operations (two trips to the pantry, two statements
+that recompute a subexpression, two copies) that have obvious waste. Clearly, the larger the exposed
+context, the greater the scope for optimization. While the identification of certain operation patterns as
+being worth optimizing is often a matter of designer intuition, optimizations can be tested in practice
+using benchmarks.
+
+P2: Shift computation in time
+Systems have an aspect in space and time. The space aspect is represented by the subsystems, possibly
+geographically distributed, into which the system is decomposed. The time aspect is represented by
+the fact that a system is instantiated at various time scales, from fabrication time to compile time to
+parameter-setting times to run time. Many efficiencies can be gained by shifting computation in time.
+Here are three generic methods that fall under time-shifting.
+• P2a: Precompute. This refers to computing quantities before they are actually used, to save time at
+  the point of use. For example, Chef Charlie prepares crushed garlic in advance to save time during
+  the dinner rush. A common systems example is table-lookup methods, where the computation of an
+  expensive function f in run time is replaced by the lookup of a table that contains the value of f
+  for every element in the domain of f . A networking example is the precomputation of IP and TCP
+  headers for packets in a connection; because only a few header fields change for each packet, this
+  reduces the work to write packet headers (Chapter 9).
+• P2b: Evaluate Lazily. This refers to postponing expensive operations at critical times, hoping that
+  either the operation will not be needed later or a less busy time will be found to perform the opera-
+             3.3 Fifteen implementation principles—categorization and description                               59
+
+
+
+
+FIGURE 3.8
+Easing the implementation of Subsystem 1 by weakening its specification from S to, say, W , at the cost of making
+Subsystem 2 do more work.
+
+
+  tion. For example, Chef Charlie postpones dishwashing to the end of the day. While precomputation
+  is computing before the need, lazy evaluation is computing only when needed.
+  A famous example of lazy evaluation in systems is copy-on-write in the Mach operating system. Sup-
+  pose we have to copy a virtual address space A to another space, B, for process migration. A general
+  solution is to copy all pages in A to B to allow for pages in B to be written independently. Instead,
+  copy-on-write makes page table entries in B’s virtual address space point to the corresponding page
+  in A. When a process using B writes to a location, then a separate copy of the corresponding page in
+  A is made for B, and the write is performed. Since we expect the number of pages that are written
+  in B to be small compared to the total number of pages, this avoids unnecessary copying.
+  A simple networking example occurs when a network packet arrives at an endnode X in a different
+  byte order than X’s native byte order. Rather than swap all bytes immediately, it can be more efficient
+  to wait to swap the bytes that are actually read.
+• P2c: Share Expenses. This refers to taking advantage of expensive operations done by other parts
+  of the system. An important example of expense sharing is batching, where several expensive op-
+  erations can be done together more cheaply than doing each separately. For example, Charlie bakes
+  several pies in one batch. Computer systems have used batch processing for years, especially in the
+  early days of mainframes, before time sharing. Batching trades latency for throughput. A simple
+  networking example of expense sharing is timing wheels (Chapter 7), where the timer data structure
+  shares expensive per-clock-tick processing with the routine that updates the time-of-day clock.
+
+P3: Relax system requirements
+When a system is first designed top-down, functions are partitioned among subsystems. After fixing
+subsystem requirements and interfaces, individual subsystems are designed. When implementation dif-
+ficulties arise, the basic system structure may have to be redone, as shown in Fig. 3.8.
+    As shown in Chapter 1, implementation difficulties (e.g., implementing a divide) can sometimes be
+solved by relaxing the specification requirements for, say, Subsystem 1. This is shown in the figure by
+weakening the specification of Subsystem 1 from, say, S to W , but at the cost of making Subsystem 2
+obey a stronger property, Q, compared to the previous property, P .
+    Three techniques that arise from this principle are distinguished by how they relax the original
+subsystem specification.
+60        Chapter 3 Fifteen implementation principles
+
+
+
+• P3a: Trade Certainty for Time. Systems designers can fool themselves into believing that their
+  systems offer deterministic guarantees, when in fact we all depend on probabilities. For example,
+  quantum mechanics tells us there is some probability that the atoms in your body will rearrange
+  themselves to form a hockey puck, but this is clearly improbable.2 This opens the door to consider
+  randomized strategies when deterministic algorithms are too slow.
+  In systems, randomization is used by millions of Ethernets worldwide to sort out packet-sending
+  instants after collisions occur. A simple networking example of randomization is Cisco’s NetFlow
+  traffic measurement software: If a router does not have enough processing power to count all arriving
+  packets, it can count random samples and still be able to statistically identify large flows. A second
+  networking example is stochastic fair queuing (Chapter 14), where, rather than keep track exactly
+  of the networking conversations going through a router, conversations are tracked probabilistically
+  using hashing.
+• P3b: Trade Accuracy for Time. Similarly, numerical analysis cures us of the illusion that comput-
+  ers are perfectly accurate. Thus it can pay to relax accuracy requirements for speed. In systems,
+  many image compression techniques, such as MPEG, rely on lossy compression using interpolation.
+  Chapter 1 used approximate thresholds to replace divides by shifts. In networking, some packet-
+  scheduling algorithms at routers (Chapter 14) require sorting packets by their departure deadlines;
+  some proposals to reduce sorting overhead at high speeds suggest approximate sorting, which can
+  slightly reduce quality-of-service bounds but reduce processing.
+• P3c: Shift Computation in Space. Notice that all the examples given for this principle relaxed re-
+  quirements: Sampling may miss some packets, and the transferred image may not be identical to the
+  original image. However, other parts of the system (e.g., Subsystem 2 in Fig. 3.8) have to adapt to
+  these looser requirements. Thus we prefer to call the general idea of moving computation from one
+  subsystem to another (“robbing Peter to pay Paul”) shifting computation in space. In networking, for
+  example, the need for routers to fragment packets has recently been avoided by having end systems
+  calculate a packet size that will pass all routers.
+
+P4: Leverage off system components
+A black-box view of system design is to decompose the system into subsystems and then to design
+each subsystem in isolation. While this top-down approach has a pleasing modularity, in practice
+performance-critical components are often constructed partially bottom-up. For example, algorithms
+are designed to fit the features offered by the hardware. Here are some techniques that fall under this
+principle.
+• P4a: Exploit Locality. Chapter 2 showed that memory hardware offers efficiencies if related data
+  is laid out contiguously, e.g., same sector for disks, or same DRAM page for DRAMs. Disk-search
+  algorithms exploit this fact by using search trees of high radix, such as B-trees. IP-lookup algorithms
+  (Chapter 11) use the same trick to reduce lookup times by placing several keys in a wide word, as
+  did the example in Chapter 1.
+• P4b: Trade Memory for Speed. The obvious technique is to use more memory, such as lookup tables,
+  to save processing time. A less obvious technique is to compress a data structure to make it more
+  likely to fit into cache, because cache accesses are cheaper than memory accesses; in this case,
+
+
+2 Quote due to Tony Lauck.
+              3.3 Fifteen implementation principles—categorization and description                                            61
+
+
+
+  both memory and speed may be improved. The Lulea IP-lookup algorithm described in Chapter 11
+  uses this idea by using sparse arrays that can still be looked up efficiently using space-efficient
+  bitmaps.
+• P4c: Exploit Hardware Features. Compilers use strength reduction to optimize away multipli-
+  cations in loops; for example, in a loop where addresses are 4 bytes and the index i increases
+  by 1 each time, instead of computing 4 ∗ i, the compiler calculates the new array index as be-
+  ing 4 higher than its previous value. This exploits the fact that multiplies are more expensive
+  than additions on many modern processors. Similarly, it pays to manipulate data in multiples of
+  the machine word size, as we will see in the fast IP-checksum algorithms described in Chap-
+  ter 9.
+    If this principle is carried too far, the modularity of the system will be in jeopardy. Two techniques
+alleviate this problem. First, if we exploit other system features only to improve performance, then
+changes to those system features can only affect performance and not correctness. Second, we use this
+technique only for system components that profiling has shown to be a bottleneck.
+
+P5: Add hardware to improve performance
+When all else fails, goes the aphorism, use brute force. Adding new hardware,3 such as buying a faster
+processor, can be simpler and more cost effective than using clever techniques. Besides the brute-force
+approach of using faster infrastructure (e.g., faster processors, memory, buses, links), there are cleverer
+hardware–software trade-offs. Since hardware is less flexible and has higher design costs, it pays to add
+the minimum amount of hardware needed.
+    Thus baking at the Greasy Spoon was sped up using microwave ovens. In computer systems, dra-
+matic improvements each year in processor speeds and memory densities suggest doing key algorithms
+in software and upgrading to faster processors for speed increases. But computer systems abound with
+cleverer hardware–software trade-offs.
+    For example, in a multiprocessor system, if a processor wishes to write data, it must inform any
+“owners” of cached versions of the data. This interaction can be avoided if each processor has a piece
+of hardware that watches the bus for write transactions by other processors and automatically inval-
+idates the cached location when necessary. This simple hardware snoopy cache controller allows the
+remainder of the cache-consistency algorithm to be efficiently performed in software.
+    Decomposing functions between hardware and software is an art in itself. Hardware offers several
+benefits. First, there is no time required to fetch instructions: Instructions are effectively hardcoded.
+Second, common computational sequences (which would require several instructions in software) can
+be done in a single hardware clock cycle. For example, finding the first bit set in, say, a 32-bit word
+may take several instructions on a RISC machine but can be computed by a simple priority encoder, as
+shown in the previous chapter.
+    Third, hardware allows you to explicitly take advantage of parallelism inherent in the problem.
+Finally, hardware manufactured in volume may be cheaper than a general-purpose processor. For ex-
+ample, a Pentium may cost $100, while an ASIC in volume with similar speeds may cost $10.
+
+
+3 By contrast, Principle P4 talks about exploiting existing system features, such as the existing hardware. Of course, the distinc-
+tion between principles tends to blur and must be taken with a grain of salt.
+62       Chapter 3 Fifteen implementation principles
+
+
+
+    On the other hand, a software design is easily transported to the next generation of faster chips.
+Hardware, despite the use of programmable chips, is still less flexible. Despite this, with the advent of
+design tools such as VHDL synthesis packages, hardware design times have decreased considerably.
+Thus in the last few years chips performing fairly complex functions, such as image compression and
+IP lookups, have been designed.
+    Besides specific performance improvements, new technology can result in a complete paradigm
+shift. A visionary designer may completely redesign a system in anticipation of such trends. For exam-
+ple, the invention of the transistor and fast digital memories certainly enabled the use of digitized voice
+in the telephone network.
+    Increases in chip density have led computer architects to ponder what computational features to add
+to memories to alleviate the processor-memory bottleneck. In networks, the availability of high-speed
+links in the 1980s led to the use of large addresses and large headers. Ironically, the emergence of
+laptops in the 1990s led to the use of low-bandwidth wireless links and to a renewed concern for header
+compression. Technology trends can seesaw!
+    The following specific hardware techniques are often used in networking ASICs and are worth
+mentioning. They were first described in Chapter 2 and are repeated here for convenience.
+• P5a: Use Memory Interleaving and Pipelining. Similar techniques are used in IP lookup, in classi-
+  fication, and in scheduling algorithms that implement QoS. The multiple banks can be implemented
+  using several external memories, a single external memory such as a RAMBUS, or on-chip SRAM
+  within a chip that also contains processing logic.
+• P5b: Use Wide Word Parallelism. A common theme in many networking designs, such as the
+  Lucent bit vector scheme (Chapter 12), is to use wide memory words that can be processed in
+  parallel. This can be implemented using DRAM and exploiting page mode or by using SRAM and
+  making each memory word wider.
+• P5c: Combine DRAM and SRAM. We have explained in Chapter 2 and will explain in Chapter 16
+  two clever applications of this principle.
+
+
+3.3.2 Principles for modularity with efficiency
+An engineer who had read Dave Clark’s classic papers (e.g., Clark [1985]) on the inefficiencies of
+layered implementations once complained to a researcher about modularity. The researcher (Radia
+Perlman) replied, “But that’s how we got to the stage where we could complain about something.” Her
+point, of course, was that complex systems like network protocols could only have been engineered
+using layering and modularity. The following principles, culled from work by Clark and others, show
+how to regain efficiencies while retaining modularity.
+
+P6: Create efficient specialized routines by replacing inefficient general-purpose routines
+As in mathematics, the use of abstraction in computer system design can make systems compact, or-
+thogonal, and modular. However, at times the one-size-fits-all aspect of a general-purpose routine leads
+to inefficiencies. In important cases, it can pay to design an optimized and specialized routine.
+    A systems example can be found in database caches. Most general-purpose caching strategies would
+replace the least recently used record to disk. However, consider a query-processing routine processing
+a sequence of database tuples in a loop. In such a case, it is the most recently used record that will be
+used furthest in the future, so it is the ideal candidate for replacement. Thus many database applications
+             3.3 Fifteen implementation principles—categorization and description                                       63
+
+
+
+replace the operating system caching routines with more specialized routines. It is best to do such spe-
+cialization only for key routines, to avoid code bloat. A networking example is the fast UDP processing
+routines that we describe in Chapter 9.
+
+P7: Avoid unnecessary generality
+The tendency to design abstract and general subsystems can also lead to unnecessary or rarely used
+features. Thus, rather than building several specialized routines (e.g., P6) to replace the general-purpose
+routine, we might remove features to gain performance.4
+    Of course, as in the case of P3, removing features requires users of the routine to live with re-
+strictions. For example, in RISC processors, the elimination of complex instructions such as multiplies
+required multiplication to be emulated by firmware. A networking example is provided by Fbufs (Chap-
+ter 5), which provides a specialized virtual memory service that allows efficient copying between virtual
+address spaces.
+
+P8: Don’t be tied to reference implementations
+Specifications are written for clarity, not to suggest efficient implementations. Because abstract speci-
+fication languages are unpopular, many specifications use imperative languages such as C. Rather than
+precisely describe what function is to be computed, one gets code that prescribes how to compute the
+function. This has two side effects.
+    First, there is a strong tendency to overspecify. Second, many implementors copy the reference
+implementation in the specification, which is a problem when the reference implementation was chosen
+for conceptual clarity and not efficiency. As Clark (1985) points out, implementors are free to change
+the reference implementation as long as the two implementations have the same external effects. In
+fact, there may be other structured implementations that are efficient as well as modular.
+    For example, Charlie knows that when a recipe tells him to cut beans and then to cut carrots, he can
+interchange the two steps. In the systems world, Clark originally suggested the use of upcalls (Clark,
+1985) for operating systems. In an upcall, a lower layer can call an upper layer for data or advice, seem-
+ingly violating the rules of hierarchical decomposition introduced in the design of operating systems.
+Upcalls are commonly used today in network protocol implementations.
+
+P9: Pass hints in module interfaces
+A hint is information passed from a client to a service that, if correct, can avoid expensive computation
+by the service. The two key phrases are passed and if correct. By passing the hint in its request, a
+service can avoid the need for the associative lookup needed to access a cache. For example, a hint can
+be used to supply a direct index into the processing state at the receiver. Also, unlike caches, the hint is
+not guaranteed to be correct and hence must be checked against other certifiably correct information.
+Hints improve performance if the hint is correct most of the time.
+    This definition of a hint suggests a variant in which information is passed that is guaranteed to be
+correct and hence requires no checking. For want of an established term, we will call such information
+a tip. Tips are harder to use because of the need to ensure the correctness of the tip.
+
+
+4 Butler Lampson, a computer scientist and Turing Award winner, provides two quotes: When in doubt, get rid of it (anonymous)
+and Exterminate Features (Thacker).
+
