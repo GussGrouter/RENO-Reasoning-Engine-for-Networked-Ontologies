@@ -1,0 +1,10 @@
+.DS_Store
+.obsidian/
+
+# Cursor/VSCode-ish local state
+.vscode/
+
+# Python caches
+__pycache__/
+*.pyc
+
