@@ -1,12 +1,5 @@
 {
   "userIgnoreFilters": [
-    "raw/",
-    "processed/",
-    "scripts/",
-    "wiki/political/source/",
-    "wiki/code/source/",
-    "wiki/political/indexes/",
-    "wiki/code/indexes/",
-    "wiki/code/summary/"
+    "archive/"
   ]
 }

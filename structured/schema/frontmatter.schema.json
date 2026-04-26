@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "reno://structured/schema/frontmatter.schema.json",
+  "title": "RENO Frontmatter (base)",
+  "description": "Minimal base frontmatter for maintained markdown pages under wiki/. Fields are taken verbatim from AGENTS.md; optional fields are not enumerated here.",
+  "type": "object",
+  "required": ["id", "type", "status", "phase"],
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "summary",
+        "concept",
+        "insight",
+        "source",
+        "index",
+        "decision",
+        "contradiction"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "draft",
+        "candidate",
+        "deprecated",
+        "needs-review"
+      ]
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "phase-1-parsed",
+        "phase-2-source-built",
+        "phase-3-reasoned",
+        "not-applicable"
+      ]
+    },
+    "parent": {
+      "type": ["string", "null"]
+    },
+    "prev": {
+      "type": ["string", "null"]
+    },
+    "next": {
+      "type": ["string", "null"]
+    },
+    "source_id": {
+      "type": ["string", "null"]
+    }
+  }
+}

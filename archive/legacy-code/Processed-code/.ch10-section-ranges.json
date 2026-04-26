@@ -1,0 +1,312 @@
+{
+  "10.1": {
+    "end": 919,
+    "raw": "10.1         Terminology",
+    "start": 892
+  },
+  "10.10": {
+    "end": 4759,
+    "raw": "10.10   References   577",
+    "start": 4650
+  },
+  "10.2": {
+    "end": 924,
+    "raw": "10.2       Models",
+    "start": 920
+  },
+  "10.2.1": {
+    "end": 938,
+    "raw": "10.2.1      Network Interface",
+    "start": 925
+  },
+  "10.2.2": {
+    "end": 956,
+    "raw": "10.2.2      Controller",
+    "start": 939
+  },
+  "10.2.3": {
+    "end": 998,
+    "raw": "10.2.3            Protocol Stack",
+    "start": 957
+  },
+  "10.3": {
+    "end": 1206,
+    "raw": "10.3   Concepts     507",
+    "start": 1184
+  },
+  "10.3.1": {
+    "end": 1036,
+    "raw": "10.3.1      Networks and Routing",
+    "start": 999
+  },
+  "10.3.10": {
+    "end": 1298,
+    "raw": "10.3.10       Utilization",
+    "start": 1278
+  },
+  "10.3.11": {
+    "end": 1613,
+    "raw": "10.3.11 Local Connections",
+    "start": 1299
+  },
+  "10.3.2": {
+    "end": 1055,
+    "raw": "10.3.2      Protocols",
+    "start": 1037
+  },
+  "10.3.3": {
+    "end": 1070,
+    "raw": "10.3.3      Encapsulation",
+    "start": 1056
+  },
+  "10.3.4": {
+    "end": 1108,
+    "raw": "10.3.4      Packet Size",
+    "start": 1071
+  },
+  "10.3.5": {
+    "end": 1183,
+    "raw": "10.3.5      Latency",
+    "start": 1109
+  },
+  "10.3.6": {
+    "end": 1228,
+    "raw": "10.3.6      Buffering",
+    "start": 1207
+  },
+  "10.3.7": {
+    "end": 1241,
+    "raw": "10.3.7 Connection Backlog",
+    "start": 1229
+  },
+  "10.3.8": {
+    "end": 1260,
+    "raw": "10.3.8      Interface Negotiation",
+    "start": 1242
+  },
+  "10.3.9": {
+    "end": 1277,
+    "raw": "10.3.9 Congestion Avoidance",
+    "start": 1261
+  },
+  "10.4": {
+    "end": 2056,
+    "raw": "10.4     Architecture   523",
+    "start": 1932
+  },
+  "10.4.1": {
+    "end": 2186,
+    "raw": "10.4.1, Protocols.",
+    "start": 2149
+  },
+  "10.4.2": {
+    "end": 1736,
+    "raw": "10.4.2       Hardware",
+    "start": 1614
+  },
+  "10.4.3": {
+    "end": 1931,
+    "raw": "10.4.3      Software",
+    "start": 1737
+  },
+  "10.5": {
+    "end": 2348,
+    "raw": "10.5    Methodology      531",
+    "start": 2329
+  },
+  "10.5.1": {
+    "end": 2092,
+    "raw": "10.5.1 Tools Method",
+    "start": 2057
+  },
+  "10.5.10": {
+    "end": 2501,
+    "raw": "10.5.10 Micro-Benchmarking",
+    "start": 2434
+  },
+  "10.5.2": {
+    "end": 2136,
+    "raw": "10.5.2       USE Method",
+    "start": 2093
+  },
+  "10.5.3": {
+    "end": 2148,
+    "raw": "10.5.3      Workload Characterization",
+    "start": 2137
+  },
+  "10.5.4": {
+    "end": 2259,
+    "raw": "10.5.4         Latency Analysis",
+    "start": 2187
+  },
+  "10.5.5": {
+    "end": 2278,
+    "raw": "10.5.5       Performance Monitoring",
+    "start": 2260
+  },
+  "10.5.6": {
+    "end": 2328,
+    "raw": "10.5.6        Packet Sniffing",
+    "start": 2279
+  },
+  "10.5.7": {
+    "end": 2371,
+    "raw": "10.5.7       TCP Analysis",
+    "start": 2349
+  },
+  "10.5.8": {
+    "end": 2407,
+    "raw": "10.5.8       Static Performance Tuning",
+    "start": 2372
+  },
+  "10.5.9": {
+    "end": 2433,
+    "raw": "10.5.9      Resource Controls",
+    "start": 2408
+  },
+  "10.6": {
+    "end": 3900,
+    "raw": "10.6 Observability Tools   561",
+    "start": 3839
+  },
+  "10.6.1": {
+    "end": 2602,
+    "raw": "10.6.1       ss",
+    "start": 2502
+  },
+  "10.6.10": {
+    "end": 3274,
+    "raw": "10.6.10             tcptop",
+    "start": 3240
+  },
+  "10.6.11": {
+    "end": 3324,
+    "raw": "10.6.11             tcpretrans",
+    "start": 3275
+  },
+  "10.6.12": {
+    "end": 3735,
+    "raw": "10.6.12        bpftrace",
+    "start": 3325
+  },
+  "10.6.13": {
+    "end": 3786,
+    "raw": "10.6.13 tcpdump",
+    "start": 3736
+  },
+  "10.6.14": {
+    "end": 3834,
+    "raw": "10.6.14 Wireshark",
+    "start": 3815
+  },
+  "10.6.15": {
+    "end": 3838,
+    "raw": "10.6.15 Other Tools",
+    "start": 3835
+  },
+  "10.6.2": {
+    "end": 2659,
+    "raw": "10.6.2       ip",
+    "start": 2603
+  },
+  "10.6.3": {
+    "end": 2693,
+    "raw": "10.6.3        ifconfig",
+    "start": 2660
+  },
+  "10.6.4": {
+    "end": 2750,
+    "raw": "10.6.4       nstat",
+    "start": 2694
+  },
+  "10.6.5": {
+    "end": 2910,
+    "raw": "10.6.5 netstat",
+    "start": 2751
+  },
+  "10.6.6": {
+    "end": 3075,
+    "raw": "10.6.6        sar",
+    "start": 2911
+  },
+  "10.6.7": {
+    "end": 3121,
+    "raw": "10.6.7             nicstat",
+    "start": 3076
+  },
+  "10.6.8": {
+    "end": 3185,
+    "raw": "10.6.8       ethtool",
+    "start": 3122
+  },
+  "10.6.9": {
+    "end": 3239,
+    "raw": "10.6.9            tcplife",
+    "start": 3186
+  },
+  "10.7": {
+    "end": 4147,
+    "raw": "10.7          Experimentation",
+    "start": 3893
+  },
+  "10.7.1": {
+    "end": 3933,
+    "raw": "10.7.1        ping",
+    "start": 3901
+  },
+  "10.7.2": {
+    "end": 3992,
+    "raw": "10.7.2       traceroute",
+    "start": 3934
+  },
+  "10.7.3": {
+    "end": 4015,
+    "raw": "10.7.3 pathchar",
+    "start": 3993
+  },
+  "10.7.4": {
+    "end": 4029,
+    "raw": "10.7.4     iperf",
+    "start": 4016
+  },
+  "10.7.5": {
+    "end": 4093,
+    "raw": "10.7.5        netperf",
+    "start": 4072
+  },
+  "10.7.6": {
+    "end": 4130,
+    "raw": "10.7.6      tc",
+    "start": 4094
+  },
+  "10.7.7": {
+    "end": 4147,
+    "raw": "10.7.7 Other Tools",
+    "start": 4135
+  },
+  "10.8": {
+    "end": 4439,
+    "raw": "10.8        Tuning",
+    "start": 4149
+  },
+  "10.8.1": {
+    "end": 4435,
+    "raw": "10.8.1       System-Wide",
+    "start": 4164
+  },
+  "10.8.2": {
+    "end": 4491,
+    "raw": "10.8.2 Socket Options",
+    "start": 4440
+  },
+  "10.8.3": {
+    "end": 4505,
+    "raw": "10.8.3       Configuration",
+    "start": 4492
+  },
+  "10.9": {
+    "end": 4649,
+    "raw": "10.9 Exercises",
+    "start": 4506
+  }
+}
