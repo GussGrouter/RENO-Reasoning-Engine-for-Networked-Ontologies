@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "reno://structured/schema/chunk.schema.json",
+  "title": "RENO Chunk Record",
+  "description": "Chunk JSON stored at processed/<source-id>/chunks/<chunk-id>.json. Fields are taken verbatim from AGENTS.md.",
+  "type": "object",
+  "required": [
+    "chunk_id",
+    "processed_id",
+    "raw_id",
+    "source_id",
+    "title",
+    "page_start",
+    "page_end",
+    "token_estimate",
+    "prev_chunk_id",
+    "next_chunk_id",
+    "content_hash",
+    "review_status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "chunk_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "processed_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "raw_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string"
+    },
+    "page_start": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "page_end": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "token_estimate": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "prev_chunk_id": {
+      "type": ["string", "null"]
+    },
+    "next_chunk_id": {
+      "type": ["string", "null"]
+    },
+    "content_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "review_status": {
+      "type": "string"
+    }
+  }
+}

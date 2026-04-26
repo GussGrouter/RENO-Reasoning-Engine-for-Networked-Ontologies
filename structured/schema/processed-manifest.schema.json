@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "reno://structured/schema/processed-manifest.schema.json",
+  "title": "RENO Processed Manifest",
+  "description": "Manifest stored at processed/<source-id>/manifest.json. Fields are taken verbatim from AGENTS.md.",
+  "type": "object",
+  "required": [
+    "processed_id",
+    "raw_id",
+    "parser",
+    "parser_version",
+    "parser_command",
+    "source_hash",
+    "page_range",
+    "section_range",
+    "extraction_warnings",
+    "chunk_count",
+    "generated_files"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "processed_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "raw_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parser": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parser_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parser_command": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "page_range": {
+      "type": ["string", "null"]
+    },
+    "section_range": {
+      "type": ["string", "null"]
+    },
+    "extraction_warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "chunk_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "generated_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
