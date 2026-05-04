@@ -1,0 +1,15 @@
+{
+  "chunk_id": "systems-performance-chapter-3-operating-systems-chunk-0041",
+  "content_hash": "2b445ded818a6be95354d3930fed268d906c08bd00ce62e0b09411e9f1b3a57c",
+  "next_chunk_id": "systems-performance-chapter-3-operating-systems-continuation-chunk-0042",
+  "page_end": 142,
+  "page_start": 142,
+  "prev_chunk_id": "systems-performance-chapter-3-operating-systems-chunk-0040",
+  "processed_id": "systems-performance-processed-001",
+  "raw_id": "systems-performance-raw-001",
+  "review_status": "unreviewed",
+  "source_id": "systems-performance",
+  "text": "[page 142]\n3.2 Background 103\n\n\nStacks are usually printed in leaf-to-root order, so the first line printed is the function currently\nexecuting, and beneath it is its parent, then its grandparent, and so on. In this example, the tcp_\nsendmsg() function was executing, called by sock_sendmsg(). In this stack example, to the right\nof the function name is the instruction offset, showing the location within a function. The first\nline shows tcp_sendmsg() offset 1 (which would be the second instruction), called by sock_\nsendmsg() offset 62. This offset is only useful if you desire a low-level understanding of the code\npath taken, down to the instruction level.\n\nBy reading down the stack, the full ancestry can be seen: function, parent, grandparent, and so\non. Or, by reading bottom-up, you can follow the path of execution to the current function: how\nwe got here.\n\nSince stacks expose the internal path taken through source code, there is typically no documen-\ntation for these functions other than the code itself. For this example stack, this is the Linux kernel\nsource code. An exception to this is where functions are part of an API and are documented.\n\nUser and Kernel Stacks\nWhile executing a system call, a process thread has two stacks: a user-level stack and a kernel-\nlevel stack. Their scope is pictured in Figure 3.10.\n\n\n\n\n\n\n\n\n\n\nFigure 3.10 User and kernel stacks\n\nThe user-level stack of the blocked thread does not change for the duration of a system call, as\nthe thread is using a separate kernel-level stack while executing in kernel context. (An excep-\ntion to this may be signal handlers, which may borrow a user-level stack depending on their\nconfiguration.)\n\nOn Linux, there are multiple kernel stacks for different purposes. Syscalls use a kernel exception\nstack associated with each thread, and there are also stacks associated with soft and hard inter-\nrupts (IRQs) [Bovet 05].",
+  "title": "Systems Performance \u2014 chapter 3 operating systems pages 142-142",
+  "token_estimate": 415
+}

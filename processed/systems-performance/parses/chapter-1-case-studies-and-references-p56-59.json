@@ -1,0 +1,2956 @@
+{
+  "pages": [
+    {
+      "page": 56,
+      "width": 504.005,
+      "height": 657.005,
+      "text": "    1.11 Case Studies 17\n\n\nHe checks disk error counters from /sys; they are zero. He runs iostat(1) with an interval of one\nsecond and watches utilization and saturation metrics over time. AcmeMon reported 80%\nutilization but uses a one-minute interval. At one-second granularity, Sumit can see that disk\nutilization fluctuates, often hitting 100% and causing levels of saturation and increased disk\nI/O latency.\n\nTo further confirm that this is blocking the database—and isn’t asynchronous with respect to\nthe database queries—he uses a BCC/BPF tracing tool called offcputime(8) to capture stack traces\nwhenever the database was descheduled by the kernel, along with the time spent off-CPU. The\nstack traces show that the database is often blocking during a file system read, during a query.\nThis is enough evidence for Sumit.\n\nThe next question is why. The disk performance statistics appear to be consistent with high load.\nSumit performs workload characterization to understand this further, using iostat(1) to measure\nIOPS, throughput, average disk I/O latency, and the read/write ratio. For more details, Sumit can\nuse disk I/O tracing; however, he is satisfied that this already points to a case of high disk load,\nand not a problem with the disks.\n\nSumit adds more details to the ticket, stating what he checked and including screenshots of the\ncommands used to study the disks. His summary so far is that the disks are under high load,\nwhich increases I/O latency and is slowing the queries. However, the disks appear to be acting\nnormally for the load. He asks if there is a simple explanation: did the database load increase?\n\nThe database team responds that it did not, and that the rate of queries (which isn’t reported by\nAcmeMon) has been steady. This sounds consistent with an earlier finding, that CPU utilization\nwas also steady.\n\nSumit thinks about what else could cause higher disk I/O load without a noticeable increase in\nCPU and has a quick talk with his colleagues about it. One of them suggests file system fragmen-\ntation, which is expected when the file system approaches 100% capacity. Sumit finds that it is\nonly at 30%.\n\nSumit knows he can perform drill-down analysis7 to understand the exact causes of disk I/O,\nbut this can be time-consuming. He tries to think of other easy explanations that he can check\nquickly first, based on his knowledge of the kernel I/O stack. He remembers that this disk I/O is\nlargely caused by file system cache (page cache) misses.\n\nSumit checks the file system cache hit ratio using cachestat(8)8 and finds it is currently at 91%.\nThis sounds high (good), but he has no historical data to compare it to. He logs in to other data-\nbase servers that serve similar workloads and finds their cache hit ratio to be over 98%. He also\nfinds that the file system cache size is much larger on the other servers.\n\nTurning his attention to the file system cache size and server memory usage, he finds something\nthat had been overlooked: a development project has a prototype application that is consuming\na growing amount of memory, even though it isn’t under production load yet. This memory is\ntaken from what is available for the file system cache, reducing its hit rate and causing more file\nsystem reads to become disk reads.\n\n\n    7 This is covered in Chapter 2, Methodologies, Section 2.5.12, Drill-Down Analysis.\n    8 A BCC tracing tool covered in Chapter 8, File Systems, Section 8.6.12, cachestat.",
+      "textItems": [
+        {
+          "text": "1.11",
+          "x": 362.5403999099999,
+          "y": 33.77629999999999,
+          "width": 18.870299730000056,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "Case Studies",
+          "x": 390.4404,
+          "y": 33.77629999999999,
+          "width": 53.518499460000044,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "17",
+          "x": 464.256,
+          "y": 34.27629999999999,
+          "width": 9.746100000000013,
+          "height": 8.5,
+          "fontName": "g_d0_f1",
+          "fontSize": 8.5,
+          "confidence": 1
+        },
+        {
+          "text": "He checks disk error counters from /sys; they are zero. He runs iostat(1) with an interval of one",
+          "x": 72.0024,
+          "y": 68.32399999999996,
+          "width": 361.7526000000005,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "second and watches utilization and saturation metrics over time. AcmeMon reported 80%",
+          "x": 72.0024,
+          "y": 79.82449999999994,
+          "width": 345.5677499999998,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "utilization but uses a one-minute interval. At one-second granularity, Sumit can see that disk",
+          "x": 72.0024,
+          "y": 91.32500000000005,
+          "width": 356.91314999999986,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "utilization fluctuates, often hitting 100% and causing levels of saturation and increased disk",
+          "x": 72.0024,
+          "y": 102.82550000000003,
+          "width": 355.4529000000001,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "I/O latency.",
+          "x": 72.0024,
+          "y": 114.32600000000002,
+          "width": 44.705100000000016,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "To further confirm that this is blocking the database—and isn’t asynchronous with respect to",
+          "x": 72.0024,
+          "y": 131.82425,
+          "width": 359.7874499999999,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "the database queries—he uses a BCC/BPF tracing tool called offcputime(8) to capture stack traces",
+          "x": 72.0024,
+          "y": 143.32475,
+          "width": 371.2004999999999,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "whenever the database was descheduled by the kernel, along with the time spent off-CPU. The",
+          "x": 72.0024,
+          "y": 154.82524999999998,
+          "width": 362.378775,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "stack traces show that the database is often blocking during a file system read, during a query.",
+          "x": 72.0024,
+          "y": 166.32574999999997,
+          "width": 359.6331750000003,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "This is enough evidence for Sumit.",
+          "x": 72.0024,
+          "y": 177.82625000000002,
+          "width": 132.87944999999993,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "The next question is why. The disk performance statistics appear to be consistent with high load.",
+          "x": 72.0024,
+          "y": 195.3245,
+          "width": 371.3770500000004,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Sumit performs workload characterization to understand this further, using iostat(1) to measure",
+          "x": 72.0024,
+          "y": 206.825,
+          "width": 368.8220250907493,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "IOPS, throughput, average disk I/O latency, and the read/write ratio. For more details, Sumit can",
+          "x": 72.0024,
+          "y": 218.32549999999998,
+          "width": 368.3732250000004,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "use disk I/O tracing; however, he is satisfied that this already points to a case of high disk load,",
+          "x": 72.0024,
+          "y": 229.82600000000002,
+          "width": 361.7699258167502,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "and not a problem with the disks.",
+          "x": 72.0024,
+          "y": 241.3265,
+          "width": 129.2280002639999,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Sumit adds more details to the ticket, stating what he checked and including screenshots of the",
+          "x": 72.0024,
+          "y": 258.82475,
+          "width": 365.2580250000001,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "commands used to study the disks. His summary so far is that the disks are under high load,",
+          "x": 72.0024,
+          "y": 270.32525,
+          "width": 353.3202750000006,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "which increases I/O latency and is slowing the queries. However, the disks appear to be acting",
+          "x": 72.0024,
+          "y": 281.82574999999997,
+          "width": 359.49045076724997,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "normally for the load. He asks if there is a simple explanation: did the database load increase?",
+          "x": 72.0024,
+          "y": 293.32625,
+          "width": 358.19685000000015,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "The database team responds that it did not, and that the rate of queries (which isn’t reported by",
+          "x": 72.0024,
+          "y": 310.8245,
+          "width": 365.2530757920001,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "AcmeMon) has been steady. This sounds consistent with an earlier finding, that CPU utilization",
+          "x": 72.0024,
+          "y": 322.325,
+          "width": 368.3823000000003,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "was also steady.",
+          "x": 72.0024,
+          "y": 333.8255,
+          "width": 59.86282500000004,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Sumit thinks about what else could cause higher disk I/O load without a noticeable increase in",
+          "x": 72.0024,
+          "y": 351.32375,
+          "width": 362.00752500000056,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "CPU and has a quick talk with his colleagues about it. One of them suggests file system fragmen-",
+          "x": 72.0024,
+          "y": 362.82425,
+          "width": 370.16677500000105,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "tation, which is expected when the file system approaches 100% capacity. Sumit finds that it is",
+          "x": 72.0024,
+          "y": 374.32475,
+          "width": 363.8109750000002,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "only at 30%.",
+          "x": 72.0024,
+          "y": 385.82525,
+          "width": 48.67417500000005,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Sumit knows he can perform drill-down analysis",
+          "x": 72.0024,
+          "y": 403.32349999999997,
+          "width": 187.45259999999982,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "7 ",
+          "x": 259.455,
+          "y": 402.499,
+          "width": 5.311500000000024,
+          "height": 5.774999999999977,
+          "fontName": "g_d0_f2",
+          "fontSize": 5.775,
+          "confidence": 1
+        },
+        {
+          "text": "to understand the exact causes of disk I/O,",
+          "x": 264.7665,
+          "y": 403.324,
+          "width": 162.50272499999994,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "but this can be time-consuming. He tries to think of other easy explanations that he can check",
+          "x": 72.00525,
+          "y": 414.8245,
+          "width": 364.4016750000006,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "quickly first, based on his knowledge of the kernel I/O stack. He remembers that this disk I/O is",
+          "x": 72.00525,
+          "y": 426.325,
+          "width": 364.926375792,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "largely caused by file system cache (page cache) misses.",
+          "x": 72.00525,
+          "y": 437.82550000000003,
+          "width": 211.13152500000007,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Sumit checks the file system cache hit ratio using cachestat(8)",
+          "x": 72.00525,
+          "y": 455.32375,
+          "width": 237.00974999999983,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "8 ",
+          "x": 309.015,
+          "y": 454.499,
+          "width": 5.311500000000024,
+          "height": 5.774999999999977,
+          "fontName": "g_d0_f2",
+          "fontSize": 5.775,
+          "confidence": 1
+        },
+        {
+          "text": "and finds it is currently at 91%.",
+          "x": 314.3265,
+          "y": 455.32399999999996,
+          "width": 120.11917500000004,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "This sounds high (good), but he has no historical data to compare it to. He logs in to other data-",
+          "x": 71.99925,
+          "y": 466.8245,
+          "width": 366.2785501567497,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "base servers that serve similar workloads and finds their cache hit ratio to be over 98%. He also",
+          "x": 71.99925,
+          "y": 478.325,
+          "width": 363.1650000000002,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "finds that the file system cache size is much larger on the other servers.",
+          "x": 71.99925,
+          "y": 489.82550000000003,
+          "width": 272.79780000000017,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Turning his attention to the file system cache size and server memory usage, he finds something",
+          "x": 71.99925,
+          "y": 507.32375,
+          "width": 369.8879250000001,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "that had been overlooked: a development project has a prototype application that is consuming",
+          "x": 71.99925,
+          "y": 518.82425,
+          "width": 367.5804000000004,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "a growing amount of memory, even though it isn’t under production load yet. This memory is",
+          "x": 71.99925,
+          "y": 530.32475,
+          "width": 361.0142249999995,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "taken from what is available for the file system cache, reducing its hit rate and causing more file",
+          "x": 71.99925,
+          "y": 541.82525,
+          "width": 366.5145008085002,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "system reads to become disk reads.",
+          "x": 71.99925,
+          "y": 553.32575,
+          "width": 132.76394587499993,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "7 ",
+          "x": 72.0023,
+          "y": 582.802,
+          "width": 3.8146999999999878,
+          "height": 4.899999999999977,
+          "fontName": "g_d0_f1",
+          "fontSize": 4.9,
+          "confidence": 1
+        },
+        {
+          "text": "This is covered in Chapter 2, Methodologies, Section 2.5.12, Drill-Down Analysis.",
+          "x": 75.817,
+          "y": 583.502,
+          "width": 258.48340000000013,
+          "height": 7,
+          "fontName": "g_d0_f1",
+          "fontSize": 7,
+          "confidence": 1
+        },
+        {
+          "text": "8 ",
+          "x": 72.0023,
+          "y": 593.8021,
+          "width": 3.8146999999999878,
+          "height": 4.899999999999977,
+          "fontName": "g_d0_f1",
+          "fontSize": 4.9,
+          "confidence": 1
+        },
+        {
+          "text": "A BCC tracing tool covered in Chapter 8, File Systems, Section 8.6.12, cachestat.",
+          "x": 75.817,
+          "y": 594.502,
+          "width": 260.3699,
+          "height": 7,
+          "fontName": "g_d0_f1",
+          "fontSize": 7,
+          "confidence": 1
+        }
+      ],
+      "boundingBoxes": [
+        {
+          "x1": 362.5403999099999,
+          "y1": 33.77629999999999,
+          "x2": 381.41069963999996,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 390.4404,
+          "y1": 33.77629999999999,
+          "x2": 443.95889946000005,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 464.256,
+          "y1": 34.27629999999999,
+          "x2": 474.0021,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 72.0024,
+          "y1": 68.32399999999996,
+          "x2": 433.75500000000045,
+          "y2": 76.57399999999996
+        },
+        {
+          "x1": 72.0024,
+          "y1": 79.82449999999994,
+          "x2": 417.5701499999998,
+          "y2": 88.07449999999994
+        },
+        {
+          "x1": 72.0024,
+          "y1": 91.32500000000005,
+          "x2": 428.9155499999998,
+          "y2": 99.57500000000005
+        },
+        {
+          "x1": 72.0024,
+          "y1": 102.82550000000003,
+          "x2": 427.4553000000001,
+          "y2": 111.07550000000003
+        },
+        {
+          "x1": 72.0024,
+          "y1": 114.32600000000002,
+          "x2": 116.70750000000001,
+          "y2": 122.57600000000002
+        },
+        {
+          "x1": 72.0024,
+          "y1": 131.82425,
+          "x2": 431.7898499999999,
+          "y2": 140.07425
+        },
+        {
+          "x1": 72.0024,
+          "y1": 143.32475,
+          "x2": 443.2028999999999,
+          "y2": 151.57475
+        },
+        {
+          "x1": 72.0024,
+          "y1": 154.82524999999998,
+          "x2": 434.381175,
+          "y2": 163.07524999999998
+        },
+        {
+          "x1": 72.0024,
+          "y1": 166.32574999999997,
+          "x2": 431.63557500000024,
+          "y2": 174.57574999999997
+        },
+        {
+          "x1": 72.0024,
+          "y1": 177.82625000000002,
+          "x2": 204.88184999999993,
+          "y2": 186.07625000000002
+        },
+        {
+          "x1": 72.0024,
+          "y1": 195.3245,
+          "x2": 443.37945000000036,
+          "y2": 203.5745
+        },
+        {
+          "x1": 72.0024,
+          "y1": 206.825,
+          "x2": 440.8244250907493,
+          "y2": 215.075
+        },
+        {
+          "x1": 72.0024,
+          "y1": 218.32549999999998,
+          "x2": 440.37562500000035,
+          "y2": 226.57549999999998
+        },
+        {
+          "x1": 72.0024,
+          "y1": 229.82600000000002,
+          "x2": 433.77232581675014,
+          "y2": 238.07600000000002
+        },
+        {
+          "x1": 72.0024,
+          "y1": 241.3265,
+          "x2": 201.23040026399988,
+          "y2": 249.5765
+        },
+        {
+          "x1": 72.0024,
+          "y1": 258.82475,
+          "x2": 437.26042500000005,
+          "y2": 267.07475
+        },
+        {
+          "x1": 72.0024,
+          "y1": 270.32525,
+          "x2": 425.3226750000006,
+          "y2": 278.57525
+        },
+        {
+          "x1": 72.0024,
+          "y1": 281.82574999999997,
+          "x2": 431.49285076724993,
+          "y2": 290.07574999999997
+        },
+        {
+          "x1": 72.0024,
+          "y1": 293.32625,
+          "x2": 430.1992500000001,
+          "y2": 301.57625
+        },
+        {
+          "x1": 72.0024,
+          "y1": 310.8245,
+          "x2": 437.2554757920001,
+          "y2": 319.0745
+        },
+        {
+          "x1": 72.0024,
+          "y1": 322.325,
+          "x2": 440.3847000000003,
+          "y2": 330.575
+        },
+        {
+          "x1": 72.0024,
+          "y1": 333.8255,
+          "x2": 131.86522500000004,
+          "y2": 342.0755
+        },
+        {
+          "x1": 72.0024,
+          "y1": 351.32375,
+          "x2": 434.0099250000005,
+          "y2": 359.57375
+        },
+        {
+          "x1": 72.0024,
+          "y1": 362.82425,
+          "x2": 442.169175000001,
+          "y2": 371.07425
+        },
+        {
+          "x1": 72.0024,
+          "y1": 374.32475,
+          "x2": 435.8133750000002,
+          "y2": 382.57475
+        },
+        {
+          "x1": 72.0024,
+          "y1": 385.82525,
+          "x2": 120.67657500000004,
+          "y2": 394.07525
+        },
+        {
+          "x1": 72.0024,
+          "y1": 403.32349999999997,
+          "x2": 259.4549999999998,
+          "y2": 411.57349999999997
+        },
+        {
+          "x1": 259.455,
+          "y1": 402.499,
+          "x2": 264.7665,
+          "y2": 408.274
+        },
+        {
+          "x1": 264.7665,
+          "y1": 403.324,
+          "x2": 427.26922499999995,
+          "y2": 411.574
+        },
+        {
+          "x1": 72.00525,
+          "y1": 414.8245,
+          "x2": 436.40692500000057,
+          "y2": 423.0745
+        },
+        {
+          "x1": 72.00525,
+          "y1": 426.325,
+          "x2": 436.931625792,
+          "y2": 434.575
+        },
+        {
+          "x1": 72.00525,
+          "y1": 437.82550000000003,
+          "x2": 283.13677500000006,
+          "y2": 446.07550000000003
+        },
+        {
+          "x1": 72.00525,
+          "y1": 455.32375,
+          "x2": 309.0149999999998,
+          "y2": 463.57375
+        },
+        {
+          "x1": 309.015,
+          "y1": 454.499,
+          "x2": 314.3265,
+          "y2": 460.274
+        },
+        {
+          "x1": 314.3265,
+          "y1": 455.32399999999996,
+          "x2": 434.44567500000005,
+          "y2": 463.57399999999996
+        },
+        {
+          "x1": 71.99925,
+          "y1": 466.8245,
+          "x2": 438.2778001567497,
+          "y2": 475.0745
+        },
+        {
+          "x1": 71.99925,
+          "y1": 478.325,
+          "x2": 435.1642500000002,
+          "y2": 486.575
+        },
+        {
+          "x1": 71.99925,
+          "y1": 489.82550000000003,
+          "x2": 344.7970500000002,
+          "y2": 498.07550000000003
+        },
+        {
+          "x1": 71.99925,
+          "y1": 507.32375,
+          "x2": 441.8871750000001,
+          "y2": 515.57375
+        },
+        {
+          "x1": 71.99925,
+          "y1": 518.82425,
+          "x2": 439.5796500000004,
+          "y2": 527.07425
+        },
+        {
+          "x1": 71.99925,
+          "y1": 530.32475,
+          "x2": 433.0134749999995,
+          "y2": 538.57475
+        },
+        {
+          "x1": 71.99925,
+          "y1": 541.82525,
+          "x2": 438.5137508085002,
+          "y2": 550.07525
+        },
+        {
+          "x1": 71.99925,
+          "y1": 553.32575,
+          "x2": 204.76319587499995,
+          "y2": 561.57575
+        },
+        {
+          "x1": 72.0023,
+          "y1": 582.802,
+          "x2": 75.817,
+          "y2": 587.702
+        },
+        {
+          "x1": 75.817,
+          "y1": 583.502,
+          "x2": 334.30040000000014,
+          "y2": 590.502
+        },
+        {
+          "x1": 72.0023,
+          "y1": 593.8021,
+          "x2": 75.817,
+          "y2": 598.7021
+        },
+        {
+          "x1": 75.817,
+          "y1": 594.502,
+          "x2": 336.1869,
+          "y2": 601.502
+        }
+      ]
+    },
+    {
+      "page": 57,
+      "width": 504.005,
+      "height": 657.005,
+      "text": "    18 Chapter 1}}Introduction\n\n\nSumit contacts the application development team and asks them to shut down the applica-\ntion and move it to a different server, referring to the database issue. After they do this, Sumit\nwatches disk utilization creep downward in AcmeMon as the file system cache recovers to its\noriginal size. The slow queries return to zero, and he closes the ticket as resolved.\n\n\n1.11.2 Software Change\nPamela is a performance and scalability engineer at a small company where she works on all\nperformance-related activities. The application developers have developed a new core feature\nand are unsure whether its introduction could hurt performance. Pamela decides to perform\nnon-regression testing9 of the new application version, before it is deployed in production.\n\nPamela acquires an idle server for the purpose of testing and searches for a client workload simu-\nlator. The application team had written one a while ago, although it has various limitations and\nknown bugs. She decides to try it but wants to confirm that it adequately resembles the current\nproduction workload.\n\nShe configures the server to match the current deployment configuration and runs the client\nworkload simulator from a different system to the server. The client workload can be character-\nized by studying an access log, and there is already a company tool to do this, which she uses.\nShe also runs the tool on a production server log for different times of day and compares work-\nloads. It appears that the client simulator applies an average production workload but doesn’t\naccount for variance. She notes this and continues her analysis.\n\nPamela knows a number of approaches to use at this point. She picks the easiest: increasing load\nfrom the client simulator until a limit is reached (this is sometimes called stress testing). The cli-\nent simulator can be configured to execute a target number of client requests per second, with a\ndefault of 1,000 that she had used earlier. She decides to increase load starting at 100 and adding\nincrements of 100 until a limit is reached, each level being tested for one minute. She writes a\nshell script to perform the test, which collects results in a file for plotting by other tools.\n\nWith the load running, she performs active benchmarking to determine what the limiting\nfactors are. The server resources and server threads seem largely idle. The client simulator shows\nthat the request throughput levels off at around 700 per second.\n\nShe switches to the new software version and repeats the test. This also reaches the 700 mark\nand levels off. She also analyzes the server to look for limiting factors but again cannot see any.\n\nShe plots the results, showing completed request rate versus load, to visually identify the scal-\nability profile. Both appear to reach an abrupt ceiling.\n\nWhile it appears that the software versions have similar performance characteristics, Pamela is\ndisappointed that she wasn’t able to identify the limiting factor causing the scalability ceiling.\nShe knows she checked only server resources, and the limiter could instead be an application\nlogic issue. It could also be elsewhere: the network or the client simulator.\n\n\n\n\n    9 Some call it regression testing, but it is an activity intended to confirm that a software or hardware change does\n    not cause performance to regress, hence, non-regression testing.",
+      "textItems": [
+        {
+          "text": "18",
+          "x": 30.0024,
+          "y": 34.27629999999999,
+          "width": 10.266299999999994,
+          "height": 8.5,
+          "fontName": "g_d0_f1",
+          "fontSize": 8.5,
+          "confidence": 1
+        },
+        {
+          "text": "Chapter 1",
+          "x": 60.0055,
+          "y": 33.77629999999999,
+          "width": 38.974500000000006,
+          "height": 9,
+          "fontName": "g_d0_f3",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "}}",
+          "x": 98.98,
+          "y": 33.77629999999999,
+          "width": 5.670000000000016,
+          "height": 9,
+          "fontName": "g_d0_f4",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "Introduction",
+          "x": 104.91999999999999,
+          "y": 33.77629999999999,
+          "width": 47.742300000000114,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "Sumit contacts the application development team and asks them to shut down the applica-",
+          "x": 60.002399999999994,
+          "y": 68.32399999999996,
+          "width": 348.83804999999995,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "tion and move it to a different server, referring to the database issue. After they do this, Sumit",
+          "x": 60.002399999999994,
+          "y": 79.82449999999994,
+          "width": 358.64565000000016,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "watches disk utilization creep downward in AcmeMon as the file system cache recovers to its",
+          "x": 60.002399999999994,
+          "y": 91.32500000000005,
+          "width": 355.4669250000004,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "original size. The slow queries return to zero, and he closes the ticket as resolved.",
+          "x": 60.002399999999994,
+          "y": 102.82550000000003,
+          "width": 309.4476000000002,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "1.11.2",
+          "x": 60.002399999999994,
+          "y": 131.07399999999996,
+          "width": 35.024399999999986,
+          "height": 12,
+          "fontName": "g_d0_f3",
+          "fontSize": 12,
+          "confidence": 1
+        },
+        {
+          "text": "Software Change",
+          "x": 107.02679999999998,
+          "y": 131.07399999999996,
+          "width": 88.63680000000005,
+          "height": 12,
+          "fontName": "g_d0_f3",
+          "fontSize": 12,
+          "confidence": 1
+        },
+        {
+          "text": "Pamela is a performance and scalability engineer at a small company where she works on all",
+          "x": 60.002399999999994,
+          "y": 150.32399999999996,
+          "width": 353.4069000000003,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "performance-related activities. The application developers have developed a new core feature",
+          "x": 60.002399999999994,
+          "y": 161.82449999999994,
+          "width": 357.3446250000002,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "and are unsure whether its introduction could hurt performance. Pamela decides to perform",
+          "x": 60.002399999999994,
+          "y": 173.325,
+          "width": 354.90922572599993,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "non-regression testing",
+          "x": 60.002399999999994,
+          "y": 184.82549999999998,
+          "width": 86.20059999999995,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "9 ",
+          "x": 146.203,
+          "y": 183.999,
+          "width": 5.311499999999995,
+          "height": 5.775000000000006,
+          "fontName": "g_d0_f2",
+          "fontSize": 5.775,
+          "confidence": 1
+        },
+        {
+          "text": "of the new application version, before it is deployed in production.",
+          "x": 151.5145,
+          "y": 184.824,
+          "width": 255.7244250000001,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Pamela acquires an idle server for the purpose of testing and searches for a client workload simu-",
+          "x": 60.0055,
+          "y": 202.32225,
+          "width": 369.9786750000005,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "lator. The application team had written one a while ago, although it has various limitations and",
+          "x": 60.0055,
+          "y": 213.82274999999998,
+          "width": 366.80077500000004,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "known bugs. She decides to try it but wants to confirm that it adequately resembles the current",
+          "x": 60.0055,
+          "y": 225.32324999999997,
+          "width": 364.1483999999996,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "production workload.",
+          "x": 60.0055,
+          "y": 236.82375000000002,
+          "width": 83.92560015674995,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "She configures the server to match the current deployment configuration and runs the client",
+          "x": 60.0055,
+          "y": 254.322,
+          "width": 357.72907499999997,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "workload simulator from a different system to the server. The client workload can be character-",
+          "x": 60.0055,
+          "y": 265.8225,
+          "width": 364.602975,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "ized by studying an access log, and there is already a company tool to do this, which she uses.",
+          "x": 60.0055,
+          "y": 277.323,
+          "width": 358.5986101499996,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "She also runs the tool on a production server log for different times of day and compares work-",
+          "x": 60.0055,
+          "y": 288.82349999999997,
+          "width": 362.4456000000002,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "loads. It appears that the client simulator applies an average production workload but doesn’t",
+          "x": 60.0055,
+          "y": 300.324,
+          "width": 357.3982500000004,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "account for variance. She notes this and continues her analysis.",
+          "x": 60.0055,
+          "y": 311.8245,
+          "width": 243.2991,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Pamela knows a number of approaches to use at this point. She picks the easiest: increasing load",
+          "x": 60.0055,
+          "y": 329.32275,
+          "width": 367.6695000000003,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "from the client simulator until a limit is reached (this is sometimes called",
+          "x": 60.0055,
+          "y": 340.82325,
+          "width": 281.20372500000013,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "stress testing",
+          "x": 343.2115,
+          "y": 340.82325,
+          "width": 45.2900248927499,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "). The cli-",
+          "x": 388.54525,
+          "y": 340.82325,
+          "width": 36.079724999999996,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "ent simulator can be configured to execute a target number of client requests per second, with a",
+          "x": 60.0055,
+          "y": 352.32375,
+          "width": 367.0425000000005,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "default of 1,000 that she had used earlier. She decides to increase load starting at 100 and adding",
+          "x": 60.0055,
+          "y": 363.82425,
+          "width": 370.0256999999998,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "increments of 100 until a limit is reached, each level being tested for one minute. She writes a",
+          "x": 60.0055,
+          "y": 375.32475,
+          "width": 357.79589999999973,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "shell script to perform the test, which collects results in a file for plotting by other tools.",
+          "x": 60.0055,
+          "y": 386.82525,
+          "width": 337.3548750000001,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "With the load running, she performs active benchmarking to determine what the limiting",
+          "x": 60.0055,
+          "y": 404.32349999999997,
+          "width": 347.98830000000044,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "factors are. The server resources and server threads seem largely idle. The client simulator shows",
+          "x": 60.0055,
+          "y": 415.824,
+          "width": 367.8262500000002,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "that the request throughput levels off at around 700 per second.",
+          "x": 60.0055,
+          "y": 427.3245,
+          "width": 245.55547500000034,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "She switches to the new software version and repeats the test. This also reaches the 700 mark",
+          "x": 60.0055,
+          "y": 444.82275,
+          "width": 355.58077500000013,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "and levels off. She also analyzes the server to look for limiting factors but again cannot see any.",
+          "x": 60.0055,
+          "y": 456.32325000000003,
+          "width": 363.92812500000036,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "She plots the results, showing completed request rate versus load, to visually identify the scal-",
+          "x": 60.0055,
+          "y": 473.8215,
+          "width": 359.05567500000035,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "ability profile. Both appear to reach an abrupt ceiling.",
+          "x": 60.0055,
+          "y": 485.322,
+          "width": 207.00900000000007,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "While it appears that the software versions have similar performance characteristics, Pamela is",
+          "x": 60.0055,
+          "y": 502.82025,
+          "width": 363.63360077550016,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "disappointed that she wasn’t able to identify the limiting factor causing the scalability ceiling.",
+          "x": 60.0055,
+          "y": 514.32075,
+          "width": 362.11807500000054,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "She knows she checked only server resources, and the limiter could instead be an application",
+          "x": 60.0055,
+          "y": 525.82125,
+          "width": 355.95615000000026,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "logic issue. It could also be elsewhere: the network or the client simulator.",
+          "x": 60.0055,
+          "y": 537.3217500000001,
+          "width": 282.21930000000003,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "9 ",
+          "x": 60.002399999999994,
+          "y": 583.802,
+          "width": 3.8148993000000075,
+          "height": 4.899999999999977,
+          "fontName": "g_d0_f1",
+          "fontSize": 4.9,
+          "confidence": 1
+        },
+        {
+          "text": "Some call it",
+          "x": 63.8172993,
+          "y": 584.502,
+          "width": 37.62919230000003,
+          "height": 7,
+          "fontName": "g_d0_f1",
+          "fontSize": 7,
+          "confidence": 1
+        },
+        {
+          "text": "regression",
+          "x": 103.74529999999999,
+          "y": 584.502,
+          "width": 32.204199999999986,
+          "height": 7,
+          "fontName": "g_d0_f6",
+          "fontSize": 7,
+          "confidence": 1
+        },
+        {
+          "text": "testing, but it is an activity intended to confirm that a software or hardware change does",
+          "x": 138.2623,
+          "y": 584.502,
+          "width": 281.9579000000001,
+          "height": 7,
+          "fontName": "g_d0_f1",
+          "fontSize": 7,
+          "confidence": 1
+        },
+        {
+          "text": "not cause performance to regress, hence,",
+          "x": 60.002300000000005,
+          "y": 594.505,
+          "width": 133.66570000000007,
+          "height": 7,
+          "fontName": "g_d0_f1",
+          "fontSize": 7,
+          "confidence": 1
+        },
+        {
+          "text": "non",
+          "x": 195.9703,
+          "y": 594.505,
+          "width": 11.46739999999997,
+          "height": 7,
+          "fontName": "g_d0_f6",
+          "fontSize": 7,
+          "confidence": 1
+        },
+        {
+          "text": "-regression testing.",
+          "x": 207.7583,
+          "y": 594.505,
+          "width": 61.192600000000056,
+          "height": 7,
+          "fontName": "g_d0_f1",
+          "fontSize": 7,
+          "confidence": 1
+        }
+      ],
+      "boundingBoxes": [
+        {
+          "x1": 30.0024,
+          "y1": 34.27629999999999,
+          "x2": 40.268699999999995,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 60.0055,
+          "y1": 33.77629999999999,
+          "x2": 98.98,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 98.98,
+          "y1": 33.77629999999999,
+          "x2": 104.65000000000002,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 104.91999999999999,
+          "y1": 33.77629999999999,
+          "x2": 152.6623000000001,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 68.32399999999996,
+          "x2": 408.8404499999999,
+          "y2": 76.57399999999996
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 79.82449999999994,
+          "x2": 418.6480500000001,
+          "y2": 88.07449999999994
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 91.32500000000005,
+          "x2": 415.46932500000037,
+          "y2": 99.57500000000005
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 102.82550000000003,
+          "x2": 369.45000000000016,
+          "y2": 111.07550000000003
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 131.07399999999996,
+          "x2": 95.02679999999998,
+          "y2": 143.07399999999996
+        },
+        {
+          "x1": 107.02679999999998,
+          "y1": 131.07399999999996,
+          "x2": 195.66360000000003,
+          "y2": 143.07399999999996
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 150.32399999999996,
+          "x2": 413.40930000000026,
+          "y2": 158.57399999999996
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 161.82449999999994,
+          "x2": 417.34702500000014,
+          "y2": 170.07449999999994
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 173.325,
+          "x2": 414.9116257259999,
+          "y2": 181.575
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 184.82549999999998,
+          "x2": 146.20299999999995,
+          "y2": 193.07549999999998
+        },
+        {
+          "x1": 146.203,
+          "y1": 183.999,
+          "x2": 151.5145,
+          "y2": 189.774
+        },
+        {
+          "x1": 151.5145,
+          "y1": 184.824,
+          "x2": 407.2389250000001,
+          "y2": 193.074
+        },
+        {
+          "x1": 60.0055,
+          "y1": 202.32225,
+          "x2": 429.9841750000005,
+          "y2": 210.57225
+        },
+        {
+          "x1": 60.0055,
+          "y1": 213.82274999999998,
+          "x2": 426.806275,
+          "y2": 222.07274999999998
+        },
+        {
+          "x1": 60.0055,
+          "y1": 225.32324999999997,
+          "x2": 424.15389999999957,
+          "y2": 233.57324999999997
+        },
+        {
+          "x1": 60.0055,
+          "y1": 236.82375000000002,
+          "x2": 143.93110015674995,
+          "y2": 245.07375000000002
+        },
+        {
+          "x1": 60.0055,
+          "y1": 254.322,
+          "x2": 417.73457499999995,
+          "y2": 262.572
+        },
+        {
+          "x1": 60.0055,
+          "y1": 265.8225,
+          "x2": 424.608475,
+          "y2": 274.0725
+        },
+        {
+          "x1": 60.0055,
+          "y1": 277.323,
+          "x2": 418.6041101499996,
+          "y2": 285.573
+        },
+        {
+          "x1": 60.0055,
+          "y1": 288.82349999999997,
+          "x2": 422.45110000000017,
+          "y2": 297.07349999999997
+        },
+        {
+          "x1": 60.0055,
+          "y1": 300.324,
+          "x2": 417.4037500000004,
+          "y2": 308.574
+        },
+        {
+          "x1": 60.0055,
+          "y1": 311.8245,
+          "x2": 303.3046,
+          "y2": 320.0745
+        },
+        {
+          "x1": 60.0055,
+          "y1": 329.32275,
+          "x2": 427.6750000000003,
+          "y2": 337.57275
+        },
+        {
+          "x1": 60.0055,
+          "y1": 340.82325,
+          "x2": 341.2092250000001,
+          "y2": 349.07325
+        },
+        {
+          "x1": 343.2115,
+          "y1": 340.82325,
+          "x2": 388.5015248927499,
+          "y2": 349.07325
+        },
+        {
+          "x1": 388.54525,
+          "y1": 340.82325,
+          "x2": 424.624975,
+          "y2": 349.07325
+        },
+        {
+          "x1": 60.0055,
+          "y1": 352.32375,
+          "x2": 427.04800000000046,
+          "y2": 360.57375
+        },
+        {
+          "x1": 60.0055,
+          "y1": 363.82425,
+          "x2": 430.0311999999998,
+          "y2": 372.07425
+        },
+        {
+          "x1": 60.0055,
+          "y1": 375.32475,
+          "x2": 417.8013999999997,
+          "y2": 383.57475
+        },
+        {
+          "x1": 60.0055,
+          "y1": 386.82525,
+          "x2": 397.3603750000001,
+          "y2": 395.07525
+        },
+        {
+          "x1": 60.0055,
+          "y1": 404.32349999999997,
+          "x2": 407.9938000000004,
+          "y2": 412.57349999999997
+        },
+        {
+          "x1": 60.0055,
+          "y1": 415.824,
+          "x2": 427.83175000000017,
+          "y2": 424.074
+        },
+        {
+          "x1": 60.0055,
+          "y1": 427.3245,
+          "x2": 305.5609750000003,
+          "y2": 435.5745
+        },
+        {
+          "x1": 60.0055,
+          "y1": 444.82275,
+          "x2": 415.5862750000001,
+          "y2": 453.07275
+        },
+        {
+          "x1": 60.0055,
+          "y1": 456.32325000000003,
+          "x2": 423.93362500000035,
+          "y2": 464.57325000000003
+        },
+        {
+          "x1": 60.0055,
+          "y1": 473.8215,
+          "x2": 419.06117500000033,
+          "y2": 482.0715
+        },
+        {
+          "x1": 60.0055,
+          "y1": 485.322,
+          "x2": 267.01450000000006,
+          "y2": 493.572
+        },
+        {
+          "x1": 60.0055,
+          "y1": 502.82025,
+          "x2": 423.63910077550014,
+          "y2": 511.07025
+        },
+        {
+          "x1": 60.0055,
+          "y1": 514.32075,
+          "x2": 422.1235750000005,
+          "y2": 522.57075
+        },
+        {
+          "x1": 60.0055,
+          "y1": 525.82125,
+          "x2": 415.96165000000025,
+          "y2": 534.07125
+        },
+        {
+          "x1": 60.0055,
+          "y1": 537.3217500000001,
+          "x2": 342.2248,
+          "y2": 545.5717500000001
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 583.802,
+          "x2": 63.8172993,
+          "y2": 588.702
+        },
+        {
+          "x1": 63.8172993,
+          "y1": 584.502,
+          "x2": 101.44649160000003,
+          "y2": 591.502
+        },
+        {
+          "x1": 103.74529999999999,
+          "y1": 584.502,
+          "x2": 135.94949999999997,
+          "y2": 591.502
+        },
+        {
+          "x1": 138.2623,
+          "y1": 584.502,
+          "x2": 420.2202000000001,
+          "y2": 591.502
+        },
+        {
+          "x1": 60.002300000000005,
+          "y1": 594.505,
+          "x2": 193.66800000000006,
+          "y2": 601.505
+        },
+        {
+          "x1": 195.9703,
+          "y1": 594.505,
+          "x2": 207.43769999999998,
+          "y2": 601.505
+        },
+        {
+          "x1": 207.7583,
+          "y1": 594.505,
+          "x2": 268.95090000000005,
+          "y2": 601.505
+        }
+      ]
+    },
+    {
+      "page": 58,
+      "width": 504.005,
+      "height": 657.005,
+      "text": "    1.12 References 19\n\n\nPamela wonders if a different approach may be needed, such as running a fixed rate of oper-\nations and then characterizing resource usage (CPU, disk I/O, network I/O), so that it can be\nexpressed in terms of a single client request. She runs the simulator at a rate of 700 per second for\nthe current and new software and measures resource consumption. The current software drove\nthe 32 CPUs to an average of 20% utilization for the given load. The new software drove the\nsame CPUs to 30% utilization, for the same load. It would appear that this is indeed a regression,\none that consumes more CPU resources.\n\nCurious to understand the 700 limit, Pamela launches a higher load and then investigates all\ncomponents in the data path, including the network, the client system, and the client workload\ngenerator. She also performs drill-down analysis of the server and client software. She docu-\nments what she has checked, including screenshots, for reference.\n\nTo investigate the client software she performs thread state analysis and finds that it is single-\nthreaded! That one thread is spending 100% of its time executing on-CPU. This convinces her\nthat this is the limiter of the test.\n\nAs an experiment, she launches the client software in parallel on different client systems. In this\nway, she drives the server to 100% CPU utilization for both the current and new software. The\ncurrent version reaches 3,500 requests/sec, and the new version 2,300 requests/sec, consistent\nwith earlier findings of resource consumption.\n\nPamela informs the application developers that there is a regression with the new software\nversion, and she begins to profile its CPU usage using a CPU flame graph to understand why:\nwhat code paths are contributing. She notes that an average production workload was tested and\nthat varied workloads were not. She also files a bug to note that the client workload generator is\nsingle-threaded, which can become a bottleneck.\n\n\n    1.11.3 More Reading\n    A more detailed case study is provided as Chapter 16, Case Study, which documents how I\n    resolved a particular cloud performance issue. The next chapter introduces the methodologies\n    used for performance analysis, and the remaining chapters cover the necessary background\n    and specifics.\n\n\n    1.12 References\n\n    [Hollingsworth 94] Hollingsworth, J., Miller, B., and Cargille, J., “Dynamic Program\n    Instrumentation for Scalable Performance Tools,” Scalable High-Performance Computing\n    Conference (SHPCC), May 1994.\n\n    [Tamches 99] Tamches, A., and Miller, B., “Fine-Grained Dynamic Instrumentation of\n    Commodity Operating System Kernels,” Proceedings of the 3rd Symposium on Operating Systems\n    Design and Implementation, February 1999.\n\n    [Kleen 08] Kleen, A., “On Submitting Kernel Patches,” Intel Open Source Technology Center,\n    http://halobates.de/on-submitting-patches.pdf, 2008.",
+      "textItems": [
+        {
+          "text": "1.12",
+          "x": 370.8474,
+          "y": 33.77629999999999,
+          "width": 18.98909999999995,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "References",
+          "x": 398.8364999999999,
+          "y": 33.77629999999999,
+          "width": 45.11880000000002,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "19",
+          "x": 463.801,
+          "y": 34.27629999999999,
+          "width": 10.201700000000017,
+          "height": 8.5,
+          "fontName": "g_d0_f1",
+          "fontSize": 8.5,
+          "confidence": 1
+        },
+        {
+          "text": "Pamela wonders if a different approach may be needed, such as running a fixed rate of oper-",
+          "x": 72.0024,
+          "y": 68.32399999999996,
+          "width": 352.7328757424999,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "ations and then characterizing resource usage (CPU, disk I/O, network I/O), so that it can be",
+          "x": 72.0024,
+          "y": 79.82449999999994,
+          "width": 351.5819999999999,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "expressed in terms of a single client request. She runs the simulator at a rate of 700 per second for",
+          "x": 72.0024,
+          "y": 91.32500000000005,
+          "width": 371.88359999999966,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "the current and new software and measures resource consumption. The current software drove",
+          "x": 72.0024,
+          "y": 102.82550000000003,
+          "width": 365.2596749999999,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "the 32 CPUs to an average of 20% utilization for the given load. The new software drove the",
+          "x": 72.0024,
+          "y": 114.32600000000002,
+          "width": 351.83197574249994,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "same CPUs to 30% utilization, for the same load. It would appear that this is indeed a regression,",
+          "x": 72.0024,
+          "y": 125.82650000000001,
+          "width": 369.9597,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "one that consumes more CPU resources.",
+          "x": 72.0024,
+          "y": 137.327,
+          "width": 154.30965000000003,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Curious to understand the 700 limit, Pamela launches a higher load and then investigates all",
+          "x": 72.0024,
+          "y": 154.82524999999998,
+          "width": 356.33482500000036,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "components in the data path, including the network, the client system, and the client workload",
+          "x": 72.0024,
+          "y": 166.32574999999997,
+          "width": 367.5177007672502,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "generator. She also performs drill-down analysis of the server and client software. She docu-",
+          "x": 72.0024,
+          "y": 177.82625000000002,
+          "width": 353.03482500000007,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "ments what she has checked, including screenshots, for reference.",
+          "x": 72.0024,
+          "y": 189.32675,
+          "width": 252.69337499999997,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "To investigate the client software she performs thread state analysis and finds that it is single-",
+          "x": 72.0024,
+          "y": 206.825,
+          "width": 358.5738758002502,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "threaded! That one thread is spending 100% of its time executing on-CPU. This convinces her",
+          "x": 72.0024,
+          "y": 218.32549999999998,
+          "width": 361.31122500000015,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "that this is the limiter of the test.",
+          "x": 72.0024,
+          "y": 229.82600000000002,
+          "width": 126.40484999999993,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "As an experiment, she launches the client software in parallel on different client systems. In this",
+          "x": 72.0024,
+          "y": 247.32425,
+          "width": 370.953,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "way, she drives the server to 100% CPU utilization for both the current and new software. The",
+          "x": 72.0024,
+          "y": 258.82475,
+          "width": 361.02742575900004,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "current version reaches 3,500 requests/sec, and the new version 2,300 requests/sec, consistent",
+          "x": 72.0024,
+          "y": 270.32525,
+          "width": 360.14880000000016,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "with earlier findings of resource consumption.",
+          "x": 72.0024,
+          "y": 281.82574999999997,
+          "width": 179.33849999999995,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Pamela informs the application developers that there is a regression with the new software",
+          "x": 72.0024,
+          "y": 299.324,
+          "width": 347.73749999999984,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "version, and she begins to profile its CPU usage using a CPU flame graph to understand why:",
+          "x": 72.0024,
+          "y": 310.8245,
+          "width": 355.3365749999999,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "what code paths are contributing. She notes that an average production workload was tested and",
+          "x": 72.0024,
+          "y": 322.325,
+          "width": 370.12057500000014,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "that varied workloads were not. She also files a bug to note that the client workload generator is",
+          "x": 72.0024,
+          "y": 333.8255,
+          "width": 365.09467500000017,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "single-threaded, which can become a bottleneck.",
+          "x": 72.0024,
+          "y": 345.326,
+          "width": 189.05947537949984,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "1.11.3",
+          "x": 72.0024,
+          "y": 373.574,
+          "width": 34.718399999999974,
+          "height": 12,
+          "fontName": "g_d0_f3",
+          "fontSize": 12,
+          "confidence": 1
+        },
+        {
+          "text": "More Reading",
+          "x": 118.69919999999996,
+          "y": 373.574,
+          "width": 72.19800000000001,
+          "height": 12,
+          "fontName": "g_d0_f3",
+          "fontSize": 12,
+          "confidence": 1
+        },
+        {
+          "text": "A more detailed case study is provided as Chapter 16, Case Study, which documents how I",
+          "x": 72.0024,
+          "y": 392.824,
+          "width": 344.34097429049984,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "resolved a particular cloud performance issue. The next chapter introduces the methodologies",
+          "x": 72.0024,
+          "y": 404.3245,
+          "width": 361.66597500000023,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "used for performance analysis, and the remaining chapters cover the necessary background",
+          "x": 72.0024,
+          "y": 415.825,
+          "width": 351.6636749999999,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "and specifics.",
+          "x": 72.0024,
+          "y": 427.32550000000003,
+          "width": 52.02780000000001,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "1.12",
+          "x": 72.0024,
+          "y": 458.57399999999996,
+          "width": 30.692999999999984,
+          "height": 15,
+          "fontName": "g_d0_f3",
+          "fontSize": 15,
+          "confidence": 1
+        },
+        {
+          "text": "References",
+          "x": 117.6954,
+          "y": 458.57399999999996,
+          "width": 72.28499999999997,
+          "height": 15,
+          "fontName": "g_d0_f3",
+          "fontSize": 15,
+          "confidence": 1
+        },
+        {
+          "text": "[Hollingsworth 94]",
+          "x": 84.002,
+          "y": 482.8239,
+          "width": 78.40552500000003,
+          "height": 8.25,
+          "fontName": "g_d0_f7",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Hollingsworth, J., Miller, B., and Cargille, J., “Dynamic Program",
+          "x": 166.535,
+          "y": 482.8239,
+          "width": 246.32107500000004,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Instrumentation for Scalable Performance Tools,”",
+          "x": 84.002,
+          "y": 494.32439999999997,
+          "width": 190.2161250000001,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Scalable High-Performance Computing",
+          "x": 276.194,
+          "y": 494.32439999999997,
+          "width": 138.7229250000002,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Conference (SHPCC)",
+          "x": 84.002,
+          "y": 505.82489999999996,
+          "width": 73.47779985975002,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", May 1994.",
+          "x": 157.28675,
+          "y": 505.82489999999996,
+          "width": 44.30497491750003,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Tamches 99]",
+          "x": 84.002,
+          "y": 522.3249,
+          "width": 53.960775,
+          "height": 8.25,
+          "fontName": "g_d0_f7",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Tamches, A., and Miller, B., “Fine-Grained Dynamic Instrumentation of",
+          "x": 142.09025,
+          "y": 522.3249,
+          "width": 276.700875,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Commodity Operating System Kernels,”",
+          "x": 84.002,
+          "y": 533.8254,
+          "width": 154.97129999999999,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Proceedings of the 3rd Symposium on Operating Systems",
+          "x": 240.95,
+          "y": 533.8254,
+          "width": 199.7448754290004,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Design and Implementation",
+          "x": 84.002,
+          "y": 545.3259,
+          "width": 100.162425,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", February 1999.",
+          "x": 184.223,
+          "y": 545.3259,
+          "width": 61.64812500000005,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Kleen 08]",
+          "x": 84.002,
+          "y": 561.8259,
+          "width": 41.677350000000004,
+          "height": 8.25,
+          "fontName": "g_d0_f7",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Kleen, A., “On Submitting Kernel Patches,”",
+          "x": 129.8225,
+          "y": 561.8259,
+          "width": 165.19800000000004,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Intel Open Source Technology Center",
+          "x": 297.02525000825,
+          "y": 561.8259,
+          "width": 130.14292528050015,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ",",
+          "x": 426.66575,
+          "y": 561.8259,
+          "width": 2.367750000000001,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "http://halobates.de/on-submitting-patches.pdf, 2008.",
+          "x": 84.002,
+          "y": 573.3264,
+          "width": 206.61299999999983,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        }
+      ],
+      "boundingBoxes": [
+        {
+          "x1": 370.8474,
+          "y1": 33.77629999999999,
+          "x2": 389.83649999999994,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 398.8364999999999,
+          "y1": 33.77629999999999,
+          "x2": 443.9552999999999,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 463.801,
+          "y1": 34.27629999999999,
+          "x2": 474.0027,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 72.0024,
+          "y1": 68.32399999999996,
+          "x2": 424.7352757424999,
+          "y2": 76.57399999999996
+        },
+        {
+          "x1": 72.0024,
+          "y1": 79.82449999999994,
+          "x2": 423.58439999999985,
+          "y2": 88.07449999999994
+        },
+        {
+          "x1": 72.0024,
+          "y1": 91.32500000000005,
+          "x2": 443.8859999999996,
+          "y2": 99.57500000000005
+        },
+        {
+          "x1": 72.0024,
+          "y1": 102.82550000000003,
+          "x2": 437.26207499999987,
+          "y2": 111.07550000000003
+        },
+        {
+          "x1": 72.0024,
+          "y1": 114.32600000000002,
+          "x2": 423.8343757424999,
+          "y2": 122.57600000000002
+        },
+        {
+          "x1": 72.0024,
+          "y1": 125.82650000000001,
+          "x2": 441.96209999999996,
+          "y2": 134.0765
+        },
+        {
+          "x1": 72.0024,
+          "y1": 137.327,
+          "x2": 226.31205000000003,
+          "y2": 145.577
+        },
+        {
+          "x1": 72.0024,
+          "y1": 154.82524999999998,
+          "x2": 428.33722500000033,
+          "y2": 163.07524999999998
+        },
+        {
+          "x1": 72.0024,
+          "y1": 166.32574999999997,
+          "x2": 439.52010076725014,
+          "y2": 174.57574999999997
+        },
+        {
+          "x1": 72.0024,
+          "y1": 177.82625000000002,
+          "x2": 425.03722500000003,
+          "y2": 186.07625000000002
+        },
+        {
+          "x1": 72.0024,
+          "y1": 189.32675,
+          "x2": 324.69577499999997,
+          "y2": 197.57675
+        },
+        {
+          "x1": 72.0024,
+          "y1": 206.825,
+          "x2": 430.5762758002502,
+          "y2": 215.075
+        },
+        {
+          "x1": 72.0024,
+          "y1": 218.32549999999998,
+          "x2": 433.3136250000001,
+          "y2": 226.57549999999998
+        },
+        {
+          "x1": 72.0024,
+          "y1": 229.82600000000002,
+          "x2": 198.40724999999992,
+          "y2": 238.07600000000002
+        },
+        {
+          "x1": 72.0024,
+          "y1": 247.32425,
+          "x2": 442.95539999999994,
+          "y2": 255.57425
+        },
+        {
+          "x1": 72.0024,
+          "y1": 258.82475,
+          "x2": 433.029825759,
+          "y2": 267.07475
+        },
+        {
+          "x1": 72.0024,
+          "y1": 270.32525,
+          "x2": 432.15120000000013,
+          "y2": 278.57525
+        },
+        {
+          "x1": 72.0024,
+          "y1": 281.82574999999997,
+          "x2": 251.34089999999995,
+          "y2": 290.07574999999997
+        },
+        {
+          "x1": 72.0024,
+          "y1": 299.324,
+          "x2": 419.7398999999998,
+          "y2": 307.574
+        },
+        {
+          "x1": 72.0024,
+          "y1": 310.8245,
+          "x2": 427.3389749999999,
+          "y2": 319.0745
+        },
+        {
+          "x1": 72.0024,
+          "y1": 322.325,
+          "x2": 442.1229750000001,
+          "y2": 330.575
+        },
+        {
+          "x1": 72.0024,
+          "y1": 333.8255,
+          "x2": 437.09707500000013,
+          "y2": 342.0755
+        },
+        {
+          "x1": 72.0024,
+          "y1": 345.326,
+          "x2": 261.06187537949984,
+          "y2": 353.576
+        },
+        {
+          "x1": 72.0024,
+          "y1": 373.574,
+          "x2": 106.72079999999997,
+          "y2": 385.574
+        },
+        {
+          "x1": 118.69919999999996,
+          "y1": 373.574,
+          "x2": 190.89719999999997,
+          "y2": 385.574
+        },
+        {
+          "x1": 72.0024,
+          "y1": 392.824,
+          "x2": 416.3433742904998,
+          "y2": 401.074
+        },
+        {
+          "x1": 72.0024,
+          "y1": 404.3245,
+          "x2": 433.6683750000002,
+          "y2": 412.5745
+        },
+        {
+          "x1": 72.0024,
+          "y1": 415.825,
+          "x2": 423.66607499999986,
+          "y2": 424.075
+        },
+        {
+          "x1": 72.0024,
+          "y1": 427.32550000000003,
+          "x2": 124.03020000000001,
+          "y2": 435.57550000000003
+        },
+        {
+          "x1": 72.0024,
+          "y1": 458.57399999999996,
+          "x2": 102.69539999999998,
+          "y2": 473.57399999999996
+        },
+        {
+          "x1": 117.6954,
+          "y1": 458.57399999999996,
+          "x2": 189.98039999999997,
+          "y2": 473.57399999999996
+        },
+        {
+          "x1": 84.002,
+          "y1": 482.8239,
+          "x2": 162.40752500000002,
+          "y2": 491.0739
+        },
+        {
+          "x1": 166.535,
+          "y1": 482.8239,
+          "x2": 412.85607500000003,
+          "y2": 491.0739
+        },
+        {
+          "x1": 84.002,
+          "y1": 494.32439999999997,
+          "x2": 274.2181250000001,
+          "y2": 502.57439999999997
+        },
+        {
+          "x1": 276.194,
+          "y1": 494.32439999999997,
+          "x2": 414.9169250000002,
+          "y2": 502.57439999999997
+        },
+        {
+          "x1": 84.002,
+          "y1": 505.82489999999996,
+          "x2": 157.47979985975002,
+          "y2": 514.0749
+        },
+        {
+          "x1": 157.28675,
+          "y1": 505.82489999999996,
+          "x2": 201.59172491750004,
+          "y2": 514.0749
+        },
+        {
+          "x1": 84.002,
+          "y1": 522.3249,
+          "x2": 137.962775,
+          "y2": 530.5749
+        },
+        {
+          "x1": 142.09025,
+          "y1": 522.3249,
+          "x2": 418.79112499999997,
+          "y2": 530.5749
+        },
+        {
+          "x1": 84.002,
+          "y1": 533.8254,
+          "x2": 238.9733,
+          "y2": 542.0754
+        },
+        {
+          "x1": 240.95,
+          "y1": 533.8254,
+          "x2": 440.6948754290004,
+          "y2": 542.0754
+        },
+        {
+          "x1": 84.002,
+          "y1": 545.3259,
+          "x2": 184.164425,
+          "y2": 553.5759
+        },
+        {
+          "x1": 184.223,
+          "y1": 545.3259,
+          "x2": 245.87112500000006,
+          "y2": 553.5759
+        },
+        {
+          "x1": 84.002,
+          "y1": 561.8259,
+          "x2": 125.67935,
+          "y2": 570.0759
+        },
+        {
+          "x1": 129.8225,
+          "y1": 561.8259,
+          "x2": 295.0205,
+          "y2": 570.0759
+        },
+        {
+          "x1": 297.02525000825,
+          "y1": 561.8259,
+          "x2": 427.16817528875015,
+          "y2": 570.0759
+        },
+        {
+          "x1": 426.66575,
+          "y1": 561.8259,
+          "x2": 429.0335,
+          "y2": 570.0759
+        },
+        {
+          "x1": 84.002,
+          "y1": 573.3264,
+          "x2": 290.61499999999984,
+          "y2": 581.5764
+        }
+      ]
+    },
+    {
+      "page": 59,
+      "width": 504.005,
+      "height": 657.005,
+      "text": "20 Chapter 1}}Introduction\n\n\n[Gregg 11a] Gregg, B., and Mauro, J., DTrace: Dynamic Tracing in Oracle Solaris, Mac OS X and\nFreeBSD, Prentice Hall, 2011.\n\n[Gregg 15a] Gregg, B., “Linux Performance Analysis in 60,000 Milliseconds,” Netflix\nTechnology Blog, http://techblog.netflix.com/2015/11/linux-performance-analysis-in-60s.\nhtml, 2015.\n\n[Dekker 18] Dekker, S., Drift into Failure: From Hunting Broken Components to Understanding\nComplex Systems, CRC Press, 2018.\n\n[Gregg 19] Gregg, B., BPF Performance Tools: Linux System and Application Observability,\nAddison-Wesley, 2019.\n\n[Corry 20] Corry, A., Retrospectives Antipatterns, Addison-Wesley, 2020.",
+      "textItems": [
+        {
+          "text": "20",
+          "x": 30.0024,
+          "y": 34.27629999999999,
+          "width": 10.262049999999995,
+          "height": 8.5,
+          "fontName": "g_d0_f1",
+          "fontSize": 8.5,
+          "confidence": 1
+        },
+        {
+          "text": "Chapter 1",
+          "x": 60.0013,
+          "y": 33.77629999999999,
+          "width": 38.974500000000006,
+          "height": 9,
+          "fontName": "g_d0_f3",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "}}",
+          "x": 98.9758,
+          "y": 33.77629999999999,
+          "width": 5.670000000000016,
+          "height": 9,
+          "fontName": "g_d0_f4",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "Introduction",
+          "x": 104.91579999999999,
+          "y": 33.77629999999999,
+          "width": 47.742300000000114,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "[Gregg 11a]",
+          "x": 72.0024,
+          "y": 68.32399999999996,
+          "width": 45.900525,
+          "height": 8.25,
+          "fontName": "g_d0_f7",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Gregg, B., and Mauro, J.,",
+          "x": 122.03039999999999,
+          "y": 68.32399999999996,
+          "width": 93.05175000000003,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "DTrace: Dynamic Tracing in Oracle Solaris, Mac OS X and",
+          "x": 217.07535,
+          "y": 68.32399999999996,
+          "width": 207.7548000000007,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "FreeBSD",
+          "x": 72.0024,
+          "y": 79.82449999999994,
+          "width": 30.04649999999998,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", Prentice Hall, 2011.",
+          "x": 101.84264999999999,
+          "y": 79.82449999999994,
+          "width": 79.43842499999994,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Gregg 15a]",
+          "x": 72.0024,
+          "y": 96.32449999999994,
+          "width": 46.217325,
+          "height": 8.25,
+          "fontName": "g_d0_f7",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Gregg, B., “Linux Performance Analysis in 60,000 Milliseconds,”",
+          "x": 122.34390000824999,
+          "y": 96.32449999999994,
+          "width": 248.6731500577498,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Netflix",
+          "x": 373.02015,
+          "y": 96.32449999999994,
+          "width": 25.635224999999934,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Technology Blog",
+          "x": 72.0024,
+          "y": 107.82500000000005,
+          "width": 57.742575000000045,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", http://techblog.netflix.com/2015/11/linux-performance-analysis-in-60s.",
+          "x": 129.5214,
+          "y": 107.82500000000005,
+          "width": 284.54827499999976,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "html, 2015.",
+          "x": 72.0024,
+          "y": 119.32550000000003,
+          "width": 44.54752500000001,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Dekker 18]",
+          "x": 72.0024,
+          "y": 135.82550000000003,
+          "width": 47.35995,
+          "height": 8.25,
+          "fontName": "g_d0_f7",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Dekker, S.,",
+          "x": 123.48734999999999,
+          "y": 135.82550000000003,
+          "width": 40.49595000000002,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Drift into Failure: From Hunting Broken Components to Understanding",
+          "x": 165.97815,
+          "y": 135.82550000000003,
+          "width": 253.3014000000003,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Complex Systems",
+          "x": 72.0024,
+          "y": 147.32600000000002,
+          "width": 62.09610011549995,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", CRC Press, 2018.",
+          "x": 134.01765,
+          "y": 147.32600000000002,
+          "width": 68.58307500000001,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Gregg 19]",
+          "x": 72.0024,
+          "y": 163.82600000000002,
+          "width": 41.60887499999998,
+          "height": 8.25,
+          "fontName": "g_d0_f7",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Gregg, B.,",
+          "x": 117.74039999175,
+          "y": 163.82600000000002,
+          "width": 37.10189992575002,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "BPF Performance Tools: Linux System and Application Observability",
+          "x": 156.83715,
+          "y": 163.82600000000002,
+          "width": 243.91125000000005,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ",",
+          "x": 400.19565,
+          "y": 163.82600000000002,
+          "width": 2.367750000000001,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Addison-Wesley, 2019.",
+          "x": 72.0024,
+          "y": 175.3265,
+          "width": 86.29664999999994,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Corry 20]",
+          "x": 72.0024,
+          "y": 191.8265,
+          "width": 41.69055,
+          "height": 8.25,
+          "fontName": "g_d0_f7",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Corry, A.,",
+          "x": 117.81465,
+          "y": 191.8265,
+          "width": 36.852749999999986,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Retrospectives Antipatterns",
+          "x": 156.6639,
+          "y": 191.8265,
+          "width": 97.66762499999999,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", Addison-Wesley, 2020.",
+          "x": 254.28615000000002,
+          "y": 191.8265,
+          "width": 91.87859999999995,
+          "height": 8.25,
+          "fontName": "g_d0_f2",
+          "fontSize": 8.25,
+          "confidence": 1
+        }
+      ],
+      "boundingBoxes": [
+        {
+          "x1": 30.0024,
+          "y1": 34.27629999999999,
+          "x2": 40.26445,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 60.0013,
+          "y1": 33.77629999999999,
+          "x2": 98.9758,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 98.9758,
+          "y1": 33.77629999999999,
+          "x2": 104.64580000000002,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 104.91579999999999,
+          "y1": 33.77629999999999,
+          "x2": 152.6581000000001,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 72.0024,
+          "y1": 68.32399999999996,
+          "x2": 117.902925,
+          "y2": 76.57399999999996
+        },
+        {
+          "x1": 122.03039999999999,
+          "y1": 68.32399999999996,
+          "x2": 215.08215,
+          "y2": 76.57399999999996
+        },
+        {
+          "x1": 217.07535,
+          "y1": 68.32399999999996,
+          "x2": 424.8301500000007,
+          "y2": 76.57399999999996
+        },
+        {
+          "x1": 72.0024,
+          "y1": 79.82449999999994,
+          "x2": 102.04889999999997,
+          "y2": 88.07449999999994
+        },
+        {
+          "x1": 101.84264999999999,
+          "y1": 79.82449999999994,
+          "x2": 181.28107499999993,
+          "y2": 88.07449999999994
+        },
+        {
+          "x1": 72.0024,
+          "y1": 96.32449999999994,
+          "x2": 118.219725,
+          "y2": 104.57449999999994
+        },
+        {
+          "x1": 122.34390000824999,
+          "y1": 96.32449999999994,
+          "x2": 371.0170500659998,
+          "y2": 104.57449999999994
+        },
+        {
+          "x1": 373.02015,
+          "y1": 96.32449999999994,
+          "x2": 398.65537499999994,
+          "y2": 104.57449999999994
+        },
+        {
+          "x1": 72.0024,
+          "y1": 107.82500000000005,
+          "x2": 129.74497500000004,
+          "y2": 116.07500000000005
+        },
+        {
+          "x1": 129.5214,
+          "y1": 107.82500000000005,
+          "x2": 414.06967499999973,
+          "y2": 116.07500000000005
+        },
+        {
+          "x1": 72.0024,
+          "y1": 119.32550000000003,
+          "x2": 116.549925,
+          "y2": 127.57550000000003
+        },
+        {
+          "x1": 72.0024,
+          "y1": 135.82550000000003,
+          "x2": 119.36234999999999,
+          "y2": 144.07550000000003
+        },
+        {
+          "x1": 123.48734999999999,
+          "y1": 135.82550000000003,
+          "x2": 163.9833,
+          "y2": 144.07550000000003
+        },
+        {
+          "x1": 165.97815,
+          "y1": 135.82550000000003,
+          "x2": 419.2795500000003,
+          "y2": 144.07550000000003
+        },
+        {
+          "x1": 72.0024,
+          "y1": 147.32600000000002,
+          "x2": 134.09850011549995,
+          "y2": 155.57600000000002
+        },
+        {
+          "x1": 134.01765,
+          "y1": 147.32600000000002,
+          "x2": 202.600725,
+          "y2": 155.57600000000002
+        },
+        {
+          "x1": 72.0024,
+          "y1": 163.82600000000002,
+          "x2": 113.61127499999998,
+          "y2": 172.07600000000002
+        },
+        {
+          "x1": 117.74039999175,
+          "y1": 163.82600000000002,
+          "x2": 154.84229991750001,
+          "y2": 172.07600000000002
+        },
+        {
+          "x1": 156.83715,
+          "y1": 163.82600000000002,
+          "x2": 400.74840000000006,
+          "y2": 172.07600000000002
+        },
+        {
+          "x1": 400.19565,
+          "y1": 163.82600000000002,
+          "x2": 402.5634,
+          "y2": 172.07600000000002
+        },
+        {
+          "x1": 72.0024,
+          "y1": 175.3265,
+          "x2": 158.29904999999994,
+          "y2": 183.5765
+        },
+        {
+          "x1": 72.0024,
+          "y1": 191.8265,
+          "x2": 113.69295,
+          "y2": 200.0765
+        },
+        {
+          "x1": 117.81465,
+          "y1": 191.8265,
+          "x2": 154.6674,
+          "y2": 200.0765
+        },
+        {
+          "x1": 156.6639,
+          "y1": 191.8265,
+          "x2": 254.331525,
+          "y2": 200.0765
+        },
+        {
+          "x1": 254.28615000000002,
+          "y1": 191.8265,
+          "x2": 346.16474999999997,
+          "y2": 200.0765
+        }
+      ]
+    }
+  ]
+}

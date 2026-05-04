@@ -1,0 +1,193 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "reno://structured/schema/processed-manifest.schema.json",
+  "title": "RENO Processed Manifest",
+  "description": "Manifest stored at processed/<source-id>/manifest.json. Holds parser/processed metadata, raw-registration fields named in AGENTS.md, and a slices[] array recording each bounded Phase 1 slice ingested for this source. Top-level parser/page_range/section_range/parser_command reflect the most recently appended slice; per-slice authoritative values live in slices[]. Top-level chunk_count is the total across all slices.",
+  "type": "object",
+  "required": [
+    "processed_id",
+    "raw_id",
+    "parser",
+    "parser_version",
+    "parser_command",
+    "source_hash",
+    "page_range",
+    "section_range",
+    "extraction_warnings",
+    "chunk_count",
+    "generated_files",
+    "source_kind",
+    "title_or_origin",
+    "raw_path",
+    "original_path",
+    "file_size_bytes",
+    "license_copyright_status",
+    "ingestion_status",
+    "slices"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "processed_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "raw_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parser": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parser_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parser_command": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "page_range": {
+      "type": ["string", "null"]
+    },
+    "section_range": {
+      "type": ["string", "null"]
+    },
+    "extraction_warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "chunk_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "generated_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "source_kind": {
+      "type": "string",
+      "enum": [
+        "book-section",
+        "paper-section",
+        "standard-section",
+        "technical-doc",
+        "first-party-artifact",
+        "explicit-snapshot"
+      ]
+    },
+    "title_or_origin": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable title or origin (e.g. book title, paper citation, doc URL)."
+    },
+    "raw_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Repo-relative path to the registered raw artifact under raw/<source-id>/."
+    },
+    "original_path": {
+      "type": ["string", "null"],
+      "description": "Path the raw artifact came from before registration, if known."
+    },
+    "file_size_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "license_copyright_status": {
+      "type": ["string", "null"],
+      "description": "Free-form license/copyright note. null when unknown."
+    },
+    "ingestion_status": {
+      "type": "string",
+      "enum": [
+        "phase-1-in-progress",
+        "phase-1-parsed",
+        "phase-2-source-built",
+        "phase-3-reasoned",
+        "needs-review"
+      ]
+    },
+    "slices": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Per-bounded-slice ingestion records. Append-only; existing entries must not be mutated except for explicit repair tasks. slice_id values must be unique within the array. chunk_ids across slices must partition the source-level chain without overlap.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "slice_id",
+          "page_range",
+          "section_range",
+          "parse_path",
+          "chunk_ids",
+          "chunk_count",
+          "page_start",
+          "page_end",
+          "parser",
+          "parser_version",
+          "parser_command"
+        ],
+        "properties": {
+          "slice_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stable kebab-case slice identifier, e.g. chapter-1-introduction-p40-55."
+          },
+          "page_range": {
+            "type": ["string", "null"],
+            "description": "Free-form page range string for this slice, typically matching the LiteParse --target-pages argument."
+          },
+          "section_range": {
+            "type": ["string", "null"]
+          },
+          "parse_path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Repo-relative path to the promoted LiteParse JSON for this slice, normally processed/<source-id>/parses/<slice-id>.json."
+          },
+          "chunk_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "chunk_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "page_start": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "page_end": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "parser": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parser_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parser_command": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
