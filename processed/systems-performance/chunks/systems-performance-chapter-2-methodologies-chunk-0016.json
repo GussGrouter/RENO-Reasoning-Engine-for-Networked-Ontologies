@@ -1,0 +1,15 @@
+{
+  "chunk_id": "systems-performance-chapter-2-methodologies-chunk-0016",
+  "content_hash": "2414a4c1450e259c86bb6794f46b8ffeaec4d92cfcccd8d23364f7ed5e884607",
+  "next_chunk_id": "systems-performance-chapter-2-methodologies-continuation-chunk-0017",
+  "page_end": 75,
+  "page_start": 75,
+  "prev_chunk_id": "systems-performance-chapter-2-methodologies-chunk-0015",
+  "processed_id": "systems-performance-processed-001",
+  "raw_id": "systems-performance-raw-001",
+  "review_status": "unreviewed",
+  "source_id": "systems-performance",
+  "text": "[page 75]\n36 Chapter 2}}Methodologies\n\n\n\n\n\n\n\n\n\n\nFigure 2.9 Cache hit ratio and performance\n\nThe performance difference between 98% and 99% is much greater than that between 10%\nand 11%. This is a nonlinear profile because of the difference in speed between cache hits and\nmisses\u2014the two storage tiers at play. The greater the difference, the steeper the slope becomes.\n\nAnother metric for understanding cache performance is the cache miss rate, in terms of misses\nper second. This is proportional (linear) to the performance penalty of each miss and can be\neasier to interpret.\n\nFor example, workloads A and B perform the same task using different algorithms and use a\nmain memory cache to avoid reading from disk. Workload A has a cache hit ratio of 90%, and\nworkload B has a cache hit ratio of 80%. This information alone suggests workload A performs\nbetter. What if workload A had a miss rate of 200/s and workload B, 20/s? In those terms, work-\nload B performs 10x fewer disk reads, which may complete the task much sooner than A. To be\ncertain, the total runtime for each workload can be calculated as\n\n     runtime = (hit rate \u00d7 hit latency) + (miss rate \u00d7 miss latency)\n\nThis calculation uses the average hit and miss latencies and assumes the work is serialized.\n\nAlgorithms\nCache management algorithms and policies determine what to store in the limited space avail-\nable for a cache.\n\nMost recently used (MRU) refers to a cache retention policy, which decides what to favor keeping\nin the cache: the objects that have been used most recently. Least recently used (LRU) can refer to\nan equivalent cache eviction policy, deciding what objects to remove from the cache when more\nspace is needed. There are also most frequently used (MFU) and least frequently used (LFU) policies.\n\nYou may encounter not frequently used (NFU), which may be an inexpensive but less thorough\nversion of LRU.\n\nHot, Cold, and Warm Caches\nThese words are commonly used to describe the state of the cache:\n\n    \u25a0 Cold: A cold cache is empty, or populated with unwanted data. The hit ratio for a cold\n      cache is zero (or near zero as it begins to warm up).",
+  "title": "Systems Performance \u2014 chapter 2 methodologies pages 75-75",
+  "token_estimate": 485
+}

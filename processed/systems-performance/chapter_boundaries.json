@@ -1,0 +1,191 @@
+{
+  "source_id": "systems-performance",
+  "raw_id": "systems-performance-raw-001",
+  "boundary_map_version": "1.0.0",
+  "generated_from_parse": "processed/systems-performance/parse.candidate-frontmatter-contents-p1-39.json",
+  "parser_command": "liteparse parse raw/systems-performance/Systems.Performance.Enterprise.and.the.Cloud.pdf -o processed/systems-performance/parse.candidate-frontmatter-contents-p1-39.json --format json --target-pages 1-39 --no-ocr -q",
+  "evidence_basis": "table of contents / front matter",
+  "notes": [
+    "Chapter starts are taken from the Contents at a Glance entry on parse page 8.",
+    "Chapter end pages are derived as next chapter start minus one.",
+    "Chapter 16 end page is derived as Appendix A start (795) minus one."
+  ],
+  "chapter_boundaries": [
+    {
+      "chapter_number": 1,
+      "chapter_title": "Introduction",
+      "start_pdf_page": 40,
+      "end_pdf_page": 59,
+      "printed_page_start": 1,
+      "printed_page_end": 20,
+      "evidence_text": "1 Introduction 1; 2 Methodologies 21",
+      "confidence": "high",
+      "notes": "End derived from Chapter 2 printed-page start minus one."
+    },
+    {
+      "chapter_number": 2,
+      "chapter_title": "Methodologies",
+      "start_pdf_page": 60,
+      "end_pdf_page": 127,
+      "printed_page_start": 21,
+      "printed_page_end": 88,
+      "evidence_text": "2 Methodologies 21; 3 Operating Systems 89",
+      "confidence": "high",
+      "notes": "End derived from Chapter 3 printed-page start minus one."
+    },
+    {
+      "chapter_number": 3,
+      "chapter_title": "Operating Systems",
+      "start_pdf_page": 128,
+      "end_pdf_page": 167,
+      "printed_page_start": 89,
+      "printed_page_end": 128,
+      "evidence_text": "3 Operating Systems 89; 4 Observability Tools 129",
+      "confidence": "high",
+      "notes": "End derived from Chapter 4 printed-page start minus one."
+    },
+    {
+      "chapter_number": 4,
+      "chapter_title": "Observability Tools",
+      "start_pdf_page": 168,
+      "end_pdf_page": 209,
+      "printed_page_start": 129,
+      "printed_page_end": 170,
+      "evidence_text": "4 Observability Tools 129; 5 Applications 171",
+      "confidence": "high",
+      "notes": "End derived from Chapter 5 printed-page start minus one."
+    },
+    {
+      "chapter_number": 5,
+      "chapter_title": "Applications",
+      "start_pdf_page": 210,
+      "end_pdf_page": 257,
+      "printed_page_start": 171,
+      "printed_page_end": 218,
+      "evidence_text": "5 Applications 171; 6 CPUs 219",
+      "confidence": "high",
+      "notes": "End derived from Chapter 6 printed-page start minus one."
+    },
+    {
+      "chapter_number": 6,
+      "chapter_title": "CPUs",
+      "start_pdf_page": 258,
+      "end_pdf_page": 341,
+      "printed_page_start": 219,
+      "printed_page_end": 302,
+      "evidence_text": "6 CPUs 219; 7 Memory 303",
+      "confidence": "high",
+      "notes": "End derived from Chapter 7 printed-page start minus one."
+    },
+    {
+      "chapter_number": 7,
+      "chapter_title": "Memory",
+      "start_pdf_page": 342,
+      "end_pdf_page": 397,
+      "printed_page_start": 303,
+      "printed_page_end": 358,
+      "evidence_text": "7 Memory 303; 8 File Systems 359",
+      "confidence": "high",
+      "notes": "End derived from Chapter 8 printed-page start minus one."
+    },
+    {
+      "chapter_number": 8,
+      "chapter_title": "File Systems",
+      "start_pdf_page": 398,
+      "end_pdf_page": 461,
+      "printed_page_start": 359,
+      "printed_page_end": 422,
+      "evidence_text": "8 File Systems 359; 9 Disks 423",
+      "confidence": "high",
+      "notes": "End derived from Chapter 9 printed-page start minus one."
+    },
+    {
+      "chapter_number": 9,
+      "chapter_title": "Disks",
+      "start_pdf_page": 462,
+      "end_pdf_page": 537,
+      "printed_page_start": 423,
+      "printed_page_end": 498,
+      "evidence_text": "9 Disks 423; 10 Network 499",
+      "confidence": "high",
+      "notes": "End derived from Chapter 10 printed-page start minus one."
+    },
+    {
+      "chapter_number": 10,
+      "chapter_title": "Network",
+      "start_pdf_page": 538,
+      "end_pdf_page": 617,
+      "printed_page_start": 499,
+      "printed_page_end": 578,
+      "evidence_text": "10 Network 499; 11 Cloud Computing 579",
+      "confidence": "high",
+      "notes": "End derived from Chapter 11 printed-page start minus one."
+    },
+    {
+      "chapter_number": 11,
+      "chapter_title": "Cloud Computing",
+      "start_pdf_page": 618,
+      "end_pdf_page": 679,
+      "printed_page_start": 579,
+      "printed_page_end": 640,
+      "evidence_text": "11 Cloud Computing 579; 12 Benchmarking 641",
+      "confidence": "high",
+      "notes": "End derived from Chapter 12 printed-page start minus one."
+    },
+    {
+      "chapter_number": 12,
+      "chapter_title": "Benchmarking",
+      "start_pdf_page": 680,
+      "end_pdf_page": 709,
+      "printed_page_start": 641,
+      "printed_page_end": 670,
+      "evidence_text": "12 Benchmarking 641; 13 perf 671",
+      "confidence": "high",
+      "notes": "End derived from Chapter 13 printed-page start minus one."
+    },
+    {
+      "chapter_number": 13,
+      "chapter_title": "perf",
+      "start_pdf_page": 710,
+      "end_pdf_page": 743,
+      "printed_page_start": 671,
+      "printed_page_end": 704,
+      "evidence_text": "13 perf 671; 14 Ftrace 705",
+      "confidence": "high",
+      "notes": "End derived from Chapter 14 printed-page start minus one."
+    },
+    {
+      "chapter_number": 14,
+      "chapter_title": "Ftrace",
+      "start_pdf_page": 744,
+      "end_pdf_page": 789,
+      "printed_page_start": 705,
+      "printed_page_end": 750,
+      "evidence_text": "14 Ftrace 705; 15 BPF 751",
+      "confidence": "high",
+      "notes": "End derived from Chapter 15 printed-page start minus one."
+    },
+    {
+      "chapter_number": 15,
+      "chapter_title": "BPF",
+      "start_pdf_page": 790,
+      "end_pdf_page": 821,
+      "printed_page_start": 751,
+      "printed_page_end": 782,
+      "evidence_text": "15 BPF 751; 16 Case Study 783",
+      "confidence": "high",
+      "notes": "End derived from Chapter 16 printed-page start minus one."
+    },
+    {
+      "chapter_number": 16,
+      "chapter_title": "Case Study",
+      "start_pdf_page": 822,
+      "end_pdf_page": 833,
+      "printed_page_start": 783,
+      "printed_page_end": 794,
+      "evidence_text": "16 Case Study 783; A USE Method: Linux 795",
+      "confidence": "high",
+      "notes": "End derived from Appendix A printed-page start minus one."
+    }
+  ]
+}

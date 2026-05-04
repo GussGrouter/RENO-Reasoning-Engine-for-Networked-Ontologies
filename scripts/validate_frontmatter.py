@@ -20,8 +20,10 @@ when at least one explicit violation is detected.
 
 Uses Python stdlib only. If a leading YAML block is present, only a small
 subset of YAML used for RENO frontmatter is recognized: scalar key: value pairs
-with strings, numbers, booleans, null, and inline empty lists ([]). Complex
-YAML constructs are rejected with a clear error rather than silently parsed.
+with strings, numbers, booleans, null, inline empty lists ([]), and flat inline
+non-empty lists ([item, "item with spaces", ...]). Complex YAML constructs
+(nested mappings, multi-line lists, anchors, aliases, etc.) are rejected with a
+clear error rather than silently parsed.
 """
 
 from __future__ import annotations
@@ -59,6 +61,40 @@ ALLOWED_PHASES = {
 REQUIRED_FIELDS = ("id", "type", "status", "phase")
 
 
+def split_inline_list(inner: str) -> List[str]:
+    """Split the inside of an inline YAML list on top-level commas.
+
+    Respects single- and double-quoted strings. Brackets/braces inside quoted
+    strings are not treated as nesting. Nested unquoted brackets/braces are
+    rejected by the caller via parse_scalar (which forbids '[' or '{' inside an
+    item after this split).
+    """
+    parts: List[str] = []
+    buf: List[str] = []
+    quote: str | None = None
+    for ch in inner:
+        if quote is not None:
+            buf.append(ch)
+            if ch == quote:
+                quote = None
+            continue
+        if ch in ('"', "'"):
+            quote = ch
+            buf.append(ch)
+            continue
+        if ch == ",":
+            parts.append("".join(buf).strip())
+            buf = []
+            continue
+        buf.append(ch)
+    if quote is not None:
+        raise ValueError("unterminated quoted string in inline list")
+    tail = "".join(buf).strip()
+    if tail or parts:
+        parts.append(tail)
+    return parts
+
+
 def parse_scalar(raw: str) -> Any:
     raw = raw.strip()
     if raw == "" or raw.lower() == "null" or raw == "~":
@@ -67,6 +103,24 @@ def parse_scalar(raw: str) -> Any:
         return []
     if raw == "{}":
         return {}
+    if raw.startswith("[") and raw.endswith("]"):
+        inner = raw[1:-1].strip()
+        if not inner:
+            return []
+        try:
+            parts = split_inline_list(inner)
+        except ValueError as exc:
+            raise ValueError(f"malformed inline list {raw!r}: {exc}") from exc
+        items: List[Any] = []
+        for part in parts:
+            if "[" in part or "]" in part or "{" in part or "}" in part:
+                raise ValueError(
+                    f"nested or malformed item in inline list {raw!r}: {part!r}"
+                )
+            items.append(parse_scalar(part))
+        return items
+    if raw.startswith("[") or raw.startswith("{"):
+        raise ValueError(f"unsupported nested or unclosed YAML value: {raw!r}")
     if raw.lower() == "true":
         return True
     if raw.lower() == "false":
@@ -124,7 +178,13 @@ def extract_frontmatter(text: str) -> Tuple[Dict[str, Any] | None, List[str]]:
         if not key:
             errors.append(f"empty key in frontmatter line: {raw_line!r}")
             continue
-        fm[key] = parse_scalar(value)
+        try:
+            fm[key] = parse_scalar(value)
+        except ValueError as exc:
+            errors.append(
+                f"could not parse value for key '{key}' in frontmatter line "
+                f"{raw_line!r}: {exc}"
+            )
     return fm, errors
 
 

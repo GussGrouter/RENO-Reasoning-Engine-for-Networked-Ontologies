@@ -1,0 +1,15 @@
+{
+  "chunk_id": "systems-performance-chapter-4-observability-tools-tail-chunk-0066",
+  "content_hash": "1307ace2caffaf308872aadff1b8a9b97ff2b672c4762e2dcf41ef26e90ab5f9",
+  "next_chunk_id": "systems-performance-chapter-5-applications-chunk-0067",
+  "page_end": 209,
+  "page_start": 208,
+  "prev_chunk_id": "systems-performance-chapter-4-observability-tools-tail-chunk-0065",
+  "processed_id": "systems-performance-processed-001",
+  "raw_id": "systems-performance-raw-001",
+  "review_status": "unreviewed",
+  "source_id": "systems-performance",
+  "text": "[page 208]\n4.8 References 169\n\n\n[Weisbecker 13] Weisbecker, F., \u201cStatus of Linux dynticks,\u201d OSPERT,\nhttp://www.ertl.jp/~shinpei/conf/ospert13/slides/FredericWeisbecker.pdf, 2013.\n\n[Intel 16] Intel 64 and IA-32 Architectures Software Developer\u2019s Manual Volume 3B: System\nProgramming Guide, Part 2, September 2016, https://www.intel.com/content/www/us/en/\narchitecture-and-technology/64-ia-32-architectures-software-developer-vol-3b-part-2-\nmanual.html, 2016.\n\n[AMD 18] Open-Source Register Reference for AMD Family 17h Processors Models 00h-2Fh,\nhttps://developer.amd.com/resources/developer-guides-manuals, 2018.\n\n[ARM 19] Arm\u00ae Architecture Reference Manual Armv8, for Armv8-A architecture profile,\nhttps://developer.arm.com/architectures/cpu-architecture/a-profile/docs?_\nga=2.78191124.1893781712.1575908489-930650904.1559325573, 2019.\n\n[Gregg 19] Gregg, B., BPF Performance Tools: Linux System and Application Observability,\nAddison-Wesley, 2019.\n\n[Atoptool 20] \u201cAtop,\u201d www.atoptool.nl/index.php, accessed 2020.\n\n[Bowden 20] Bowden, T., Bauer, B., et al., \u201cThe /proc Filesystem,\u201d Linux documentation,\nhttps://www.kernel.org/doc/html/latest/filesystems/proc.html, accessed 2020.\n\n[Gregg 20a] Gregg, B., \u201cLinux Performance,\u201d http://www.brendangregg.com/\nlinuxperf.html, accessed 2020.\n\n[LTTng 20] \u201cLTTng,\u201d https://lttng.org, accessed 2020.\n\n[PCP 20] \u201cPerformance Co-Pilot,\u201d https://pcp.io, accessed 2020.\n\n[Prometheus 20] \u201cExporters and Integrations,\u201d https://prometheus.io/docs/instrumenting/\nexporters, accessed 2020.\n\n[Sourceware 20] \u201cSystemTap,\u201d https://sourceware.org/systemtap, accessed 2020.\n\n[Ts\u2019o 20] Ts\u2019o, T., Zefan, L., and Zanussi, T., \u201cEvent Tracing,\u201d Linux documentation,\nhttps://www.kernel.org/doc/html/latest/trace/events.html, accessed 2020.\n\n[Xenbits 20] \u201cXen Hypervisor Command Line Options,\u201d https://xenbits.xen.org/docs/\n4.11-testing/misc/xen-command-line.html, accessed 2020.\n\n[UTK 20] \u201cPerformance Application Programming Interface,\u201d http://icl.cs.utk.edu/papi,\naccessed 2020.\n\n[page 209]\nThis page intentionally left blank",
+  "title": "Systems Performance \u2014 chapter 4 observability tools tail pages 208-209",
+  "token_estimate": 240
+}
