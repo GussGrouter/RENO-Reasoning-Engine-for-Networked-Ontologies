@@ -1,0 +1,3824 @@
+{
+  "pages": [
+    {
+      "page": 121,
+      "width": 504.005,
+      "height": 657.005,
+      "text": "    82 Chapter 2}}Methodologies\n\n\nMany of the I/O were submillisecond, shown close to the x-axis. This is where the resolution of\nscatter plots begins to become a problem, as the points overlap and become difficult to distin-\nguish. This gets worse with more data: imagine plotting events from an entire cloud, involving\nmillions of data points, on one scatter plot: the dots can merge and become a “wall of paint.”\nAnother problem is the volume of data that must be collected and processed: x and y coordinates\nfor every I/O.\n\n\n2.10.3 Heat Maps\nHeat maps (more properly called a column quantization) can solve the scatter plot scalability prob-\nlems by quantizing x and y ranges into groups called buckets. These are displayed as large pixels,\ncolored based on the number of events in that x and y range. This quantizing also solves the\nscatter plot visual density limit, allowing heat maps to show data from a single system or thou-\nsands of systems in the same way. Heat maps had previously been used for location such as disk\noffsets (e.g., TazTool [McDougall 06a]); I invented their use in computing for latency, utilization,\nand other metrics. Latency heat maps were first included in Analytics for the Sun Microsystems\nZFS Storage appliance, released in 2008 [Gregg 10a][Gregg 10b], and are now commonplace in\nperformance monitoring products such as Grafana [Grafana 20].\n\nThe same dataset as plotted earlier is shown in Figure 2.30 as a heat map.\n\n\n\n\n\n\n\n\n\n\n    Figure 2.30 Heat map\n\n    High-latency outliers can be identified as blocks that are high in the heat map, usually of light\n    colors as they span few I/O (often a single I/O). Patterns in the bulk of the data begin to emerge,\n    which may be impossible to see with a scatter plot.\n\n    The full range of seconds for this disk I/O trace (not shown earlier) is shown in the Figure 2.31\n    heat map.",
+      "textItems": [
+        {
+          "text": "82",
+          "x": 30.0024,
+          "y": 34.27629999999999,
+          "width": 10.270549999999993,
+          "height": 8.5,
+          "fontName": "g_d0_f1",
+          "fontSize": 8.5,
+          "confidence": 1
+        },
+        {
+          "text": "Chapter 2",
+          "x": 60.0008,
+          "y": 33.77629999999999,
+          "width": 38.974500000000006,
+          "height": 9,
+          "fontName": "g_d0_f2",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "}}",
+          "x": 98.9753,
+          "y": 33.77629999999999,
+          "width": 5.670000000000016,
+          "height": 9,
+          "fontName": "g_d0_f3",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "Methodologies",
+          "x": 104.9153,
+          "y": 33.77629999999999,
+          "width": 58.92840000000004,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "Many of the I/O were submillisecond, shown close to the x-axis. This is where the resolution of",
+          "x": 60.002399999999994,
+          "y": 68.32399999999996,
+          "width": 363.994124868,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "scatter plots begins to become a problem, as the points overlap and become difficult to distin-",
+          "x": 60.002399999999994,
+          "y": 79.82449999999994,
+          "width": 359.57460077550013,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "guish. This gets worse with more data: imagine plotting events from an entire cloud, involving",
+          "x": 60.002399999999994,
+          "y": 91.32500000000005,
+          "width": 364.0840500000003,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "millions of data points, on one scatter plot: the dots can merge and become a “wall of paint.”",
+          "x": 60.002399999999994,
+          "y": 102.82550000000003,
+          "width": 356.0337000000002,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Another problem is the volume of data that must be collected and processed: x and y coordinates",
+          "x": 60.002399999999994,
+          "y": 114.32600000000002,
+          "width": 371.68560000000025,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "for every I/O.",
+          "x": 60.002399999999994,
+          "y": 125.82650000000001,
+          "width": 50.751525000000015,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "2.10.3",
+          "x": 60.002399999999994,
+          "y": 154.07399999999996,
+          "width": 33.94199999999999,
+          "height": 12,
+          "fontName": "g_d0_f2",
+          "fontSize": 12,
+          "confidence": 1
+        },
+        {
+          "text": "Heat Maps",
+          "x": 105.94439999999997,
+          "y": 154.07399999999996,
+          "width": 55.97040000000001,
+          "height": 12,
+          "fontName": "g_d0_f2",
+          "fontSize": 12,
+          "confidence": 1
+        },
+        {
+          "text": "Heat maps (more properly called a",
+          "x": 60.002399999999994,
+          "y": 173.324,
+          "width": 130.80292500000007,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "column quantization",
+          "x": 192.75315,
+          "y": 173.324,
+          "width": 75.30847500000004,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ") can solve the scatter plot scalability prob-",
+          "x": 267.84465,
+          "y": 173.324,
+          "width": 164.12715000000026,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "lems by quantizing x and y ranges into groups called",
+          "x": 60.002399999999994,
+          "y": 184.8245,
+          "width": 202.24462499999996,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "buckets",
+          "x": 264.2889,
+          "y": 184.8245,
+          "width": 26.648325,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ". These are displayed as large pixels,",
+          "x": 290.89515,
+          "y": 184.8245,
+          "width": 136.60927500000025,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "colored based on the number of events in that x and y range. This quantizing also solves the",
+          "x": 60.01065,
+          "y": 196.325,
+          "width": 353.4357750000004,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "scatter plot visual density limit, allowing heat maps to show data from a single system or thou-",
+          "x": 60.01065,
+          "y": 207.82549999999998,
+          "width": 363.31020000000007,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "sands of systems in the same way. Heat maps had previously been used for location such as disk",
+          "x": 60.01065,
+          "y": 219.32600000000002,
+          "width": 365.36280000000033,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "offsets (e.g., TazTool [McDougall 06a]); I invented their use in computing for latency, utilization,",
+          "x": 60.01065,
+          "y": 230.8265,
+          "width": 368.8591499999998,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "and other metrics. Latency heat maps were first included in Analytics for the Sun Microsystems",
+          "x": 60.01065,
+          "y": 242.327,
+          "width": 366.15974999999975,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "ZFS Storage appliance, released in 2008 [Gregg 10a][Gregg 10b], and are now commonplace in",
+          "x": 60.01065,
+          "y": 253.8275,
+          "width": 358.95667499999996,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "performance monitoring products such as Grafana [Grafana 20].",
+          "x": 60.01065,
+          "y": 265.328,
+          "width": 247.9083750577501,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "The same dataset as plotted earlier is shown in Figure 2.30 as a heat map.",
+          "x": 60.01065,
+          "y": 282.82625,
+          "width": 278.9638500000003,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Figure 2.30",
+          "x": 60.002399999999994,
+          "y": 484.125,
+          "width": 47.978091000000006,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "Heat map",
+          "x": 116.65899999999999,
+          "y": 484.625,
+          "width": 36.95460000000003,
+          "height": 8.5,
+          "fontName": "g_d0_f1",
+          "fontSize": 8.5,
+          "confidence": 1
+        },
+        {
+          "text": "High-latency outliers can be identified as blocks that are high in the heat map, usually of light",
+          "x": 60.002399999999994,
+          "y": 511.375,
+          "width": 361.45807500000024,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "colors as they span few I/O (often a single I/O). Patterns in the bulk of the data begin to emerge,",
+          "x": 60.002399999999994,
+          "y": 522.8755,
+          "width": 365.6903249999998,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "which may be impossible to see with a scatter plot.",
+          "x": 60.002399999999994,
+          "y": 534.376,
+          "width": 194.19840000000005,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "The full range of seconds for this disk I/O trace (not shown earlier) is shown in the Figure 2.31",
+          "x": 60.002399999999994,
+          "y": 551.87425,
+          "width": 359.8485007920003,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "heat map.",
+          "x": 60.002399999999994,
+          "y": 563.37475,
+          "width": 37.97722500000003,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        }
+      ],
+      "boundingBoxes": [
+        {
+          "x1": 30.0024,
+          "y1": 34.27629999999999,
+          "x2": 40.272949999999994,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 60.0008,
+          "y1": 33.77629999999999,
+          "x2": 98.9753,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 98.9753,
+          "y1": 33.77629999999999,
+          "x2": 104.64530000000002,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 104.9153,
+          "y1": 33.77629999999999,
+          "x2": 163.84370000000004,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 68.32399999999996,
+          "x2": 423.99652486799994,
+          "y2": 76.57399999999996
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 79.82449999999994,
+          "x2": 419.5770007755001,
+          "y2": 88.07449999999994
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 91.32500000000005,
+          "x2": 424.08645000000024,
+          "y2": 99.57500000000005
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 102.82550000000003,
+          "x2": 416.03610000000015,
+          "y2": 111.07550000000003
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 114.32600000000002,
+          "x2": 431.6880000000002,
+          "y2": 122.57600000000002
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 125.82650000000001,
+          "x2": 110.75392500000001,
+          "y2": 134.0765
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 154.07399999999996,
+          "x2": 93.94439999999999,
+          "y2": 166.07399999999996
+        },
+        {
+          "x1": 105.94439999999997,
+          "y1": 154.07399999999996,
+          "x2": 161.91479999999999,
+          "y2": 166.07399999999996
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 173.324,
+          "x2": 190.80532500000007,
+          "y2": 181.574
+        },
+        {
+          "x1": 192.75315,
+          "y1": 173.324,
+          "x2": 268.06162500000005,
+          "y2": 181.574
+        },
+        {
+          "x1": 267.84465,
+          "y1": 173.324,
+          "x2": 431.97180000000026,
+          "y2": 181.574
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 184.8245,
+          "x2": 262.24702499999995,
+          "y2": 193.0745
+        },
+        {
+          "x1": 264.2889,
+          "y1": 184.8245,
+          "x2": 290.937225,
+          "y2": 193.0745
+        },
+        {
+          "x1": 290.89515,
+          "y1": 184.8245,
+          "x2": 427.50442500000025,
+          "y2": 193.0745
+        },
+        {
+          "x1": 60.01065,
+          "y1": 196.325,
+          "x2": 413.4464250000004,
+          "y2": 204.575
+        },
+        {
+          "x1": 60.01065,
+          "y1": 207.82549999999998,
+          "x2": 423.32085000000006,
+          "y2": 216.07549999999998
+        },
+        {
+          "x1": 60.01065,
+          "y1": 219.32600000000002,
+          "x2": 425.37345000000033,
+          "y2": 227.57600000000002
+        },
+        {
+          "x1": 60.01065,
+          "y1": 230.8265,
+          "x2": 428.86979999999977,
+          "y2": 239.0765
+        },
+        {
+          "x1": 60.01065,
+          "y1": 242.327,
+          "x2": 426.17039999999974,
+          "y2": 250.577
+        },
+        {
+          "x1": 60.01065,
+          "y1": 253.8275,
+          "x2": 418.96732499999996,
+          "y2": 262.0775
+        },
+        {
+          "x1": 60.01065,
+          "y1": 265.328,
+          "x2": 307.9190250577501,
+          "y2": 273.578
+        },
+        {
+          "x1": 60.01065,
+          "y1": 282.82625,
+          "x2": 338.9745000000003,
+          "y2": 291.07625
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 484.125,
+          "x2": 107.980491,
+          "y2": 493.125
+        },
+        {
+          "x1": 116.65899999999999,
+          "y1": 484.625,
+          "x2": 153.61360000000002,
+          "y2": 493.125
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 511.375,
+          "x2": 421.4604750000002,
+          "y2": 519.625
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 522.8755,
+          "x2": 425.69272499999977,
+          "y2": 531.1255
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 534.376,
+          "x2": 254.20080000000004,
+          "y2": 542.626
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 551.87425,
+          "x2": 419.8509007920003,
+          "y2": 560.12425
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 563.37475,
+          "x2": 97.97962500000003,
+          "y2": 571.62475
+        }
+      ]
+    },
+    {
+      "page": 122,
+      "width": 504.005,
+      "height": 657.005,
+      "text": "    2.10 Visualizations 83\n\n\n\n\n\n\n\n\n\n\nFigure 2.31 Heat map: full range\n\nDespite spanning nine times the range, the visualization is still very readable. A bimodal distri-\nbution can be seen for much of the range, with some I/O returning with near-zero latency (likely\na disk cache hit), and others with a little less than 1 ms (likely a disk cache miss).\n\nThere are other examples of heat maps later in this book, including in Chapter 6, CPUs, Section 6.7,\nVisualizations; Chapter 8, File Systems, Section 8.6.18, Visualizations; and Chapter 9, Disks,\nSection 9.7.3, Latency Heat Maps. My website also has examples of latency, utilization, and\nsubsecond-offset heat maps [Gregg 15b].\n\n\n2.10.4 Timeline Charts\nA timeline chart shows a set of activities as bars on a timeline. These are commonly used for\nfront-end performance analysis (web browsers), where they are also called waterfall charts, and\nshow the timing of network requests. An example from the Firefox web browser is shown in\nFigure 2.32.\n\nIn Figure 2.32, the first network request is highlighted: apart from showing its duration as a hor-\nizontal bar, components of this duration are also shown as colored bars. These are also explained\nin the right panel: the slowest component for the first request is “Waiting,” which is waiting\nfor the HTTP response from the server. Requests two to six begin after the first request begins\nreceiving data, and are likely dependent on that data. If explicit dependency arrows are included\nin the chart, it becomes a type of Gantt chart.\n\nFor back-end performance analysis (servers), similar charts are used to show timelines for\nthreads or CPUs. Example software includes KernelShark [KernelShark 20] and Trace Compass\n[Eclipse 20]. For an example KernelShark screenshot, see Chapter 14, Ftrace, Section 14.11.5,\nKernelShark. Trace Compass also draws arrows showing dependencies, where one thread has\nwoken up another.",
+      "textItems": [
+        {
+          "text": "2.10",
+          "x": 361.5675,
+          "y": 33.77629999999999,
+          "width": 18.679499999999962,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "Visualizations",
+          "x": 389.2434,
+          "y": 33.77629999999999,
+          "width": 54.76499999999987,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "83",
+          "x": 463.548,
+          "y": 34.27629999999999,
+          "width": 10.45414999999997,
+          "height": 8.5,
+          "fontName": "g_d0_f1",
+          "fontSize": 8.5,
+          "confidence": 1
+        },
+        {
+          "text": "Figure 2.31",
+          "x": 72.0024,
+          "y": 244.832,
+          "width": 47.681090999999995,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "Heat map: full range",
+          "x": 128.362,
+          "y": 245.332,
+          "width": 77.66959999999997,
+          "height": 8.5,
+          "fontName": "g_d0_f1",
+          "fontSize": 8.5,
+          "confidence": 1
+        },
+        {
+          "text": "Despite spanning nine times the range, the visualization is still very readable. A bimodal distri-",
+          "x": 72.0024,
+          "y": 272.082,
+          "width": 365.9889741997499,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "bution can be seen for much of the range, with some I/O returning with near-zero latency (likely",
+          "x": 72.0024,
+          "y": 283.5825,
+          "width": 370.91752499999996,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "a disk cache hit), and others with a little less than 1 ms (likely a disk cache miss).",
+          "x": 72.0024,
+          "y": 295.08299999999997,
+          "width": 308.1779250000002,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "There are other examples of heat maps later in this book, including in Chapter 6, CPUs, Section 6.7,",
+          "x": 72.0024,
+          "y": 312.58125,
+          "width": 365.12932500000045,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Visualizations; Chapter 8, File Systems, Section 8.6.18, Visualizations; and Chapter 9, Disks,",
+          "x": 72.0024,
+          "y": 324.08175,
+          "width": 352.1265000000003,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Section 9.7.3, Latency Heat Maps. My website also has examples of latency, utilization, and",
+          "x": 72.0024,
+          "y": 335.58225,
+          "width": 347.56755074250043,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "subsecond-offset heat maps [Gregg 15b].",
+          "x": 72.0024,
+          "y": 347.08275,
+          "width": 154.70812499999988,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "2.10.4",
+          "x": 72.0024,
+          "y": 375.332,
+          "width": 33.725999999999985,
+          "height": 12,
+          "fontName": "g_d0_f2",
+          "fontSize": 12,
+          "confidence": 1
+        },
+        {
+          "text": "Timeline Charts",
+          "x": 117.72839999999997,
+          "y": 375.332,
+          "width": 81.21479999999994,
+          "height": 12,
+          "fontName": "g_d0_f2",
+          "fontSize": 12,
+          "confidence": 1
+        },
+        {
+          "text": "A timeline chart shows a set of activities as bars on a timeline. These are commonly used for",
+          "x": 72.0024,
+          "y": 394.582,
+          "width": 352.59922499999993,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "front-end performance analysis (web browsers), where they are also called",
+          "x": 72.0024,
+          "y": 406.0825,
+          "width": 283.2010505940002,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "waterfall charts",
+          "x": 357.2544,
+          "y": 406.0825,
+          "width": 56.250975000000096,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", and",
+          "x": 413.4534,
+          "y": 406.0825,
+          "width": 19.138350000000003,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "show the timing of network requests. An example from the Firefox web browser is shown in",
+          "x": 72.0024,
+          "y": 417.58299999999997,
+          "width": 351.71317571775023,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Figure 2.32.",
+          "x": 72.0024,
+          "y": 429.08349999999996,
+          "width": 45.764399999999995,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "In Figure 2.32, the first network request is highlighted: apart from showing its duration as a hor-",
+          "x": 72.0024,
+          "y": 446.58175,
+          "width": 369.4646999999999,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "izontal bar, components of this duration are also shown as colored bars. These are also explained",
+          "x": 72.0024,
+          "y": 458.08225,
+          "width": 371.74664999999993,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "in the right panel: the slowest component for the first request is “Waiting,” which is waiting",
+          "x": 72.0024,
+          "y": 469.58275000000003,
+          "width": 353.1429000000005,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "for the HTTP response from the server. Requests two to six begin after the first request begins",
+          "x": 72.0024,
+          "y": 481.08325,
+          "width": 357.67545077549994,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "receiving data, and are likely dependent on that data. If explicit dependency arrows are included",
+          "x": 72.0024,
+          "y": 492.58375,
+          "width": 371.1237749999998,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "in the chart, it becomes a type of Gantt chart.",
+          "x": 72.0024,
+          "y": 504.08425,
+          "width": 175.79512499999993,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "For back-end performance analysis (servers), similar charts are used to show timelines for",
+          "x": 72.0024,
+          "y": 521.5825,
+          "width": 341.8494757342504,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "threads or CPUs. Example software includes KernelShark [KernelShark 20] and Trace Compass",
+          "x": 72.0024,
+          "y": 533.083,
+          "width": 360.9853499999999,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Eclipse 20]. For an example KernelShark screenshot, see Chapter 14, Ftrace, Section 14.11.5,",
+          "x": 72.0024,
+          "y": 544.5835,
+          "width": 352.675125759,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "KernelShark. Trace Compass also draws arrows showing dependencies, where one thread has",
+          "x": 72.0024,
+          "y": 556.084,
+          "width": 355.5279750000002,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "woken up another.",
+          "x": 72.0024,
+          "y": 567.5844999999999,
+          "width": 72.24195,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        }
+      ],
+      "boundingBoxes": [
+        {
+          "x1": 361.5675,
+          "y1": 33.77629999999999,
+          "x2": 380.24699999999996,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 389.2434,
+          "y1": 33.77629999999999,
+          "x2": 444.0083999999999,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 463.548,
+          "y1": 34.27629999999999,
+          "x2": 474.00215,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 72.0024,
+          "y1": 244.832,
+          "x2": 119.68349099999999,
+          "y2": 253.832
+        },
+        {
+          "x1": 128.362,
+          "y1": 245.332,
+          "x2": 206.03159999999997,
+          "y2": 253.832
+        },
+        {
+          "x1": 72.0024,
+          "y1": 272.082,
+          "x2": 437.9913741997499,
+          "y2": 280.332
+        },
+        {
+          "x1": 72.0024,
+          "y1": 283.5825,
+          "x2": 442.9199249999999,
+          "y2": 291.8325
+        },
+        {
+          "x1": 72.0024,
+          "y1": 295.08299999999997,
+          "x2": 380.18032500000015,
+          "y2": 303.33299999999997
+        },
+        {
+          "x1": 72.0024,
+          "y1": 312.58125,
+          "x2": 437.1317250000004,
+          "y2": 320.83125
+        },
+        {
+          "x1": 72.0024,
+          "y1": 324.08175,
+          "x2": 424.12890000000027,
+          "y2": 332.33175
+        },
+        {
+          "x1": 72.0024,
+          "y1": 335.58225,
+          "x2": 419.5699507425004,
+          "y2": 343.83225
+        },
+        {
+          "x1": 72.0024,
+          "y1": 347.08275,
+          "x2": 226.71052499999988,
+          "y2": 355.33275
+        },
+        {
+          "x1": 72.0024,
+          "y1": 375.332,
+          "x2": 105.72839999999998,
+          "y2": 387.332
+        },
+        {
+          "x1": 117.72839999999997,
+          "y1": 375.332,
+          "x2": 198.9431999999999,
+          "y2": 387.332
+        },
+        {
+          "x1": 72.0024,
+          "y1": 394.582,
+          "x2": 424.6016249999999,
+          "y2": 402.832
+        },
+        {
+          "x1": 72.0024,
+          "y1": 406.0825,
+          "x2": 355.2034505940002,
+          "y2": 414.3325
+        },
+        {
+          "x1": 357.2544,
+          "y1": 406.0825,
+          "x2": 413.5053750000001,
+          "y2": 414.3325
+        },
+        {
+          "x1": 413.4534,
+          "y1": 406.0825,
+          "x2": 432.59175,
+          "y2": 414.3325
+        },
+        {
+          "x1": 72.0024,
+          "y1": 417.58299999999997,
+          "x2": 423.7155757177502,
+          "y2": 425.83299999999997
+        },
+        {
+          "x1": 72.0024,
+          "y1": 429.08349999999996,
+          "x2": 117.76679999999999,
+          "y2": 437.33349999999996
+        },
+        {
+          "x1": 72.0024,
+          "y1": 446.58175,
+          "x2": 441.46709999999985,
+          "y2": 454.83175
+        },
+        {
+          "x1": 72.0024,
+          "y1": 458.08225,
+          "x2": 443.7490499999999,
+          "y2": 466.33225
+        },
+        {
+          "x1": 72.0024,
+          "y1": 469.58275000000003,
+          "x2": 425.1453000000005,
+          "y2": 477.83275000000003
+        },
+        {
+          "x1": 72.0024,
+          "y1": 481.08325,
+          "x2": 429.6778507754999,
+          "y2": 489.33325
+        },
+        {
+          "x1": 72.0024,
+          "y1": 492.58375,
+          "x2": 443.12617499999976,
+          "y2": 500.83375
+        },
+        {
+          "x1": 72.0024,
+          "y1": 504.08425,
+          "x2": 247.79752499999992,
+          "y2": 512.33425
+        },
+        {
+          "x1": 72.0024,
+          "y1": 521.5825,
+          "x2": 413.85187573425037,
+          "y2": 529.8325
+        },
+        {
+          "x1": 72.0024,
+          "y1": 533.083,
+          "x2": 432.9877499999999,
+          "y2": 541.333
+        },
+        {
+          "x1": 72.0024,
+          "y1": 544.5835,
+          "x2": 424.677525759,
+          "y2": 552.8335
+        },
+        {
+          "x1": 72.0024,
+          "y1": 556.084,
+          "x2": 427.53037500000016,
+          "y2": 564.334
+        },
+        {
+          "x1": 72.0024,
+          "y1": 567.5844999999999,
+          "x2": 144.24435,
+          "y2": 575.8344999999999
+        }
+      ]
+    },
+    {
+      "page": 123,
+      "width": 504.005,
+      "height": 657.005,
+      "text": "    84 Chapter 2}}Methodologies\n\n\n\n\n\n\n\n\n\n\nFigure 2.32 Firefox timeline chart\n\n2.10.5 Surface Plot\nThis is a representation of three dimensions, rendered as a three-dimensional surface. It works\nbest when the third-dimension value does not frequently change dramatically from one point\nto the next, producing a surface resembling rolling hills. A surface plot is often rendered as a\nwireframe model.\n\nFigure 2.33 shows a wireframe surface plot of per-CPU utilization. It contains 60 seconds of\nper-second values from many servers (this is cropped from an image that spanned a data center\nof over 300 physical servers and 5,312 CPUs) [Gregg 11b].\n\nEach server is represented by plotting its 16 CPUs as rows on the surface, the 60 per-second uti-\nlization measurements as columns, and then setting the height of the surface to the utilization\nvalue. Color is also set to reflect the utilization value. Both hue and saturation could be used, if\ndesired, to add fourth and fifth dimensions of data to the visualization. (With sufficient resolu-\ntion, a pattern could be used to indicate a sixth dimension.)\n\nThese 16 × 60 server rectangles are then mapped across the surface as a checkerboard. Even\nwithout markings, some server rectangles can be clearly seen in the image. One that appears as\nan elevated plateau on the right shows that its CPUs are almost always at 100%.\n\nThe use of grid lines highlights subtle changes in elevation. Some faint lines are visible, which\nindicate a single CPU constantly running at low utilization (a few percent).",
+      "textItems": [
+        {
+          "text": "84",
+          "x": 30.0024,
+          "y": 34.27629999999999,
+          "width": 10.437999999999995,
+          "height": 8.5,
+          "fontName": "g_d0_f1",
+          "fontSize": 8.5,
+          "confidence": 1
+        },
+        {
+          "text": "Chapter 2",
+          "x": 60.00620000000001,
+          "y": 33.77629999999999,
+          "width": 38.974500000000006,
+          "height": 9,
+          "fontName": "g_d0_f2",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "}}",
+          "x": 98.9807,
+          "y": 33.77629999999999,
+          "width": 5.670000000000016,
+          "height": 9,
+          "fontName": "g_d0_f3",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "Methodologies",
+          "x": 104.92070000000001,
+          "y": 33.77629999999999,
+          "width": 58.92840000000004,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "Figure 2.32",
+          "x": 60.002399999999994,
+          "y": 293.016,
+          "width": 47.843991,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "Firefox timeline chart",
+          "x": 116.525,
+          "y": 293.516,
+          "width": 80.07255000000009,
+          "height": 8.5,
+          "fontName": "g_d0_f1",
+          "fontSize": 8.5,
+          "confidence": 1
+        },
+        {
+          "text": "2.10.5",
+          "x": 60.002399999999994,
+          "y": 316.016,
+          "width": 33.88080000000001,
+          "height": 12,
+          "fontName": "g_d0_f2",
+          "fontSize": 12,
+          "confidence": 1
+        },
+        {
+          "text": "Surface Plot",
+          "x": 105.88319999999999,
+          "y": 316.016,
+          "width": 63.61200000000008,
+          "height": 12,
+          "fontName": "g_d0_f2",
+          "fontSize": 12,
+          "confidence": 1
+        },
+        {
+          "text": "This is a representation of three dimensions, rendered as a three-dimensional surface. It works",
+          "x": 60.002399999999994,
+          "y": 335.266,
+          "width": 361.68494999999973,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "best when the third-dimension value does not frequently change dramatically from one point",
+          "x": 60.002399999999994,
+          "y": 346.7665,
+          "width": 361.8664500000003,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "to the next, producing a surface resembling rolling hills. A surface plot is often rendered as a",
+          "x": 60.002399999999994,
+          "y": 358.267,
+          "width": 354.26407500000005,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "wireframe model",
+          "x": 60.002399999999994,
+          "y": 369.7675,
+          "width": 60.06495000000001,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ".",
+          "x": 120.0129,
+          "y": 369.7675,
+          "width": 2.367750000000001,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Figure 2.33 shows a wireframe surface plot of per-CPU utilization. It contains 60 seconds of",
+          "x": 60.002399999999994,
+          "y": 387.26574999999997,
+          "width": 350.09782499999994,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "per-second values from many servers (this is cropped from an image that spanned a data center",
+          "x": 60.002399999999994,
+          "y": 398.76625,
+          "width": 364.9965000000001,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "of over 300 physical servers and 5,312 CPUs) [Gregg 11b].",
+          "x": 60.002399999999994,
+          "y": 410.26675,
+          "width": 219.00284999999994,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Each server is represented by plotting its 16 CPUs as rows on the surface, the 60 per-second uti-",
+          "x": 60.002399999999994,
+          "y": 427.765,
+          "width": 363.00247500000023,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "lization measurements as columns, and then setting the height of the surface to the utilization",
+          "x": 60.002399999999994,
+          "y": 439.2655,
+          "width": 364.4082634499998,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "value. Color is also set to reflect the utilization value. Both hue and saturation could be used, if",
+          "x": 60.002399999999994,
+          "y": 450.76599999999996,
+          "width": 364.14179918324953,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "desired, to add fourth and fifth dimensions of data to the visualization. (With sufficient resolu-",
+          "x": 60.002399999999994,
+          "y": 462.2665,
+          "width": 366.2546258002501,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "tion, a pattern could be used to indicate a sixth dimension.)",
+          "x": 60.002399999999994,
+          "y": 473.767,
+          "width": 229.1569500000002,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "These 16",
+          "x": 60.002399999999994,
+          "y": 491.26525000000004,
+          "width": 33.41745000000002,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "×",
+          "x": 95.41635,
+          "y": 491.26525000000004,
+          "width": 4.529250000000005,
+          "height": 8.25,
+          "fontName": "g_d0_f6",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "60 server rectangles are then mapped across the surface as a checkerboard. Even",
+          "x": 101.94210000000001,
+          "y": 491.26525000000004,
+          "width": 306.41985000000045,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "without markings, some server rectangles can be clearly seen in the image. One that appears as",
+          "x": 60.002399999999994,
+          "y": 502.76575,
+          "width": 364.0832250000002,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "an elevated plateau on the right shows that its CPUs are almost always at 100%.",
+          "x": 60.002399999999994,
+          "y": 514.26625,
+          "width": 304.4134506435,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "The use of grid lines highlights subtle changes in elevation. Some faint lines are visible, which",
+          "x": 60.002399999999994,
+          "y": 531.7645,
+          "width": 361.23532500000033,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "indicate a single CPU constantly running at low utilization (a few percent).",
+          "x": 60.002399999999994,
+          "y": 543.265,
+          "width": 287.46217438124995,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        }
+      ],
+      "boundingBoxes": [
+        {
+          "x1": 30.0024,
+          "y1": 34.27629999999999,
+          "x2": 40.4404,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 60.00620000000001,
+          "y1": 33.77629999999999,
+          "x2": 98.98070000000001,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 98.9807,
+          "y1": 33.77629999999999,
+          "x2": 104.65070000000001,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 104.92070000000001,
+          "y1": 33.77629999999999,
+          "x2": 163.84910000000005,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 293.016,
+          "x2": 107.846391,
+          "y2": 302.016
+        },
+        {
+          "x1": 116.525,
+          "y1": 293.516,
+          "x2": 196.5975500000001,
+          "y2": 302.016
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 316.016,
+          "x2": 93.8832,
+          "y2": 328.016
+        },
+        {
+          "x1": 105.88319999999999,
+          "y1": 316.016,
+          "x2": 169.49520000000007,
+          "y2": 328.016
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 335.266,
+          "x2": 421.6873499999997,
+          "y2": 343.516
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 346.7665,
+          "x2": 421.8688500000003,
+          "y2": 355.0165
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 358.267,
+          "x2": 414.266475,
+          "y2": 366.517
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 369.7675,
+          "x2": 120.06735,
+          "y2": 378.0175
+        },
+        {
+          "x1": 120.0129,
+          "y1": 369.7675,
+          "x2": 122.38065,
+          "y2": 378.0175
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 387.26574999999997,
+          "x2": 410.1002249999999,
+          "y2": 395.51574999999997
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 398.76625,
+          "x2": 424.99890000000005,
+          "y2": 407.01625
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 410.26675,
+          "x2": 279.00524999999993,
+          "y2": 418.51675
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 427.765,
+          "x2": 423.0048750000002,
+          "y2": 436.015
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 439.2655,
+          "x2": 424.4106634499998,
+          "y2": 447.5155
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 450.76599999999996,
+          "x2": 424.1441991832495,
+          "y2": 459.01599999999996
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 462.2665,
+          "x2": 426.25702580025006,
+          "y2": 470.5165
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 473.767,
+          "x2": 289.1593500000002,
+          "y2": 482.017
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 491.26525000000004,
+          "x2": 93.41985000000001,
+          "y2": 499.51525000000004
+        },
+        {
+          "x1": 95.41635,
+          "y1": 491.26525000000004,
+          "x2": 99.9456,
+          "y2": 499.51525000000004
+        },
+        {
+          "x1": 101.94210000000001,
+          "y1": 491.26525000000004,
+          "x2": 408.36195000000043,
+          "y2": 499.51525000000004
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 502.76575,
+          "x2": 424.08562500000016,
+          "y2": 511.01575
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 514.26625,
+          "x2": 364.4158506435,
+          "y2": 522.51625
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 531.7645,
+          "x2": 421.2377250000003,
+          "y2": 540.0145
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 543.265,
+          "x2": 347.4645743812499,
+          "y2": 551.515
+        }
+      ]
+    },
+    {
+      "page": 124,
+      "width": 504.005,
+      "height": 657.005,
+      "text": "    2.11 Exercises 85\n\n\n\n\n\n\n\n\n\n\nFigure 2.33 Wireframe surface plot: data center CPU utilization\n\n2.10.6 Visualization Tools\nUnix performance analysis has historically focused on the use of text-based tools, due in part\nto limited graphical support. Such tools can be executed quickly over a login session and report\ndata in real time. Visualizations have been more time-consuming to access and often require a\ntrace-and-report cycle. When working urgent performance issues, the speed at which you can\naccess metrics can be critical.\n\nModern visualization tools provide real-time views of system performance, accessible from the\nbrowser and mobile devices. There are numerous products that do this, including many that\ncan monitor your entire cloud. Chapter 1, Introduction, Section 1.7.1, Counters, Statistics, and\nMetrics, includes an example screenshot from one such product, Grafana, and other monitoring\nproducts are discussed in Chapter 4, Observability Tools, Section 4.2.4, Monitoring.\n\n\n    2.11   Exercises\n\n    1.  Answer the following questions about key performance terminology:\n\n        ■  What are IOPS?\n\n        ■  What is utilization?\n\n        ■  What is saturation?\n\n        ■  What is latency?\n\n        ■  What is micro-benchmarking?",
+      "textItems": [
+        {
+          "text": "2.11",
+          "x": 377.9934,
+          "y": 33.77629999999999,
+          "width": 18.81989999999996,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "Exercises",
+          "x": 405.8141999999999,
+          "y": 33.77629999999999,
+          "width": 38.181599999999946,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "85",
+          "x": 463.621,
+          "y": 34.27629999999999,
+          "width": 10.381899999999973,
+          "height": 8.5,
+          "fontName": "g_d0_f1",
+          "fontSize": 8.5,
+          "confidence": 1
+        },
+        {
+          "text": "Figure 2.33",
+          "x": 72.0024,
+          "y": 269.253,
+          "width": 48.040190999999965,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "Wireframe surface plot: data center CPU utilization",
+          "x": 128.721,
+          "y": 269.753,
+          "width": 193.66060000000004,
+          "height": 8.5,
+          "fontName": "g_d0_f1",
+          "fontSize": 8.5,
+          "confidence": 1
+        },
+        {
+          "text": "2.10.6",
+          "x": 72.0024,
+          "y": 292.253,
+          "width": 33.632400059999995,
+          "height": 12,
+          "fontName": "g_d0_f2",
+          "fontSize": 12,
+          "confidence": 1
+        },
+        {
+          "text": "Visualization Tools",
+          "x": 117.63480008399995,
+          "y": 292.253,
+          "width": 94.65600021600002,
+          "height": 12,
+          "fontName": "g_d0_f2",
+          "fontSize": 12,
+          "confidence": 1
+        },
+        {
+          "text": "Unix performance analysis has historically focused on the use of text-based tools, due in part",
+          "x": 72.0024,
+          "y": 311.503,
+          "width": 357.69195076725043,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "to limited graphical support. Such tools can be executed quickly over a login session and report",
+          "x": 72.0024,
+          "y": 323.0035,
+          "width": 365.6985750000001,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "data in real time. Visualizations have been more time-consuming to access and often require a",
+          "x": 72.0024,
+          "y": 334.504,
+          "width": 362.6089500000003,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "trace-and-report cycle. When working urgent performance issues, the speed at which you can",
+          "x": 72.0024,
+          "y": 346.0045,
+          "width": 359.25532573425016,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "access metrics can be critical.",
+          "x": 72.0024,
+          "y": 357.505,
+          "width": 112.22475,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Modern visualization tools provide real-time views of system performance, accessible from the",
+          "x": 72.0024,
+          "y": 375.00325,
+          "width": 363.53130000000067,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "browser and mobile devices. There are numerous products that do this, including many that",
+          "x": 72.0024,
+          "y": 386.50374999999997,
+          "width": 354.572614275,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "can monitor your entire cloud. Chapter 1, Introduction, Section 1.7.1, Counters, Statistics, and",
+          "x": 72.0024,
+          "y": 398.00425,
+          "width": 362.5149,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Metrics, includes an example screenshot from one such product, Grafana, and other monitoring",
+          "x": 72.0024,
+          "y": 409.50475,
+          "width": 369.9143257507502,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "products are discussed in Chapter 4, Observability Tools, Section 4.2.4, Monitoring.",
+          "x": 72.0024,
+          "y": 421.00525,
+          "width": 321.91335000000004,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "2.11",
+          "x": 72.0024,
+          "y": 452.253,
+          "width": 30.247500000000002,
+          "height": 15,
+          "fontName": "g_d0_f2",
+          "fontSize": 15,
+          "confidence": 1
+        },
+        {
+          "text": "Exercises",
+          "x": 117.2499,
+          "y": 452.253,
+          "width": 59.960999999999984,
+          "height": 15,
+          "fontName": "g_d0_f2",
+          "fontSize": 15,
+          "confidence": 1
+        },
+        {
+          "text": "1.",
+          "x": 72.0024,
+          "y": 476.503,
+          "width": 6.904425000000003,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Answer the following questions about key performance terminology:",
+          "x": 84.0012,
+          "y": 476.503,
+          "width": 265.65825000000007,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "■",
+          "x": 84.502,
+          "y": 496.253,
+          "width": 3.043999999999997,
+          "height": 4,
+          "fontName": "g_d0_f8",
+          "fontSize": 4,
+          "confidence": 1
+        },
+        {
+          "text": "What are IOPS?",
+          "x": 93.502,
+          "y": 493.003,
+          "width": 59.86612499999997,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "■",
+          "x": 84.502,
+          "y": 512.7529999999999,
+          "width": 3.043999999999997,
+          "height": 4,
+          "fontName": "g_d0_f8",
+          "fontSize": 4,
+          "confidence": 1
+        },
+        {
+          "text": "What is utilization?",
+          "x": 93.502,
+          "y": 509.50299999999993,
+          "width": 75.99982499999994,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "■",
+          "x": 84.502,
+          "y": 529.2529999999999,
+          "width": 3.043999999999997,
+          "height": 4,
+          "fontName": "g_d0_f8",
+          "fontSize": 4,
+          "confidence": 1
+        },
+        {
+          "text": "What is saturation?",
+          "x": 93.502,
+          "y": 526.0029999999999,
+          "width": 74.922375,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "■",
+          "x": 84.502,
+          "y": 545.7529999999999,
+          "width": 3.043999999999997,
+          "height": 4,
+          "fontName": "g_d0_f8",
+          "fontSize": 4,
+          "confidence": 1
+        },
+        {
+          "text": "What is latency?",
+          "x": 93.502,
+          "y": 542.5029999999999,
+          "width": 63.05226262500004,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "■",
+          "x": 84.502,
+          "y": 562.253,
+          "width": 3.043999999999997,
+          "height": 4,
+          "fontName": "g_d0_f8",
+          "fontSize": 4,
+          "confidence": 1
+        },
+        {
+          "text": "What is micro-benchmarking?",
+          "x": 93.502,
+          "y": 559.003,
+          "width": 118.43369999999997,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        }
+      ],
+      "boundingBoxes": [
+        {
+          "x1": 377.9934,
+          "y1": 33.77629999999999,
+          "x2": 396.81329999999997,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 405.8141999999999,
+          "y1": 33.77629999999999,
+          "x2": 443.99579999999986,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 463.621,
+          "y1": 34.27629999999999,
+          "x2": 474.00289999999995,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 72.0024,
+          "y1": 269.253,
+          "x2": 120.04259099999996,
+          "y2": 278.253
+        },
+        {
+          "x1": 128.721,
+          "y1": 269.753,
+          "x2": 322.38160000000005,
+          "y2": 278.253
+        },
+        {
+          "x1": 72.0024,
+          "y1": 292.253,
+          "x2": 105.63480005999999,
+          "y2": 304.253
+        },
+        {
+          "x1": 117.63480008399995,
+          "y1": 292.253,
+          "x2": 212.29080029999997,
+          "y2": 304.253
+        },
+        {
+          "x1": 72.0024,
+          "y1": 311.503,
+          "x2": 429.6943507672504,
+          "y2": 319.753
+        },
+        {
+          "x1": 72.0024,
+          "y1": 323.0035,
+          "x2": 437.7009750000001,
+          "y2": 331.2535
+        },
+        {
+          "x1": 72.0024,
+          "y1": 334.504,
+          "x2": 434.61135000000024,
+          "y2": 342.754
+        },
+        {
+          "x1": 72.0024,
+          "y1": 346.0045,
+          "x2": 431.25772573425013,
+          "y2": 354.2545
+        },
+        {
+          "x1": 72.0024,
+          "y1": 357.505,
+          "x2": 184.22715,
+          "y2": 365.755
+        },
+        {
+          "x1": 72.0024,
+          "y1": 375.00325,
+          "x2": 435.53370000000064,
+          "y2": 383.25325
+        },
+        {
+          "x1": 72.0024,
+          "y1": 386.50374999999997,
+          "x2": 426.57501427499994,
+          "y2": 394.75374999999997
+        },
+        {
+          "x1": 72.0024,
+          "y1": 398.00425,
+          "x2": 434.5173,
+          "y2": 406.25425
+        },
+        {
+          "x1": 72.0024,
+          "y1": 409.50475,
+          "x2": 441.9167257507502,
+          "y2": 417.75475
+        },
+        {
+          "x1": 72.0024,
+          "y1": 421.00525,
+          "x2": 393.91575,
+          "y2": 429.25525
+        },
+        {
+          "x1": 72.0024,
+          "y1": 452.253,
+          "x2": 102.2499,
+          "y2": 467.253
+        },
+        {
+          "x1": 117.2499,
+          "y1": 452.253,
+          "x2": 177.21089999999998,
+          "y2": 467.253
+        },
+        {
+          "x1": 72.0024,
+          "y1": 476.503,
+          "x2": 78.906825,
+          "y2": 484.753
+        },
+        {
+          "x1": 84.0012,
+          "y1": 476.503,
+          "x2": 349.65945000000005,
+          "y2": 484.753
+        },
+        {
+          "x1": 84.502,
+          "y1": 496.253,
+          "x2": 87.54599999999999,
+          "y2": 500.253
+        },
+        {
+          "x1": 93.502,
+          "y1": 493.003,
+          "x2": 153.36812499999996,
+          "y2": 501.253
+        },
+        {
+          "x1": 84.502,
+          "y1": 512.7529999999999,
+          "x2": 87.54599999999999,
+          "y2": 516.7529999999999
+        },
+        {
+          "x1": 93.502,
+          "y1": 509.50299999999993,
+          "x2": 169.50182499999994,
+          "y2": 517.7529999999999
+        },
+        {
+          "x1": 84.502,
+          "y1": 529.2529999999999,
+          "x2": 87.54599999999999,
+          "y2": 533.2529999999999
+        },
+        {
+          "x1": 93.502,
+          "y1": 526.0029999999999,
+          "x2": 168.424375,
+          "y2": 534.2529999999999
+        },
+        {
+          "x1": 84.502,
+          "y1": 545.7529999999999,
+          "x2": 87.54599999999999,
+          "y2": 549.7529999999999
+        },
+        {
+          "x1": 93.502,
+          "y1": 542.5029999999999,
+          "x2": 156.55426262500004,
+          "y2": 550.7529999999999
+        },
+        {
+          "x1": 84.502,
+          "y1": 562.253,
+          "x2": 87.54599999999999,
+          "y2": 566.253
+        },
+        {
+          "x1": 93.502,
+          "y1": 559.003,
+          "x2": 211.93569999999997,
+          "y2": 567.253
+        }
+      ]
+    },
+    {
+      "page": 125,
+      "width": 504.005,
+      "height": 657.005,
+      "text": "    86 Chapter 2}}Methodologies\n\n\n2. Choose five methodologies to use for your (or a hypothetical) environment. Select the order\n   in which they can be conducted, and explain the reason for choosing each.\n\n3. Summarize problems when using average latency as a sole performance metric. Can these\n   problems be solved by including the 99th percentile?\n\n\n2.12 References\n\n   [Amdahl 67] Amdahl, G., “Validity of the Single Processor Approach to Achieving Large\n   Scale Computing Capabilities,” AFIPS, 1967.\n\n   [Jain 91] Jain, R., The Art of Computer Systems Performance Analysis: Techniques for Experimental\n   Design, Measurement, Simulation and Modeling, Wiley, 1991.\n\n   [Cockcroft 95] Cockcroft, A., Sun Performance and Tuning, Prentice Hall, 1995.\n\n   [Gunther 97] Gunther, N., The Practical Performance Analyst, McGraw-Hill, 1997.\n\n   [Wong 97] Wong, B., Configuration and Capacity Planning for Solaris Servers, Prentice Hall, 1997.\n\n   [Elling 00] Elling, R., “Static Performance Tuning,” Sun Blueprints, 2000.\n\n   [Millsap 03] Millsap, C., and J. Holt., Optimizing Oracle Performance, O’Reilly, 2003.\n\n   [McDougall 06a] McDougall, R., Mauro, J., and Gregg, B., Solaris Performance and Tools:\n   DTrace and MDB Techniques for Solaris 10 and OpenSolaris, Prentice Hall, 2006.\n\n   [Gunther 07] Gunther, N., Guerrilla Capacity Planning, Springer, 2007.\n\n   [Allspaw 08] Allspaw, J., The Art of Capacity Planning, O’Reilly, 2008.\n\n   [Gregg 10a] Gregg, B., “Visualizing System Latency,” Communications of the ACM, July 2010.\n\n   [Gregg 10b] Gregg, B., “Visualizations for Performance Analysis (and More),” USENIX LISA,\n   https://www.usenix.org/legacy/events/lisa10/tech/#gregg, 2010.\n\n   [Gregg 11b] Gregg, B., “Utilization Heat Maps,” http://www.brendangregg.com/HeatMaps/\n   utilization.html, published 2011.\n\n   [Williams 11] Williams, C., “The $300m Cable That Will Save Traders Milliseconds,” The\n   Telegraph, https://www.telegraph.co.uk/technology/news/8753784/The-300m-cable-that-will-\n   save-traders-milliseconds.html, 2011.\n\n   [Gregg 13b] Gregg, B., “Thinking Methodically about Performance,” Communications of the\n   ACM, February 2013.\n\n   [Gregg 14a] Gregg, B., “Performance Scalability Models,” https://github.com/brendangregg/\n   PerfModels, 2014.\n\n   [Harrington 14] Harrington, B., and Rapoport, R., “Introducing Atlas: Netflix’s Primary\n   Telemetry Platform,” Netflix Technology Blog, https://medium.com/netflix-techblog/\n   introducing-atlas-netflixs-primary-telemetry-platform-bd31f4d8ed9a, 2014.\n\n   [Gregg 15b] Gregg, B., “Heatmaps,” http://www.brendangregg.com/heatmaps.html, 2015.",
+      "textItems": [
+        {
+          "text": "86",
+          "x": 30.0024,
+          "y": 34.27629999999999,
+          "width": 10.373400000000004,
+          "height": 8.5,
+          "fontName": "g_d0_f1",
+          "fontSize": 8.5,
+          "confidence": 1
+        },
+        {
+          "text": "Chapter 2",
+          "x": 60.004599999999996,
+          "y": 33.77629999999999,
+          "width": 38.974500000000006,
+          "height": 9,
+          "fontName": "g_d0_f2",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "}}",
+          "x": 98.9791,
+          "y": 33.77629999999999,
+          "width": 5.670000000000016,
+          "height": 9,
+          "fontName": "g_d0_f3",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "Methodologies",
+          "x": 104.91909999999999,
+          "y": 33.77629999999999,
+          "width": 58.92840000000004,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "2. Choose five methodologies to use for your (or a hypothetical) environment. Select the order",
+          "x": 60.002399999999994,
+          "y": 68.32399999999996,
+          "width": 364.88265000000047,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "in which they can be conducted, and explain the reason for choosing each.",
+          "x": 71.9979,
+          "y": 79.82449999999994,
+          "width": 288.93645059399995,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "3. Summarize problems when using average latency as a sole performance metric. Can these",
+          "x": 60.002399999999994,
+          "y": 96.32449999999994,
+          "width": 355.91325071775,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "problems be solved by including the 99th percentile?",
+          "x": 71.9979,
+          "y": 107.82500000000005,
+          "width": 204.2023505775001,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "2.12",
+          "x": 60.002399999999994,
+          "y": 138.07399999999996,
+          "width": 30.401999999999987,
+          "height": 15,
+          "fontName": "g_d0_f2",
+          "fontSize": 15,
+          "confidence": 1
+        },
+        {
+          "text": "References",
+          "x": 105.40440000000001,
+          "y": 138.07399999999996,
+          "width": 72.28499999999997,
+          "height": 15,
+          "fontName": "g_d0_f2",
+          "fontSize": 15,
+          "confidence": 1
+        },
+        {
+          "text": "[Amdahl 67]",
+          "x": 72.0024,
+          "y": 162.32399999999996,
+          "width": 50.98995082500002,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Amdahl, G., “Validity of the Single Processor Approach to Achieving Large",
+          "x": 127.12065000000001,
+          "y": 162.32399999999996,
+          "width": 286.31295000000017,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Scale Computing Capabilities,”",
+          "x": 72.0024,
+          "y": 173.8245,
+          "width": 120.11092500000004,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "AFIPS",
+          "x": 194.10983,
+          "y": 173.8245,
+          "width": 22.092675000000014,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", 1967.",
+          "x": 216.2949,
+          "y": 173.8245,
+          "width": 24.367199999999997,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Jain 91]",
+          "x": 72.0024,
+          "y": 190.3245,
+          "width": 34.55924999999999,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Jain, R.,",
+          "x": 110.68664999999999,
+          "y": 190.3245,
+          "width": 29.70577499999996,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "The Art of Computer Systems Performance Analysis: Techniques for Experimental",
+          "x": 142.35015,
+          "y": 190.3245,
+          "width": 289.69050000000016,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Design, Measurement, Simulation and Modeling",
+          "x": 72.0024,
+          "y": 201.825,
+          "width": 172.78717500000002,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", Wiley, 1991.",
+          "x": 244.58415000000002,
+          "y": 201.825,
+          "width": 51.64005000000003,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Cockcroft 95]",
+          "x": 72.0024,
+          "y": 218.325,
+          "width": 58.44135000000003,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Cockcroft, A.,",
+          "x": 134.5704,
+          "y": 218.325,
+          "width": 53.230650000000026,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Sun Performance and Tuning",
+          "x": 189.7959,
+          "y": 218.325,
+          "width": 103.60185020624996,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", Prentice Hall, 1995.",
+          "x": 293.17665,
+          "y": 218.325,
+          "width": 79.75770000000006,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Gunther 97]",
+          "x": 72.0024,
+          "y": 234.825,
+          "width": 52.812374999999975,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Gunther, N.,",
+          "x": 128.93565,
+          "y": 234.825,
+          "width": 48.458849999999984,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "The Practical Performance Analyst",
+          "x": 179.4174,
+          "y": 234.825,
+          "width": 124.15177499999993,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", McGraw-Hill, 1997.",
+          "x": 303.6294,
+          "y": 234.825,
+          "width": 79.09110000000004,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Wong 97]",
+          "x": 72.0024,
+          "y": 251.325,
+          "width": 41.864625000000004,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Wong, B.,",
+          "x": 117.82289999999998,
+          "y": 251.325,
+          "width": 36.658049999999974,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Configuration and Capacity Planning for Solaris Servers",
+          "x": 156.30915,
+          "y": 251.325,
+          "width": 195.62070445500018,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", Prentice Hall, 1997.",
+          "x": 351.78465,
+          "y": 251.325,
+          "width": 77.17050000000012,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Elling 00]",
+          "x": 71.99415,
+          "y": 267.825,
+          "width": 43.173075000000026,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Elling, R., “Static Performance Tuning,”",
+          "x": 119.29140000000001,
+          "y": 267.825,
+          "width": 152.16877499999993,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Sun Blueprints",
+          "x": 273.44265,
+          "y": 267.825,
+          "width": 52.39822500000014,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", 2000.",
+          "x": 325.8054,
+          "y": 267.825,
+          "width": 26.72505000000001,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Millsap 03]",
+          "x": 71.99415,
+          "y": 284.325,
+          "width": 48.82597491749995,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Millsap, C., and J. Holt.,",
+          "x": 124.95089999999999,
+          "y": 284.325,
+          "width": 91.61707499999991,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Optimizing Oracle Performance",
+          "x": 218.5554,
+          "y": 284.325,
+          "width": 112.39552500000022,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", O’Reilly, 2003.",
+          "x": 330.97815,
+          "y": 284.325,
+          "width": 61.316475000000025,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[McDougall 06a]",
+          "x": 71.99415,
+          "y": 300.825,
+          "width": 67.954425,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "McDougall, R., Mauro, J., and Gregg, B.,",
+          "x": 144.07440000825,
+          "y": 300.825,
+          "width": 152.15557532175006,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Solaris Performance and Tools:",
+          "x": 298.2339,
+          "y": 300.825,
+          "width": 110.24640000000005,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "DTrace and MDB Techniques for Solaris 10 and OpenSolaris",
+          "x": 71.99415,
+          "y": 312.3255,
+          "width": 214.50330000000008,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", Prentice Hall, 2006.",
+          "x": 286.4529,
+          "y": 312.3255,
+          "width": 80.93332500000002,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Gunther 07]",
+          "x": 71.99415,
+          "y": 328.8255,
+          "width": 52.83547499999999,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Gunther, N.,",
+          "x": 128.95215,
+          "y": 328.8255,
+          "width": 48.45885000000001,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Guerrilla Capacity Planning",
+          "x": 179.4339,
+          "y": 328.8255,
+          "width": 101.1573747855,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", Springer, 2007.",
+          "x": 280.3644,
+          "y": 328.8255,
+          "width": 61.95502500000009,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Allspaw 08]",
+          "x": 71.99415,
+          "y": 345.3255,
+          "width": 50.61539999999998,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Allspaw, J.,",
+          "x": 126.7329,
+          "y": 345.3255,
+          "width": 41.84812499999998,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "The Art of Capacity Planning",
+          "x": 170.5734,
+          "y": 345.3255,
+          "width": 105.02002477724994,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", O’Reilly, 2008.",
+          "x": 275.3649,
+          "y": 345.3255,
+          "width": 61.59202499999998,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Gregg 10a]",
+          "x": 71.9859,
+          "y": 361.8255,
+          "width": 46.35014999999997,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Gregg, B., “Visualizing System Latency,”",
+          "x": 122.45939999999999,
+          "y": 361.8255,
+          "width": 154.24035,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Communications of the ACM",
+          "x": 278.6979,
+          "y": 361.8255,
+          "width": 104.7956250000002,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", July 2010.",
+          "x": 383.4399,
+          "y": 361.8255,
+          "width": 42.63435009075005,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Gregg 10b]",
+          "x": 71.99415,
+          "y": 378.3255,
+          "width": 46.96394999999997,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Gregg, B., “Visualizations for Performance Analysis (and More),”",
+          "x": 123.0864,
+          "y": 378.3255,
+          "width": 246.60405000000029,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "USENIX LISA",
+          "x": 371.6589,
+          "y": 378.3255,
+          "width": 49.66500000000002,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ",",
+          "x": 421.2744,
+          "y": 378.3255,
+          "width": 2.367750000000001,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "https://www.usenix.org/legacy/events/lisa10/tech/#gregg, 2010.",
+          "x": 71.9859,
+          "y": 389.826,
+          "width": 246.30375000000004,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Gregg 11b]",
+          "x": 71.9859,
+          "y": 406.326,
+          "width": 46.42522499999998,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Gregg, B., “Utilization Heat Maps,” http://www.brendangregg.com/HeatMaps/",
+          "x": 122.53365000824999,
+          "y": 406.326,
+          "width": 301.22730004125,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "utilization.html, published 2011.",
+          "x": 71.9859,
+          "y": 417.8265,
+          "width": 127.58954999999993,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Williams 11]",
+          "x": 71.9859,
+          "y": 434.3265,
+          "width": 55.13392499999999,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Williams, C., “The $300m Cable That Will Save Traders Milliseconds,”",
+          "x": 131.24565000825,
+          "y": 434.3265,
+          "width": 270.26010007424964,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "The",
+          "x": 403.50225,
+          "y": 434.3265,
+          "width": 14.001075000000071,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Telegraph",
+          "x": 71.9859,
+          "y": 445.827,
+          "width": 34.54605000000001,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", https://www.telegraph.co.uk/technology/news/8753784/The-300m-cable-that-will-",
+          "x": 106.56989999999999,
+          "y": 445.827,
+          "width": 325.42702499999996,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "save-traders-milliseconds.html, 2011.",
+          "x": 71.9859,
+          "y": 457.3275,
+          "width": 144.65467500000005,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Gregg 13b]",
+          "x": 71.9859,
+          "y": 473.8275,
+          "width": 46.848449999999985,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Gregg, B., “Thinking Methodically about Performance,”",
+          "x": 122.95439999999999,
+          "y": 473.8275,
+          "width": 215.2738499999999,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Communications of the",
+          "x": 340.2099,
+          "y": 473.8275,
+          "width": 84.25725000000017,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "ACM",
+          "x": 71.97765,
+          "y": 485.328,
+          "width": 18.53032499999999,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", February 2013.",
+          "x": 90.4659,
+          "y": 485.328,
+          "width": 61.946774999999974,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Gregg 14a]",
+          "x": 71.97765,
+          "y": 501.828,
+          "width": 46.02015,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Gregg, B., “Performance Scalability Models,” https://github.com/brendangregg/",
+          "x": 122.121149175,
+          "y": 501.828,
+          "width": 306.36286229999996,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "PerfModels, 2014.",
+          "x": 71.97765,
+          "y": 513.3285,
+          "width": 69.15067499999999,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Harrington 14]",
+          "x": 71.97765,
+          "y": 529.8285,
+          "width": 64.995975,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Harrington, B., and Rapoport, R., “Introducing Atlas: Netflix’s Primary",
+          "x": 141.09615,
+          "y": 529.8285,
+          "width": 272.4034499999999,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Telemetry Platform,”",
+          "x": 71.97765,
+          "y": 541.329,
+          "width": 80.2964250000001,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Netflix Technology Blog",
+          "x": 154.27058,
+          "y": 541.329,
+          "width": 85.34625000000003,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", https://medium.com/netflix-techblog/",
+          "x": 239.40314999999998,
+          "y": 541.329,
+          "width": 153.41700030524999,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "introducing-atlas-netflixs-primary-telemetry-platform-bd31f4d8ed9a, 2014.",
+          "x": 71.97765,
+          "y": 552.8295,
+          "width": 293.49457499174997,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Gregg 15b]",
+          "x": 71.97765,
+          "y": 569.3295,
+          "width": 46.87402499999999,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Gregg, B., “Heatmaps,” http://www.brendangregg.com/heatmaps.html, 2015.",
+          "x": 122.979149175,
+          "y": 569.3295,
+          "width": 297.76559669999983,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        }
+      ],
+      "boundingBoxes": [
+        {
+          "x1": 30.0024,
+          "y1": 34.27629999999999,
+          "x2": 40.375800000000005,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 60.004599999999996,
+          "y1": 33.77629999999999,
+          "x2": 98.9791,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 98.9791,
+          "y1": 33.77629999999999,
+          "x2": 104.64910000000002,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 104.91909999999999,
+          "y1": 33.77629999999999,
+          "x2": 163.84750000000003,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 68.32399999999996,
+          "x2": 424.88505000000043,
+          "y2": 76.57399999999996
+        },
+        {
+          "x1": 71.9979,
+          "y1": 79.82449999999994,
+          "x2": 360.93435059399997,
+          "y2": 88.07449999999994
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 96.32449999999994,
+          "x2": 415.91565071774994,
+          "y2": 104.57449999999994
+        },
+        {
+          "x1": 71.9979,
+          "y1": 107.82500000000005,
+          "x2": 276.2002505775001,
+          "y2": 116.07500000000005
+        },
+        {
+          "x1": 60.002399999999994,
+          "y1": 138.07399999999996,
+          "x2": 90.40439999999998,
+          "y2": 153.07399999999996
+        },
+        {
+          "x1": 105.40440000000001,
+          "y1": 138.07399999999996,
+          "x2": 177.68939999999998,
+          "y2": 153.07399999999996
+        },
+        {
+          "x1": 72.0024,
+          "y1": 162.32399999999996,
+          "x2": 122.99235082500002,
+          "y2": 170.57399999999996
+        },
+        {
+          "x1": 127.12065000000001,
+          "y1": 162.32399999999996,
+          "x2": 413.4336000000002,
+          "y2": 170.57399999999996
+        },
+        {
+          "x1": 72.0024,
+          "y1": 173.8245,
+          "x2": 192.11332500000003,
+          "y2": 182.0745
+        },
+        {
+          "x1": 194.10983,
+          "y1": 173.8245,
+          "x2": 216.202505,
+          "y2": 182.0745
+        },
+        {
+          "x1": 216.2949,
+          "y1": 173.8245,
+          "x2": 240.6621,
+          "y2": 182.0745
+        },
+        {
+          "x1": 72.0024,
+          "y1": 190.3245,
+          "x2": 106.56164999999999,
+          "y2": 198.5745
+        },
+        {
+          "x1": 110.68664999999999,
+          "y1": 190.3245,
+          "x2": 140.39242499999995,
+          "y2": 198.5745
+        },
+        {
+          "x1": 142.35015,
+          "y1": 190.3245,
+          "x2": 432.04065000000014,
+          "y2": 198.5745
+        },
+        {
+          "x1": 72.0024,
+          "y1": 201.825,
+          "x2": 244.789575,
+          "y2": 210.075
+        },
+        {
+          "x1": 244.58415000000002,
+          "y1": 201.825,
+          "x2": 296.22420000000005,
+          "y2": 210.075
+        },
+        {
+          "x1": 72.0024,
+          "y1": 218.325,
+          "x2": 130.44375000000002,
+          "y2": 226.575
+        },
+        {
+          "x1": 134.5704,
+          "y1": 218.325,
+          "x2": 187.80105000000003,
+          "y2": 226.575
+        },
+        {
+          "x1": 189.7959,
+          "y1": 218.325,
+          "x2": 293.39775020624995,
+          "y2": 226.575
+        },
+        {
+          "x1": 293.17665,
+          "y1": 218.325,
+          "x2": 372.93435000000005,
+          "y2": 226.575
+        },
+        {
+          "x1": 72.0024,
+          "y1": 234.825,
+          "x2": 124.81477499999997,
+          "y2": 243.075
+        },
+        {
+          "x1": 128.93565,
+          "y1": 234.825,
+          "x2": 177.3945,
+          "y2": 243.075
+        },
+        {
+          "x1": 179.4174,
+          "y1": 234.825,
+          "x2": 303.5691749999999,
+          "y2": 243.075
+        },
+        {
+          "x1": 303.6294,
+          "y1": 234.825,
+          "x2": 382.7205,
+          "y2": 243.075
+        },
+        {
+          "x1": 72.0024,
+          "y1": 251.325,
+          "x2": 113.867025,
+          "y2": 259.575
+        },
+        {
+          "x1": 117.82289999999998,
+          "y1": 251.325,
+          "x2": 154.48094999999995,
+          "y2": 259.575
+        },
+        {
+          "x1": 156.30915,
+          "y1": 251.325,
+          "x2": 351.92985445500017,
+          "y2": 259.575
+        },
+        {
+          "x1": 351.78465,
+          "y1": 251.325,
+          "x2": 428.9551500000001,
+          "y2": 259.575
+        },
+        {
+          "x1": 71.99415,
+          "y1": 267.825,
+          "x2": 115.16722500000003,
+          "y2": 276.075
+        },
+        {
+          "x1": 119.29140000000001,
+          "y1": 267.825,
+          "x2": 271.46017499999994,
+          "y2": 276.075
+        },
+        {
+          "x1": 273.44265,
+          "y1": 267.825,
+          "x2": 325.84087500000015,
+          "y2": 276.075
+        },
+        {
+          "x1": 325.8054,
+          "y1": 267.825,
+          "x2": 352.53045000000003,
+          "y2": 276.075
+        },
+        {
+          "x1": 71.99415,
+          "y1": 284.325,
+          "x2": 120.82012491749995,
+          "y2": 292.575
+        },
+        {
+          "x1": 124.95089999999999,
+          "y1": 284.325,
+          "x2": 216.5679749999999,
+          "y2": 292.575
+        },
+        {
+          "x1": 218.5554,
+          "y1": 284.325,
+          "x2": 330.9509250000002,
+          "y2": 292.575
+        },
+        {
+          "x1": 330.97815,
+          "y1": 284.325,
+          "x2": 392.29462500000005,
+          "y2": 292.575
+        },
+        {
+          "x1": 71.99415,
+          "y1": 300.825,
+          "x2": 139.948575,
+          "y2": 309.075
+        },
+        {
+          "x1": 144.07440000825,
+          "y1": 300.825,
+          "x2": 296.22997533000006,
+          "y2": 309.075
+        },
+        {
+          "x1": 298.2339,
+          "y1": 300.825,
+          "x2": 408.48030000000006,
+          "y2": 309.075
+        },
+        {
+          "x1": 71.99415,
+          "y1": 312.3255,
+          "x2": 286.4974500000001,
+          "y2": 320.5755
+        },
+        {
+          "x1": 286.4529,
+          "y1": 312.3255,
+          "x2": 367.386225,
+          "y2": 320.5755
+        },
+        {
+          "x1": 71.99415,
+          "y1": 328.8255,
+          "x2": 124.829625,
+          "y2": 337.0755
+        },
+        {
+          "x1": 128.95215,
+          "y1": 328.8255,
+          "x2": 177.411,
+          "y2": 337.0755
+        },
+        {
+          "x1": 179.4339,
+          "y1": 328.8255,
+          "x2": 280.5912747855,
+          "y2": 337.0755
+        },
+        {
+          "x1": 280.3644,
+          "y1": 328.8255,
+          "x2": 342.3194250000001,
+          "y2": 337.0755
+        },
+        {
+          "x1": 71.99415,
+          "y1": 345.3255,
+          "x2": 122.60954999999998,
+          "y2": 353.5755
+        },
+        {
+          "x1": 126.7329,
+          "y1": 345.3255,
+          "x2": 168.58102499999998,
+          "y2": 353.5755
+        },
+        {
+          "x1": 170.5734,
+          "y1": 345.3255,
+          "x2": 275.59342477724994,
+          "y2": 353.5755
+        },
+        {
+          "x1": 275.3649,
+          "y1": 345.3255,
+          "x2": 336.95692499999996,
+          "y2": 353.5755
+        },
+        {
+          "x1": 71.9859,
+          "y1": 361.8255,
+          "x2": 118.33604999999997,
+          "y2": 370.0755
+        },
+        {
+          "x1": 122.45939999999999,
+          "y1": 361.8255,
+          "x2": 276.69975,
+          "y2": 370.0755
+        },
+        {
+          "x1": 278.6979,
+          "y1": 361.8255,
+          "x2": 383.4935250000002,
+          "y2": 370.0755
+        },
+        {
+          "x1": 383.4399,
+          "y1": 361.8255,
+          "x2": 426.07425009075007,
+          "y2": 370.0755
+        },
+        {
+          "x1": 71.99415,
+          "y1": 378.3255,
+          "x2": 118.95809999999997,
+          "y2": 386.5755
+        },
+        {
+          "x1": 123.0864,
+          "y1": 378.3255,
+          "x2": 369.6904500000003,
+          "y2": 386.5755
+        },
+        {
+          "x1": 371.6589,
+          "y1": 378.3255,
+          "x2": 421.32390000000004,
+          "y2": 386.5755
+        },
+        {
+          "x1": 421.2744,
+          "y1": 378.3255,
+          "x2": 423.64215,
+          "y2": 386.5755
+        },
+        {
+          "x1": 71.9859,
+          "y1": 389.826,
+          "x2": 318.28965000000005,
+          "y2": 398.076
+        },
+        {
+          "x1": 71.9859,
+          "y1": 406.326,
+          "x2": 118.41112499999998,
+          "y2": 414.576
+        },
+        {
+          "x1": 122.53365000824999,
+          "y1": 406.326,
+          "x2": 423.76095004949997,
+          "y2": 414.576
+        },
+        {
+          "x1": 71.9859,
+          "y1": 417.8265,
+          "x2": 199.57544999999993,
+          "y2": 426.0765
+        },
+        {
+          "x1": 71.9859,
+          "y1": 434.3265,
+          "x2": 127.11982499999999,
+          "y2": 442.5765
+        },
+        {
+          "x1": 131.24565000825,
+          "y1": 434.3265,
+          "x2": 401.5057500824996,
+          "y2": 442.5765
+        },
+        {
+          "x1": 403.50225,
+          "y1": 434.3265,
+          "x2": 417.5033250000001,
+          "y2": 442.5765
+        },
+        {
+          "x1": 71.9859,
+          "y1": 445.827,
+          "x2": 106.53195000000001,
+          "y2": 454.077
+        },
+        {
+          "x1": 106.56989999999999,
+          "y1": 445.827,
+          "x2": 431.9969249999999,
+          "y2": 454.077
+        },
+        {
+          "x1": 71.9859,
+          "y1": 457.3275,
+          "x2": 216.64057500000007,
+          "y2": 465.5775
+        },
+        {
+          "x1": 71.9859,
+          "y1": 473.8275,
+          "x2": 118.83434999999999,
+          "y2": 482.0775
+        },
+        {
+          "x1": 122.95439999999999,
+          "y1": 473.8275,
+          "x2": 338.2282499999999,
+          "y2": 482.0775
+        },
+        {
+          "x1": 340.2099,
+          "y1": 473.8275,
+          "x2": 424.4671500000002,
+          "y2": 482.0775
+        },
+        {
+          "x1": 71.97765,
+          "y1": 485.328,
+          "x2": 90.50797499999999,
+          "y2": 493.578
+        },
+        {
+          "x1": 90.4659,
+          "y1": 485.328,
+          "x2": 152.41267499999998,
+          "y2": 493.578
+        },
+        {
+          "x1": 71.97765,
+          "y1": 501.828,
+          "x2": 117.9978,
+          "y2": 510.078
+        },
+        {
+          "x1": 122.121149175,
+          "y1": 501.828,
+          "x2": 428.484011475,
+          "y2": 510.078
+        },
+        {
+          "x1": 71.97765,
+          "y1": 513.3285,
+          "x2": 141.128325,
+          "y2": 521.5785
+        },
+        {
+          "x1": 71.97765,
+          "y1": 529.8285,
+          "x2": 136.973625,
+          "y2": 538.0785
+        },
+        {
+          "x1": 141.09615,
+          "y1": 529.8285,
+          "x2": 413.4995999999999,
+          "y2": 538.0785
+        },
+        {
+          "x1": 71.97765,
+          "y1": 541.329,
+          "x2": 152.2740750000001,
+          "y2": 549.579
+        },
+        {
+          "x1": 154.27058,
+          "y1": 541.329,
+          "x2": 239.61683000000002,
+          "y2": 549.579
+        },
+        {
+          "x1": 239.40314999999998,
+          "y1": 541.329,
+          "x2": 392.82015030524997,
+          "y2": 549.579
+        },
+        {
+          "x1": 71.97765,
+          "y1": 552.8295,
+          "x2": 365.47222499174995,
+          "y2": 561.0795
+        },
+        {
+          "x1": 71.97765,
+          "y1": 569.3295,
+          "x2": 118.85167499999999,
+          "y2": 577.5795
+        },
+        {
+          "x1": 122.979149175,
+          "y1": 569.3295,
+          "x2": 420.7447458749998,
+          "y2": 577.5795
+        }
+      ]
+    },
+    {
+      "page": 126,
+      "width": 504.005,
+      "height": 657.005,
+      "text": "2.12 References 87\n\n\n[Wilkie 18]  Wilkie, T., “The RED Method: Patterns for Instrumentation & Monitoring,”\nGrafana Labs, https://www.slideshare.net/grafana/the-red-method-how-to-monitoring-your-\nmicroservices, 2018.\n\n[Eclipse 20] Eclipse Foundation, “Trace Compass,” https://www.eclipse.org/tracecompass,\naccessed 2020.\n\n[Wikipedia 20] Wikipedia, “Five Whys,” https://en.wikipedia.org/wiki/Five_whys, accessed\n2020.\n\n[Grafana 20] Grafana Labs, “Heatmap,” https://grafana.com/docs/grafana/latest/features/\npanels/heatmap, accessed 2020.\n\n[KernelShark 20] “KernelShark,” https://www.kernelshark.org, accessed 2020.\n\n[Kubernetes 20a] Kubernetes, “Horizontal Pod Autoscaler,” https://kubernetes.io/docs/tasks/\nrun-application/horizontal-pod-autoscale, accessed 2020.\n\n[R Project 20] R Project, “The R Project for Statistical Computing,” https://www.r-project.org,\naccessed 2020.",
+      "textItems": [
+        {
+          "text": "2.12",
+          "x": 370.8834,
+          "y": 33.77629999999999,
+          "width": 18.96029999999996,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "References",
+          "x": 398.8436999999999,
+          "y": 33.77629999999999,
+          "width": 45.15840000000003,
+          "height": 9,
+          "fontName": "g_d0_f1",
+          "fontSize": 9,
+          "confidence": 1
+        },
+        {
+          "text": "87",
+          "x": 463.9,
+          "y": 34.27629999999999,
+          "width": 10.10224999999997,
+          "height": 8.5,
+          "fontName": "g_d0_f1",
+          "fontSize": 8.5,
+          "confidence": 1
+        },
+        {
+          "text": "[Wilkie 18]",
+          "x": 84.002,
+          "y": 68.32399999999996,
+          "width": 45.402216749999994,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Wilkie, T., “The RED Method: Patterns for Instrumentation & Monitoring,”",
+          "x": 133.52675,
+          "y": 68.32399999999996,
+          "width": 289.11795,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Grafana Labs",
+          "x": 84.002,
+          "y": 79.82449999999994,
+          "width": 48.953024999999926,
+          "height": 8.25,
+          "fontName": "g_d0_f5",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": ", https://www.slideshare.net/grafana/the-red-method-how-to-monitoring-your-",
+          "x": 132.91625,
+          "y": 79.82449999999994,
+          "width": 306.53122499999984,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "microservices, 2018.",
+          "x": 84.002,
+          "y": 91.32500000000005,
+          "width": 78.45007499999998,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Eclipse 20]",
+          "x": 84.002,
+          "y": 107.82500000000005,
+          "width": 46.94085,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Eclipse Foundation, “Trace Compass,” https://www.eclipse.org/tracecompass,",
+          "x": 135.0695,
+          "y": 107.82500000000005,
+          "width": 297.23595000000046,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "accessed 2020.",
+          "x": 84.002,
+          "y": 119.32550000000003,
+          "width": 56.42010000000006,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Wikipedia 20]",
+          "x": 84.002,
+          "y": 135.82550000000003,
+          "width": 61.53262500000004,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Wikipedia, “Five Whys,” https://en.wikipedia.org/wiki/Five_whys, accessed",
+          "x": 149.6555,
+          "y": 135.82550000000003,
+          "width": 289.99987499999986,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "2020.",
+          "x": 84.002,
+          "y": 147.32600000000002,
+          "width": 21.888899999999992,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Grafana 20]",
+          "x": 84.002,
+          "y": 163.82600000000002,
+          "width": 51.47670000000001,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Grafana Labs, “Heatmap,” https://grafana.com/docs/grafana/latest/features/",
+          "x": 139.5987500825,
+          "y": 163.82600000000002,
+          "width": 292.13167524749986,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "panels/heatmap, accessed 2020.",
+          "x": 84.002,
+          "y": 175.3265,
+          "width": 123.04132499999996,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[KernelShark 20]",
+          "x": 84.002,
+          "y": 191.8265,
+          "width": 69.14077500000006,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "“KernelShark,” https://www.kernelshark.org, accessed 2020.",
+          "x": 157.27025,
+          "y": 191.8265,
+          "width": 231.1823249999998,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[Kubernetes 20a]",
+          "x": 84.002,
+          "y": 208.3265,
+          "width": 69.005475,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "Kubernetes, “Horizontal Pod Autoscaler,” https://kubernetes.io/docs/tasks/",
+          "x": 157.13,
+          "y": 208.3265,
+          "width": 286.8904500000002,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "run-application/horizontal-pod-autoscale, accessed 2020.",
+          "x": 84.002,
+          "y": 219.827,
+          "width": 222.31605000000002,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "[R Project 20]",
+          "x": 84.002,
+          "y": 236.327,
+          "width": 54.072975,
+          "height": 8.25,
+          "fontName": "g_d0_f9",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "R Project, “The R Project for Statistical Computing,” https://www.r-project.org,",
+          "x": 142.0325,
+          "y": 236.327,
+          "width": 295.55459999999994,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        },
+        {
+          "text": "accessed 2020.",
+          "x": 84.002,
+          "y": 247.8275,
+          "width": 56.42010000000006,
+          "height": 8.25,
+          "fontName": "g_d0_f4",
+          "fontSize": 8.25,
+          "confidence": 1
+        }
+      ],
+      "boundingBoxes": [
+        {
+          "x1": 370.8834,
+          "y1": 33.77629999999999,
+          "x2": 389.84369999999996,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 398.8436999999999,
+          "y1": 33.77629999999999,
+          "x2": 444.0020999999999,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 463.9,
+          "y1": 34.27629999999999,
+          "x2": 474.00224999999995,
+          "y2": 42.77629999999999
+        },
+        {
+          "x1": 84.002,
+          "y1": 68.32399999999996,
+          "x2": 129.40421675,
+          "y2": 76.57399999999996
+        },
+        {
+          "x1": 133.52675,
+          "y1": 68.32399999999996,
+          "x2": 422.6447,
+          "y2": 76.57399999999996
+        },
+        {
+          "x1": 84.002,
+          "y1": 79.82449999999994,
+          "x2": 132.95502499999992,
+          "y2": 88.07449999999994
+        },
+        {
+          "x1": 132.91625,
+          "y1": 79.82449999999994,
+          "x2": 439.4474749999998,
+          "y2": 88.07449999999994
+        },
+        {
+          "x1": 84.002,
+          "y1": 91.32500000000005,
+          "x2": 162.45207499999998,
+          "y2": 99.57500000000005
+        },
+        {
+          "x1": 84.002,
+          "y1": 107.82500000000005,
+          "x2": 130.94285,
+          "y2": 116.07500000000005
+        },
+        {
+          "x1": 135.0695,
+          "y1": 107.82500000000005,
+          "x2": 432.30545000000046,
+          "y2": 116.07500000000005
+        },
+        {
+          "x1": 84.002,
+          "y1": 119.32550000000003,
+          "x2": 140.42210000000006,
+          "y2": 127.57550000000003
+        },
+        {
+          "x1": 84.002,
+          "y1": 135.82550000000003,
+          "x2": 145.53462500000003,
+          "y2": 144.07550000000003
+        },
+        {
+          "x1": 149.6555,
+          "y1": 135.82550000000003,
+          "x2": 439.6553749999998,
+          "y2": 144.07550000000003
+        },
+        {
+          "x1": 84.002,
+          "y1": 147.32600000000002,
+          "x2": 105.89089999999999,
+          "y2": 155.57600000000002
+        },
+        {
+          "x1": 84.002,
+          "y1": 163.82600000000002,
+          "x2": 135.4787,
+          "y2": 172.07600000000002
+        },
+        {
+          "x1": 139.5987500825,
+          "y1": 163.82600000000002,
+          "x2": 431.7304253299999,
+          "y2": 172.07600000000002
+        },
+        {
+          "x1": 84.002,
+          "y1": 175.3265,
+          "x2": 207.04332499999995,
+          "y2": 183.5765
+        },
+        {
+          "x1": 84.002,
+          "y1": 191.8265,
+          "x2": 153.14277500000006,
+          "y2": 200.0765
+        },
+        {
+          "x1": 157.27025,
+          "y1": 191.8265,
+          "x2": 388.4525749999998,
+          "y2": 200.0765
+        },
+        {
+          "x1": 84.002,
+          "y1": 208.3265,
+          "x2": 153.007475,
+          "y2": 216.5765
+        },
+        {
+          "x1": 157.13,
+          "y1": 208.3265,
+          "x2": 444.0204500000002,
+          "y2": 216.5765
+        },
+        {
+          "x1": 84.002,
+          "y1": 219.827,
+          "x2": 306.31805,
+          "y2": 228.077
+        },
+        {
+          "x1": 84.002,
+          "y1": 236.327,
+          "x2": 138.074975,
+          "y2": 244.577
+        },
+        {
+          "x1": 142.0325,
+          "y1": 236.327,
+          "x2": 437.58709999999996,
+          "y2": 244.577
+        },
+        {
+          "x1": 84.002,
+          "y1": 247.8275,
+          "x2": 140.42210000000006,
+          "y2": 256.0775
+        }
+      ]
+    }
+  ]
+}

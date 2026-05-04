@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "reno://structured/schema/source.schema.json",
+  "title": "RENO Source Page Frontmatter",
+  "description": "Flat YAML frontmatter for bounded source pages stored under wiki/source/. Source hubs use the base summary frontmatter (frontmatter.schema.json with type=summary) and are not validated by this schema. Fields are taken from AGENTS.md; reasoning fields, Phase 3 fields, and the legacy 'domain' tag are intentionally excluded.",
+  "type": "object",
+  "required": [
+    "id",
+    "type",
+    "status",
+    "phase",
+    "parent",
+    "prev",
+    "next",
+    "source_id",
+    "raw_id",
+    "processed_ids",
+    "chunk_ids"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable kebab-case page id; equals the markdown filename without the .md suffix."
+    },
+    "type": {
+      "type": "string",
+      "enum": ["source"],
+      "description": "Bounded source pages always have type=source. Source hubs use type=summary and are not validated by this schema."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "draft",
+        "candidate",
+        "deprecated",
+        "needs-review"
+      ]
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "phase-2-source-built",
+        "phase-3-reasoned",
+        "not-applicable"
+      ],
+      "description": "Phase 1 cannot produce a source page; that is why phase-1-parsed is excluded here."
+    },
+    "parent": {
+      "type": ["string", "null"],
+      "description": "id of the source hub when one exists; null only for stand-alone single-section sources."
+    },
+    "prev": {
+      "type": ["string", "null"],
+      "description": "id of the previous bounded source page in chunk-chain order, or null for the first page."
+    },
+    "next": {
+      "type": ["string", "null"],
+      "description": "id of the next bounded source page in chunk-chain order, or null for the last known page."
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Matches processed/<source-id>/manifest.json source identity."
+    },
+    "raw_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Must equal manifest.raw_id for the same source-id."
+    },
+    "processed_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Every value must equal manifest.processed_id. A list is used so future per-section processed runs can be referenced without schema churn."
+    },
+    "chunk_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Contiguous chunk_ids, in chain order, that this bounded page extracts from. Every entry must exist as a real chunk JSON under processed/<source-id>/chunks/."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable title for this bounded slice. Optional."
+    },
+    "source_kind": {
+      "type": "string",
+      "enum": [
+        "book-section",
+        "paper-section",
+        "standard-section",
+        "technical-doc",
+        "first-party-artifact",
+        "explicit-snapshot"
+      ],
+      "description": "When present, must equal manifest.source_kind."
+    },
+    "section_range": {
+      "type": ["string", "null"],
+      "description": "When present, should match manifest.section_range for the underlying chunks."
+    }
+  }
+}

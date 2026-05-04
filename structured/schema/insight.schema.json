@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "reno://structured/schema/insight.schema.json",
+  "title": "RENO Insight Page Frontmatter",
+  "description": "Minimal flat YAML frontmatter for Phase 3 insight pages under wiki/insight/. Claims, concepts involved, source basis, and decision use belong in the markdown body.",
+  "type": "object",
+  "required": [
+    "id",
+    "type",
+    "status",
+    "phase",
+    "parent",
+    "prev",
+    "next"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "type": "string",
+      "enum": ["insight"]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "draft",
+        "candidate",
+        "deprecated",
+        "needs-review"
+      ]
+    },
+    "phase": {
+      "type": "string",
+      "enum": ["phase-3-reasoned"]
+    },
+    "parent": {
+      "type": ["string", "null"]
+    },
+    "prev": {
+      "type": ["string", "null"]
+    },
+    "next": {
+      "type": ["string", "null"]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
