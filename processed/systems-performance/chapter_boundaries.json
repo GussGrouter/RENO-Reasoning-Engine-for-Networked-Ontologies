@@ -2,8 +2,8 @@
   "source_id": "systems-performance",
   "raw_id": "systems-performance-raw-001",
   "boundary_map_version": "1.0.0",
-  "generated_from_parse": "processed/systems-performance/parse.candidate-frontmatter-contents-p1-39.json",
-  "parser_command": "liteparse parse raw/systems-performance/Systems.Performance.Enterprise.and.the.Cloud.pdf -o processed/systems-performance/parse.candidate-frontmatter-contents-p1-39.json --format json --target-pages 1-39 --no-ocr -q",
+  "generated_from_parse": "processed/systems-performance/boundary-evidence/frontmatter-contents-p1-39.parse.json",
+  "parser_command": "liteparse parse raw/systems-performance/Systems.Performance.Enterprise.and.the.Cloud.pdf -o processed/systems-performance/boundary-evidence/frontmatter-contents-p1-39.parse.json --format json --target-pages 1-39 --no-ocr -q",
   "evidence_basis": "table of contents / front matter",
   "notes": [
     "Chapter starts are taken from the Contents at a Glance entry on parse page 8.",

@@ -11,6 +11,10 @@ source_id: null
 
 # RENO Log
 
+## 2026-05-04
+
+- Repair / audit: source-id `systems-performance` — Phase 0 boundary evidence canonicalized: moved front-matter parse from `processed/systems-performance/parse.candidate-frontmatter-contents-p1-39.json` to `processed/systems-performance/boundary-evidence/frontmatter-contents-p1-39.parse.json`; `chapter_boundaries.json` field `generated_from_parse` (and recorded `parser_command` `-o` path) updated for consistency. No re-parse, re-chunk, Phase 2 source extraction, concept, or insight work; `manifest.json`, `parses/`, and `chunks/` untouched. `validate_chapter_boundaries.py --source-id systems-performance`, `validate_chunk_chain.py`, `check_indexes.py`, `validate_frontmatter.py` exited 0.
+
 ## 2026-05-03
 
 - Phase 2 extract: source-id `systems-performance`, bounded-page-id `systems-performance-ch5-applications-p210-224`, pages `210-224`, chunks `systems-performance-chapter-5-applications-chunk-0067`–`0073`; prior page `systems-performance-ch4-observability-tools-tail-p198-209` `next` updated; hub `wiki/source/systems-performance.md` updated; `validate_frontmatter.py`, `validate_chunk_chain.py`, `validate_source_provenance.py`, `check_token_budgets.py` exited 0; `check_orphans.py`, `check_broken_links.py`, `check_concept_source_support.py`, `check_phase_status.py` manual/pending unless run separately; `structured/indexes/*.jsonl` rebuilt via `scripts/build_indexes.py` and verified by `scripts/check_indexes.py`.
