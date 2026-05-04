@@ -38,7 +38,7 @@ raw -> processed chunks -> source pages -> concepts -> insights -> summaries/ind
 
 Each layer has a different authority:
 
-- `raw/`: immutable original artifacts such as PDFs, standards, papers, or explicitly requested snapshots.
+- `raw/`: immutable original artifacts on your machine (PDFs, standards, papers, or explicitly requested snapshots). This directory is **gitignored** so private or copyrighted sources are not committed; manifests and wiki provenance may still reference paths and hashes.
 - `processed/`: parser output, manifests, chunk JSON, hashes, page spans, section spans, and chunk-chain evidence. Processed data is evidence, not reasoning.
 - `wiki/source/`: bounded source-shaped memory tied to explicit chunk ranges.
 - `wiki/concept/`: reusable technical ideas created or refined only in Phase 3.
@@ -226,7 +226,7 @@ Example for Phase 2 source extraction:
 AGENTS.md          Root policy and task routing for humans/agents.
 docs/agents/       Split phase, policy, and template guidance for agents.
 prompts/           Execution prompts for Phase 0/1/2/3 and repair/audit tasks.
-raw/               Immutable original artifacts.
+raw/               Local/private originals (gitignored; do not commit copyrighted PDFs).
 processed/         Parser output, manifests, chunk JSON, and chunk chains.
 wiki/              Durable Markdown knowledge graph.
 wiki/source/       Bounded source memory tied to chunks.
@@ -240,6 +240,8 @@ scripts/           Validators, index builders, and maintenance tooling.
 ## Current Limitations / WIP
 
 - RENO is evolving and should not be treated as a finished product.
+- `raw/` is expected to exist locally for ingestion but is **ignored by git**; do not commit raw source bytes to public repos (copyrighted books, private material).
+- Processed manifests and wiki pages may reference raw paths and content hashes; those artifacts can be shared without storing the raw files themselves.
 - It is not yet a generic CLI/app or packaged workflow.
 - Ingestion prompts and validators are still being refined.
 - Source repair and graph audit workflows are present or under development as prompts/scripts in this repo, and should be treated as WIP unless validated for a specific task.
